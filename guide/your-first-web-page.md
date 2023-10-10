@@ -1,0 +1,44 @@
+## Your first web-page
+```
+<head>
+  <script src="../module/lib/ai-ui.js"></script>
+</head>
+
+<body>
+</body>
+<script>
+  /* Specify what base tags you'll reference in your UI */
+  const { h2, div, button, span } = AIUI.tag(['h2', 'div', 'button', 'span']);
+
+  /* Define a _new_ tag type, called `App`, based on the standard "<div>" tag, that is composed of some elements. It will generate markup like:
+  
+  <div>
+      <h2>Hello World</h2>
+      <button style="display: block;">What time is it?</button>
+      <div>Dunno</div>
+  </div>
+
+  */
+  const App = div.extended({
+    constructed() {
+      return [
+        h2("Hello World"),
+        button({
+          style: {
+            display: 'block'
+          }
+        },
+          "What time is it?"
+        ),
+        div("Dunno")
+      ]
+    }
+  });
+
+  /* Add add it to the document so the user can see it! */
+  document.body.appendChild(App());
+</script>
+```
+
+So far, so what? Another way of typing HTML? Not exactly ground-breaking.
+

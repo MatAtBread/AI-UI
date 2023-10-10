@@ -1,0 +1,41 @@
+{
+  "author": "matatbread",
+  "bugs": {
+    "url": "https://github.com/MatAtBread/AI-UI/issues"
+  },
+  "dependencies": {
+  },
+  "description": "A tiny, genuinely functional, UI framework for building dynamic HTML pages",
+  "devDependencies": {
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.2.2",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4"
+  },
+  "homepage": "https://github.com/MatAtBread/AI-UI#readme",
+  "keywords": [
+    "UI",
+    "framework",
+    "Javascript",
+    "Typescript",
+    "DOM",
+    "browser"
+  ],
+  "license": "MIT",
+  "main": "./lib/ai-ui.min.js",
+  "name": "@matatbread/ai-ui",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MatAtBread/AI-UI.git"
+  },
+  "scripts": {
+    "build": "npm run clean && npm run build-esm && npm run build-web-dev && npm run build-web",
+    "build-esm": "tsc -p tsconfig.json",
+    "build-web": "webpack",
+    "build-web-dev": "webpack --config webpack.dev.js",
+    "clean": "rm -rf lib/* esm/*",
+    "prepublishOnly": "npm run build"
+  },
+  "types": "./esm/ai-ui.d.ts",
+  "version": "0.9.2"
+}
