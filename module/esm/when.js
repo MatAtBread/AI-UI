@@ -3,7 +3,6 @@ import { deferred } from "./deferred.js";
 import { pushIterator, withHelpers, asyncExtras, merge } from "./iterators.js";
 const eventObservations = new Map();
 function docEventHandler(ev) {
-    var _a, _b;
     const observations = eventObservations.get(ev.type);
     if (observations) {
         for (const o of observations) {
@@ -12,7 +11,7 @@ function docEventHandler(ev) {
                 if (!document.body.contains(container)) {
                     const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
-                    (_b = (_a = push[Symbol.asyncIterator]()).throw) === null || _b === void 0 ? void 0 : _b.call(_a, new Error(msg));
+                    push[Symbol.asyncIterator]().throw?.(new Error(msg));
                 }
                 else {
                     if (selector) {
@@ -36,8 +35,7 @@ function docEventHandler(ev) {
     }
 }
 function whenEvent(container, what) {
-    var _a;
-    const parts = ((_a = what.match(/(.*)?\((.+)\)$/)) === null || _a === void 0 ? void 0 : _a.slice(1, 3)) || [what, 'change'];
+    const parts = what.match(/(.*)?\((.+)\)$/)?.slice(1, 3) || [what, 'change'];
     const [selector, eventName] = parts;
     if (!eventObservations.has(eventName)) {
         document.addEventListener(eventName, docEventHandler, {
@@ -46,7 +44,7 @@ function whenEvent(container, what) {
         });
         eventObservations.set(eventName, new Set());
     }
-    const push = pushIterator(() => { var _a; return (_a = eventObservations.get(eventName)) === null || _a === void 0 ? void 0 : _a.delete(details); });
+    const push = pushIterator(() => eventObservations.get(eventName)?.delete(details));
     const details = {
         push,
         container,
@@ -120,8 +118,8 @@ export function when(container, ...sources) {
                         : (neverGonnaHappen());
                 const events = merged[Symbol.asyncIterator]();
                 ai.next = () => events.next();
-                ai.return = (value) => { var _a, _b; return (_b = (_a = events.return) === null || _a === void 0 ? void 0 : _a.call(events, value)) !== null && _b !== void 0 ? _b : Promise.resolve({ done: true, value }); };
-                ai.throw = (...args) => { var _a, _b; return (_b = (_a = events.throw) === null || _a === void 0 ? void 0 : _a.call(events, args)) !== null && _b !== void 0 ? _b : Promise.reject({ done: true, value: args[0] }); };
+                ai.return = (value) => events.return?.(value) ?? Promise.resolve({ done: true, value });
+                ai.throw = (...args) => events.throw?.(args) ?? Promise.reject({ done: true, value: args[0] });
                 return { done: false, value: {} };
             }
         };
@@ -139,9 +137,8 @@ function elementIsInDOM(elt) {
         return Promise.resolve();
     const d = deferred();
     new MutationObserver((records, mutation) => {
-        var _a;
         for (const record of records) {
-            if ((_a = record.addedNodes) === null || _a === void 0 ? void 0 : _a.length) {
+            if (record.addedNodes?.length) {
                 if (document.body.contains(elt)) {
                     mutation.disconnect();
                     d.resolve();
@@ -170,9 +167,8 @@ function allSelectorsPresent(container, missing) {
     }
     /*** */
     new MutationObserver((records, mutation) => {
-        var _a;
         for (const record of records) {
-            if ((_a = record.addedNodes) === null || _a === void 0 ? void 0 : _a.length) {
+            if (record.addedNodes?.length) {
                 missing = missing.filter(sel => !container.querySelector(sel));
                 if (!missing.length) {
                     mutation.disconnect();

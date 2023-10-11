@@ -45,7 +45,7 @@ class QueueIteratableIterator {
             catch (ex) { }
             while (this._pending.length)
                 this._pending.shift().reject(value);
-            this._items.splice(0, this._items.length);
+            this._items = this._pending = null;
         }
         return Promise.resolve(value);
     }
@@ -58,14 +58,14 @@ class QueueIteratableIterator {
             catch (ex) { }
             while (this._pending.length)
                 this._pending.shift().reject(value);
-            this._items.splice(0, this._items.length);
+            this._items = this._pending = null;
         }
         return Promise.resolve(value);
     }
     push(value) {
         if (!this._pending) {
             //throw new Error("pushIterator has stopped");
-            return true;
+            return false;
         }
         if (this._pending.length) {
             this._pending.shift().resolve({ done: false, value });
@@ -73,7 +73,7 @@ class QueueIteratableIterator {
         else {
             this._items.push(value);
         }
-        return false;
+        return true;
     }
 }
 /* An AsyncIterable which typed objects can be published to.
@@ -106,8 +106,7 @@ export function pushIterator(stop = () => { }, bufferWhenNoConsumers = false) {
             return ai.push(value);
         },
         close(ex) {
-            var _a, _b;
-            ex ? (_a = ai.throw) === null || _a === void 0 ? void 0 : _a.call(ai, ex) : (_b = ai.return) === null || _b === void 0 ? void 0 : _b.call(ai);
+            ex ? ai.throw?.(ex) : ai.return?.();
             // This should never be referenced again, but if it is, it will throw
             ai = null;
         }
@@ -138,16 +137,16 @@ export function broadcastIterator(stop = () => { }) {
             return withHelpers(added);
         },
         push(value) {
-            if (!(ai === null || ai === void 0 ? void 0 : ai.size))
+            if (!ai?.size)
                 return false;
             for (const q of ai.values()) {
                 q.push(value);
             }
+            return true;
         },
         close(ex) {
-            var _a, _b;
             for (const q of ai.values()) {
-                ex ? (_a = q.throw) === null || _a === void 0 ? void 0 : _a.call(q, ex) : (_b = q.return) === null || _b === void 0 ? void 0 : _b.call(q);
+                ex ? q.throw?.(ex) : q.return?.();
             }
             // This should never be referenced again, but if it is, it will throw
             ai = null;
@@ -176,28 +175,25 @@ export const merge = (...ai) => {
                         return result;
                     }
                 }).catch(ex => {
-                    var _a, _b;
-                    return (_b = (_a = this.throw) === null || _a === void 0 ? void 0 : _a.call(this, ex)) !== null && _b !== void 0 ? _b : Promise.reject({ done: true, value: new Error("Iterator merge exception") });
+                    return this.throw?.(ex) ?? Promise.reject({ done: true, value: new Error("Iterator merge exception") });
                 })
                 : Promise.reject({ done: true, value: new Error("Iterator merge complete") });
         },
         return() {
-            var _a, _b;
             const ex = new Error("Merge terminated");
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    (_b = (_a = it[i]).return) === null || _b === void 0 ? void 0 : _b.call(_a, { done: true, value: ex }); // Terminate the sources with the appropriate cause
+                    it[i].return?.({ done: true, value: ex }); // Terminate the sources with the appropriate cause
                 }
             }
             return Promise.resolve({ done: true, value: ex });
         },
         throw(ex) {
-            var _a, _b;
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    (_b = (_a = it[i]).throw) === null || _b === void 0 ? void 0 : _b.call(_a, ex); // Terminate the sources with the appropriate cause
+                    it[i].throw?.(ex); // Terminate the sources with the appropriate cause
                 }
             }
             return Promise.reject(ex);
@@ -223,29 +219,30 @@ export function withHelpers(ai) {
 }
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
 async function* map(mapper) {
-    var _a, _b;
     const ai = this[Symbol.asyncIterator]();
     try {
         while (true) {
             const p = await ai.next();
             if (p.done) {
-                return (_a = ai.return) === null || _a === void 0 ? void 0 : _a.call(ai, mapper(p.value));
+                return ai.return?.(mapper(p.value));
             }
             yield mapper(p.value);
         }
     }
     catch (ex) {
-        (_b = ai.throw) === null || _b === void 0 ? void 0 : _b.call(ai, ex);
+        ai.throw?.(ex);
+    }
+    finally {
+        ai.return?.();
     }
 }
 async function* filter(fn) {
-    var _a, _b;
     const ai = this[Symbol.asyncIterator]();
     try {
         while (true) {
             const p = await ai.next();
             if (p.done) {
-                return (_a = ai.return) === null || _a === void 0 ? void 0 : _a.call(ai, p.value);
+                return ai.return?.(p.value);
             }
             if (await fn(p.value)) {
                 yield p.value;
@@ -253,7 +250,10 @@ async function* filter(fn) {
         }
     }
     catch (ex) {
-        (_b = ai.throw) === null || _b === void 0 ? void 0 : _b.call(ai, ex);
+        ai.throw?.(ex);
+    }
+    finally {
+        ai.return?.();
     }
 }
 async function* initially(initValue) {
@@ -262,14 +262,13 @@ async function* initially(initValue) {
         yield u;
 }
 async function* throttle(milliseconds) {
-    var _a, _b;
     const ai = this[Symbol.asyncIterator]();
     let paused = 0;
     try {
         while (true) {
             const p = await ai.next();
             if (p.done) {
-                return (_a = ai.return) === null || _a === void 0 ? void 0 : _a.call(ai, p.value);
+                return ai.return?.(p.value);
             }
             const now = Date.now();
             if (paused < now) {
@@ -279,13 +278,15 @@ async function* throttle(milliseconds) {
         }
     }
     catch (ex) {
-        (_b = ai.throw) === null || _b === void 0 ? void 0 : _b.call(ai, ex);
+        ai.throw?.(ex);
+    }
+    finally {
+        ai.return?.();
     }
 }
 const forever = new Promise(() => { });
 // NB: DEBOUNCE IS CURRENTLY BROKEN
 async function* debounce(milliseconds) {
-    var _a, _b;
     const ai = this[Symbol.asyncIterator]();
     let timer = forever;
     let last = -1;
@@ -293,7 +294,7 @@ async function* debounce(milliseconds) {
         while (true) {
             const p = await Promise.race([ai.next(), timer]);
             if ('done' in p && p.done)
-                return (_a = ai.return) === null || _a === void 0 ? void 0 : _a.call(ai, p.value);
+                return ai.return?.(p.value);
             if ('debounced' in p && p.debounced) {
                 if (p.debounced === last)
                     yield p.value;
@@ -310,24 +311,29 @@ async function* debounce(milliseconds) {
         }
     }
     catch (ex) {
-        (_b = ai.throw) === null || _b === void 0 ? void 0 : _b.call(ai, ex);
+        ai.throw?.(ex);
+    }
+    finally {
+        ai.return?.();
     }
 }
 async function* waitFor(cb) {
-    var _a, _b;
     const ai = this[Symbol.asyncIterator]();
     try {
         while (true) {
             const p = await ai.next();
             if (p.done) {
-                return (_a = ai.return) === null || _a === void 0 ? void 0 : _a.call(ai, p.value);
+                return ai.return?.(p.value);
             }
             await new Promise(resolve => cb(resolve));
             yield p.value;
         }
     }
     catch (ex) {
-        (_b = ai.throw) === null || _b === void 0 ? void 0 : _b.call(ai, ex);
+        ai.throw?.(ex);
+    }
+    finally {
+        ai.return?.();
     }
 }
 async function* count(field) {
@@ -343,7 +349,10 @@ async function* count(field) {
         }
     }
     catch (ex) {
-        throw ex;
+        ai.throw?.(ex);
+    }
+    finally {
+        ai.return?.();
     }
 }
 function retain() {
@@ -357,12 +366,10 @@ function retain() {
             return n;
         },
         return(value) {
-            var _a, _b;
-            return (_b = (_a = ai.return) === null || _a === void 0 ? void 0 : _a.call(ai, value)) !== null && _b !== void 0 ? _b : Promise.resolve({ done: true, value });
+            return ai.return?.(value) ?? Promise.resolve({ done: true, value });
         },
         throw(...args) {
-            var _a, _b;
-            return (_b = (_a = ai.throw) === null || _a === void 0 ? void 0 : _a.call(ai, args)) !== null && _b !== void 0 ? _b : Promise.resolve({ done: true, value: args[0] });
+            return ai.throw?.(args) ?? Promise.resolve({ done: true, value: args[0] });
         },
         get value() {
             return prev.value;
@@ -374,7 +381,7 @@ function retain() {
 }
 function broadcast(pipe = (x => x)) {
     const ai = this[Symbol.asyncIterator]();
-    const b = broadcastIterator( /*() => console.log("..stooped")*/);
+    const b = broadcastIterator(() => ai.return?.());
     (function update() {
         ai.next().then(v => {
             if (v.done) {

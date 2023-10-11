@@ -101,10 +101,6 @@ interface ExtendedTag<Base extends Element, Super> {
     S extends string | undefined,
     X extends Instance<V>,
     V extends {},
-    // @ts-ignore - the constraint "Element" fails here as overrides might hide the 
-    // true nature of the underlying Element object, but in fact it IS an element (since
-    // only "real" elements can be a base for an ExtendedTag), even tho the extended({})
-    // API allows the programmer to hide that behaviour
     CET extends Element = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
   >(_: ((i: Instance<V>) => {
     constructed?: C
@@ -120,10 +116,6 @@ interface ExtendedTag<Base extends Element, Super> {
     I extends { [id: string]: TagCreator<Element> },
     P extends {},
     S extends string | undefined,
-    // @ts-ignore - the constraint "Element" fails here as overrides might hide the 
-    // true nature of the underlying Element object, but in fact it IS an element (since
-    // only "real" elements can be a base for an ExtendedTag), even tho the extended({})
-    // API allows the programmer to hide that behaviour
     CET extends Element = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
   >(_: {
     constructed?: C
@@ -167,118 +159,14 @@ interface TagLoader {
 }
 
 const standandTags = [
-  "a",
-  "abbr",
-  "address",
-  "area",
-  "article",
-  "aside",
-  "audio",
-  "b",
-  "base",
-  "bdi",
-  "bdo",
-  "blockquote",
-  "body",
-  "br",
-  "button",
-  "canvas",
-  "caption",
-  "cite",
-  "code",
-  "col",
-  "colgroup",
-  "data",
-  "datalist",
-  "dd",
-  "del",
-  "details",
-  "dfn",
-  "dialog",
-  "div",
-  "dl",
-  "dt",
-  "em",
-  "embed",
-  "fieldset",
-  "figcaption",
-  "figure",
-  "footer",
-  "form",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "head",
-  "header",
-  "hgroup",
-  "hr",
-  "html",
-  "i",
-  "iframe",
-  "img",
-  "input",
-  "ins",
-  "kbd",
-  "label",
-  "legend",
-  "li",
-  "link",
-  "main",
-  "map",
-  "mark",
-  "menu",
-  "meta",
-  "meter",
-  "nav",
-  "noscript",
-  "object",
-  "ol",
-  "optgroup",
-  "option",
-  "output",
-  "p",
-  "picture",
-  "pre",
-  "progress",
-  "q",
-  "rp",
-  "rt",
-  "ruby",
-  "s",
-  "samp",
-  "script",
-  "search",
-  "section",
-  "select",
-  "slot",
-  "small",
-  "source",
-  "span",
-  "strong",
-  "style",
-  "sub",
-  "summary",
-  "sup",
-  "table",
-  "tbody",
-  "td",
-  "template",
-  "textarea",
-  "tfoot",
-  "th",
-  "thead",
-  "time",
-  "title",
-  "tr",
-  "track",
-  "u",
-  "ul",
-  "var",
-  "video",
-  "wbr"
+  "a","abbr","address","area","article","aside","audio","b","base","bdi","bdo","blockquote","body","br","button",
+  "canvas","caption","cite","code","col","colgroup","data","datalist","dd","del","details","dfn","dialog","div",
+  "dl","dt","em","embed","fieldset","figcaption","figure","footer","form","h1","h2","h3","h4","h5","h6","head",
+  "header","hgroup","hr","html","i","iframe","img","input","ins","kbd","label","legend","li","link","main","map",
+  "mark","menu","meta","meter","nav","noscript","object","ol","optgroup","option","output","p","picture","pre",
+  "progress","q","rp","rt","ruby","s","samp","script","search","section","select","slot","small","source","span",
+  "strong","style","sub","summary","sup","table","tbody","td","template","textarea","tfoot","th","thead","time",
+  "title","tr","track","u","ul","var","video","wbr"
 ] as const;
 
 /* Members applied to EVERY tag created, even base tags */
@@ -411,6 +299,7 @@ export const tag = <TagLoader>function <Tags extends string,
         let t: ReturnType<ReturnType<typeof appender>> = [dpm];
 
         const error = (errorValue: any) => {
+          ap.return?.(errorValue);
           const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
           if (n[0].parentNode) {
             t = appender(n[0].parentNode, n[0])(DyamicElementError(errorValue.toString()));
@@ -585,6 +474,7 @@ export const tag = <TagLoader>function <Tags extends string,
                   }
                 };
                 const error = (errorValue: any) => {
+                  ap.return?.(errorValue);
                   console.warn("Dynamic attribute error", errorValue, k, d, base);
                   appender(base)(DyamicElementError(errorValue.toString()));
                 }

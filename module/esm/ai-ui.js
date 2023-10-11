@@ -2,7 +2,7 @@ import { when } from './when.js';
 export { when } from './when.js';
 const DEBUG = false;
 function isAsyncIterator(o) {
-    return typeof (o === null || o === void 0 ? void 0 : o.next) === 'function';
+    return typeof o?.next === 'function';
 }
 export function isAsyncIterable(o) {
     return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
@@ -21,118 +21,14 @@ function asyncIterator(o) {
     throw new Error("Not as async provider");
 }
 const standandTags = [
-    "a",
-    "abbr",
-    "address",
-    "area",
-    "article",
-    "aside",
-    "audio",
-    "b",
-    "base",
-    "bdi",
-    "bdo",
-    "blockquote",
-    "body",
-    "br",
-    "button",
-    "canvas",
-    "caption",
-    "cite",
-    "code",
-    "col",
-    "colgroup",
-    "data",
-    "datalist",
-    "dd",
-    "del",
-    "details",
-    "dfn",
-    "dialog",
-    "div",
-    "dl",
-    "dt",
-    "em",
-    "embed",
-    "fieldset",
-    "figcaption",
-    "figure",
-    "footer",
-    "form",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "head",
-    "header",
-    "hgroup",
-    "hr",
-    "html",
-    "i",
-    "iframe",
-    "img",
-    "input",
-    "ins",
-    "kbd",
-    "label",
-    "legend",
-    "li",
-    "link",
-    "main",
-    "map",
-    "mark",
-    "menu",
-    "meta",
-    "meter",
-    "nav",
-    "noscript",
-    "object",
-    "ol",
-    "optgroup",
-    "option",
-    "output",
-    "p",
-    "picture",
-    "pre",
-    "progress",
-    "q",
-    "rp",
-    "rt",
-    "ruby",
-    "s",
-    "samp",
-    "script",
-    "search",
-    "section",
-    "select",
-    "slot",
-    "small",
-    "source",
-    "span",
-    "strong",
-    "style",
-    "sub",
-    "summary",
-    "sup",
-    "table",
-    "tbody",
-    "td",
-    "template",
-    "textarea",
-    "tfoot",
-    "th",
-    "thead",
-    "time",
-    "title",
-    "tr",
-    "track",
-    "u",
-    "ul",
-    "var",
-    "video",
-    "wbr"
+    "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
+    "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",
+    "dl", "dt", "em", "embed", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "head",
+    "header", "hgroup", "hr", "html", "i", "iframe", "img", "input", "ins", "kbd", "label", "legend", "li", "link", "main", "map",
+    "mark", "menu", "meta", "meter", "nav", "noscript", "object", "ol", "optgroup", "option", "output", "p", "picture", "pre",
+    "progress", "q", "rp", "rt", "ruby", "s", "samp", "script", "search", "section", "select", "slot", "small", "source", "span",
+    "strong", "style", "sub", "summary", "sup", "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead", "time",
+    "title", "tr", "track", "u", "ul", "var", "video", "wbr"
 ];
 const elementProtype = {
     get ids() {
@@ -199,7 +95,6 @@ export const tag = function (_1, _2, _3) {
     function nodes(...c) {
         const appended = [];
         (function children(c) {
-            var _a;
             if (c === undefined || c === null)
                 return;
             if (isPromiseLike(c)) {
@@ -210,7 +105,7 @@ export const tag = function (_1, _2, _3) {
                     const old = g;
                     if (old[0].parentElement) {
                         appender(old[0].parentElement, old[0])(n);
-                        old.forEach(e => { var _a; return (_a = e.parentElement) === null || _a === void 0 ? void 0 : _a.removeChild(e); });
+                        old.forEach(e => e.parentElement?.removeChild(e));
                     }
                     g = n;
                 }, x => {
@@ -224,35 +119,35 @@ export const tag = function (_1, _2, _3) {
                 return;
             }
             if (isAsyncIter(c)) {
-                const insertionStack = DEBUG ? ('\n' + ((_a = new Error().stack) === null || _a === void 0 ? void 0 : _a.replace(/^Error: /, "Insertion :"))) : '';
+                const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
                 const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
                 const dpm = DomPromiseContainer();
                 appended.push(dpm);
                 let t = [dpm];
                 const error = (errorValue) => {
+                    ap.return?.(errorValue);
                     const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
                     if (n[0].parentNode) {
                         t = appender(n[0].parentNode, n[0])(DyamicElementError(errorValue.toString()));
-                        n.forEach(e => { var _a; return (_a = e.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(e); });
+                        n.forEach(e => e.parentNode?.removeChild(e));
                     }
                     else
                         console.warn("Can't report error", errorValue, t);
                 };
                 const update = (es) => {
-                    var _a;
                     if (!es.done) {
-                        const n = (Array.isArray(t) ? t : [t]).filter(e => { var _a; return (_a = e.ownerDocument) === null || _a === void 0 ? void 0 : _a.body.contains(e); });
+                        const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
                         if (!n.length || !n[0].parentNode)
                             throw new Error("Element(s) no longer exist in document" + insertionStack);
-                        t = appender(n[0].parentNode, n[0])((_a = es.value) !== null && _a !== void 0 ? _a : DomPromiseContainer());
-                        n.forEach(e => { var _a; return (_a = e.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(e); });
+                        t = appender(n[0].parentNode, n[0])(es.value ?? DomPromiseContainer());
+                        n.forEach(e => e.parentNode?.removeChild(e));
                         ap.next().then(update).catch(error);
                     }
                 };
                 ap.next().then(update).catch(error);
                 return;
             }
-            if (typeof c === 'object' && (c === null || c === void 0 ? void 0 : c[Symbol.iterator])) {
+            if (typeof c === 'object' && c?.[Symbol.iterator]) {
                 for (const d of c)
                     children(d);
                 return;
@@ -370,12 +265,11 @@ export const tag = function (_1, _2, _3) {
                             if (isAsyncIter(value)) {
                                 const ap = asyncIterator(value);
                                 const update = (es) => {
-                                    var _a;
                                     if (!base.ownerDocument.contains(base)) {
                                         /* This element has been removed from the doc. Tell the source ap
                                           to stop sending us stuff */
                                         //throw new Error("Element no longer exists in document (update " + k + ")");
-                                        (_a = ap.return) === null || _a === void 0 ? void 0 : _a.call(ap, new Error("Element no longer exists in document (update " + k + ")"));
+                                        ap.return?.(new Error("Element no longer exists in document (update " + k + ")"));
                                         return;
                                     }
                                     if (!es.done) {
@@ -393,7 +287,7 @@ export const tag = function (_1, _2, _3) {
                                             a primitive
                                             */
                                             const destDesc = Object.getOwnPropertyDescriptor(d, k);
-                                            if (k === 'style' || !(destDesc === null || destDesc === void 0 ? void 0 : destDesc.set))
+                                            if (k === 'style' || !destDesc?.set)
                                                 assign(d[k], es.value);
                                             else
                                                 d[k] = es.value;
@@ -407,6 +301,7 @@ export const tag = function (_1, _2, _3) {
                                     }
                                 };
                                 const error = (errorValue) => {
+                                    ap.return?.(errorValue);
                                     console.warn("Dynamic attribute error", errorValue, k, d, base);
                                     appender(base)(DyamicElementError(errorValue.toString()));
                                 };
@@ -466,7 +361,6 @@ export const tag = function (_1, _2, _3) {
         const eltNewDiv = NewDiv({attrs},...children)
     */
     function extended(_overrides) {
-        var _a, _b, _c, _d;
         const overrides = (typeof _overrides !== 'function')
             ? (instance) => _overrides
             : _overrides;
@@ -483,10 +377,9 @@ export const tag = function (_1, _2, _3) {
         // Here's where we actually create the tag, by accumulating all the base attributes and
         // (finally) assigning those specified by the instantiation
         const extendTagFn = (attrs, ...children) => {
-            var _a, _b, _c;
             const noAttrs = isChildTag(attrs);
             const newCallStack = [];
-            const combinedAttrs = { [callStackSymbol]: (_a = (noAttrs ? newCallStack : attrs[callStackSymbol])) !== null && _a !== void 0 ? _a : newCallStack };
+            const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack };
             const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
             e.constructor = extendTag;
             const ped = {};
@@ -497,7 +390,7 @@ export const tag = function (_1, _2, _3) {
                 if (!noAttrs)
                     assignProps(e, attrs);
                 while (newCallStack.length) {
-                    const children = (_c = (_b = newCallStack.shift()) === null || _b === void 0 ? void 0 : _b.constructed) === null || _c === void 0 ? void 0 : _c.call(e);
+                    const children = newCallStack.shift()?.constructed?.call(e);
                     if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
                         appender(e)(children);
                 }
@@ -515,10 +408,9 @@ export const tag = function (_1, _2, _3) {
         });
         const fullProto = {};
         (function walkProto(creator) {
-            var _a, _b;
-            if (creator === null || creator === void 0 ? void 0 : creator.super)
+            if (creator?.super)
                 walkProto(creator.super);
-            const proto = (_b = (_a = creator.overrides) === null || _a === void 0 ? void 0 : _a.call(creator, staticInstance)) === null || _b === void 0 ? void 0 : _b.prototype;
+            const proto = creator.overrides?.(staticInstance)?.prototype;
             if (proto) {
                 deepDefine(fullProto, proto);
             }
@@ -531,7 +423,7 @@ export const tag = function (_1, _2, _3) {
             && typeof staticExtensions.prototype.className === 'string'
             ? staticExtensions.prototype.className
             : '?';
-        const callSite = ((_d = (_c = (_b = (_a = new Error().stack) === null || _a === void 0 ? void 0 : _a.split('\n')[2]) === null || _b === void 0 ? void 0 : _b.match(/\((.*)\)/)) === null || _c === void 0 ? void 0 : _c[1]) !== null && _d !== void 0 ? _d : '?');
+        const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
         Object.defineProperty(extendTag, "name", {
             value: "<ai-" + creatorName + " @" + callSite + ">"
         });
@@ -598,9 +490,8 @@ const DomPromiseContainer = AsyncDOMContainer.extended({
         className: 'promise'
     },
     constructed() {
-        var _a;
         return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG
-            ? (_a = new Error("Constructed").stack) === null || _a === void 0 ? void 0 : _a.replace(/^Error: /, '')
+            ? new Error("Constructed").stack?.replace(/^Error: /, '')
             : undefined);
     }
 });

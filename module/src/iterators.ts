@@ -4,7 +4,7 @@ import { DeferredPromise, deferred } from "./deferred.js";
 /* Things to suppliement the JS base AsyncIterable */
 
 export type PushIterator<T> = AsyncExtraIterable<T> & {
-  push(value: T): boolean;  // Push a new value to consumers
+  push(value: T): boolean;  // Push a new value to consumers. Returns false if all the consumers have gone
   close(ex?: Error): void;  // Tell the consumer we're done, with an optional error
 };
 export type BroadcastIterator<T> = PushIterator<T>;
@@ -34,8 +34,8 @@ export const asyncExtras = {
 };
 
 class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
-  private _pending = [] as DeferredPromise<IteratorYieldResult<T>>[];
-  private _items = [] as T[];
+  private _pending = [] as DeferredPromise<IteratorYieldResult<T>>[] | null;
+  private _items = [] as T[] | null;
 
   constructor(private readonly stop = () => { }) {
   }
@@ -45,12 +45,12 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   }
 
   next() {
-    if (this._items.length) {
-      return Promise.resolve({ done: false, value: this._items.shift()! });
+    if (this._items!.length) {
+      return Promise.resolve({ done: false, value: this._items!.shift()! });
     } 
     
     const value = deferred<IteratorYieldResult<T>>();
-    this._pending.push(value);
+    this._pending!.push(value);
     return value;
   }
 
@@ -60,8 +60,8 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
       try { this.stop() } catch (ex) { }
       while(this._pending.length)
         this._pending.shift()!.reject(value);
-      this._items.splice(0, this._items.length);
-    }
+        this._items = this._pending = null;
+      }
     return Promise.resolve(value);
   }
 
@@ -71,7 +71,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
       try { this.stop() } catch (ex) { }
       while(this._pending.length)
         this._pending.shift()!.reject(value);
-      this._items.splice(0, this._items.length);
+      this._items = this._pending = null;
     }
     return Promise.resolve(value);
   }
@@ -79,14 +79,14 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   push(value: T) {
     if (!this._pending) {
       //throw new Error("pushIterator has stopped");
-      return true;
+      return false;
     }
     if (this._pending.length) {
       this._pending.shift()!.resolve({ done: false, value });
     } else {
-      this._items.push(value);
+      this._items!.push(value);
     }
-    return false;
+    return true;
   }
 }
 
@@ -155,6 +155,7 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
       for (const q of ai.values()) {
         q.push(value);
       }
+      return true;
     },
     close(ex?: Error) {
       for (const q of ai.values()) {
@@ -253,6 +254,8 @@ async function* map<U, R>(this: AsyncIterable<U>, mapper: (o: U) => R | PromiseL
     }
   } catch (ex) {
     ai.throw?.(ex);
+  } finally {
+    ai.return?.();
   }
 }
 
@@ -270,6 +273,8 @@ async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | Promis
     }
   } catch (ex) {
     ai.throw?.(ex);
+  } finally {
+    ai.return?.();
   }
 }
 
@@ -297,6 +302,8 @@ async function* throttle<U>(this: AsyncIterable<U>, milliseconds: number): Async
     }
   } catch (ex) {
     ai.throw?.(ex);
+  } finally {
+    ai.return?.();
   }
 }
 
@@ -327,6 +334,8 @@ async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): Async
     }
   } catch (ex) {
     ai.throw?.(ex);
+  } finally {
+    ai.return?.();
   }
 }
 
@@ -343,6 +352,8 @@ async function* waitFor<U>(this: AsyncIterable<U>, cb: (done: (...a: unknown[]) 
     }
   } catch (ex) {
     ai.throw?.(ex);
+  } finally {
+    ai.return?.();
   }
 }
 
@@ -358,7 +369,9 @@ async function* count<U extends {}, K extends string>(this: AsyncIterable<U>, fi
       yield counted;
     }
   } catch (ex) {
-    throw ex;
+    ai.throw?.(ex);
+  } finally {
+    ai.return?.();
   }
 }
 
@@ -389,7 +402,7 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
 
 function broadcast<U, X>(this: AsyncIterable<U>, pipe: ((dest: AsyncIterable<U>) => AsyncIterable<X>) = (x => x as unknown as AsyncIterable<X>)): AsyncIterable<X> {
   const ai = this[Symbol.asyncIterator]();
-  const b = broadcastIterator<U>(/*() => console.log("..stooped")*/);
+  const b = broadcastIterator<U>(() => ai.return?.());
   (function update() {
     ai.next().then(v => {
       if (v.done) {

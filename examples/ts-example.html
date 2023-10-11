@@ -28,10 +28,10 @@
         ],
         "module": 6,
         "target": 7
-      });
+      }, tsFile);
       const script = document.createElement('script');
-      script.setAttribute('type', 'module')
-      script.append(jsCode);
+      script.setAttribute('type', 'module');
+      script.append(jsCode + '\n//# sourceURL=./'+tsFile);
       document.body.innerHTML = '';
       document.body.append(script);
     })

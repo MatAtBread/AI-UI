@@ -9,10 +9,16 @@ const sleep = function <T>(millis: number, r?: T) {
   });
 };
 
-const mousePos = broadcastIterator<{x: number, y: number}>(()=>console.log("stop mousePos"));
-window.addEventListener('mousemove', function handle(e) {
-  mousePos.push({x: e.clientX, y: e.clientY});
+function mousemove(e) {
+  if (!mousePos.push({x: e.clientX, y: e.clientY})) {
+    console.log("mousPos closed!!");
+  }
+}
+const mousePos = broadcastIterator<{x: number, y: number}>(()=>{
+  console.log("stop mousePos")
+  window.removeEventListener('mousemove', mousemove);
 });
+window.addEventListener('mousemove', mousemove);
 
 const Lazy = h2.extended((instance:{ myAttr: number }) => ({
   styles:`
@@ -79,13 +85,16 @@ const Laziest = Lazier.extended({
   `
 });
 
-(window as any).Laziest = Laziest;
-
 const App = div.extended({
   styles:`
   .App {
     background-color: #ddd;
     padding: 0.3em;
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    bottom: 4px;
+    right: 4px;
   }
   `,
   ids:{
@@ -144,8 +153,6 @@ const App = div.extended({
 
       div(this.when('#lazy','@ready')(()=> this.ids.lazy.thing)),
 
-      Laziest.myAttr,
-
       Laziest({ id: 'lazy'}, 'Lovely!'), pre(Laziest.valueOf()),
       Laziest.super('Super!'), pre(Laziest.super.valueOf()),
       Laziest.super.super('Super duper!'), pre(Laziest.super.super.valueOf()),
@@ -167,14 +174,14 @@ const Block = div.extended({
     className:'RedBlock',
     style: {
       backgroundColor: 'magenta'
-    } //as Partial<CSSStyleDeclaration>
+    }
   }
 });
 
 const xy = mousePos.waitFor(done => setTimeout(done, 40)).map(({x,y}) => ({
   left: `${x + 20}px`,
   top: `${y + 20}px`
-} as Partial<CSSStyleDeclaration>));
+}));
 
 
 let app: ReturnType<typeof App>;
