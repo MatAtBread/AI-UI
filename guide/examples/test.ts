@@ -1,5 +1,5 @@
-import { tag } from '../module/esm/ai-ui.js';
-import { broadcastIterator, withHelpers } from '../module/esm/iterators.js'
+import { tag } from '../../module/esm/ai-ui.js';
+import { broadcastIterator, withHelpers } from '../../module/esm/iterators.js'
 
 const { div, h2, input, span, pre, button } = tag();
 
