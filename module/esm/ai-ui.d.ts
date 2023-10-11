@@ -35,6 +35,7 @@ type CommonKeys<A, B> = keyof A & keyof B;
 type OverrideMembers<Override, Base> = Override extends Array<any> ? Override : Omit<Override & Base, CommonKeys<Override, Base>> & {
     [K in CommonKeys<Override, Base>]: Override[K] extends object ? Override[K] extends Function ? Override[K] : Base[K] extends object ? OverrideMembers<Override[K], Base[K]> : Override[K] : Override[K];
 };
+type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 interface ExtendedTag<Base extends Element, Super> {
     <C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<Element>;
@@ -43,7 +44,7 @@ interface ExtendedTag<Base extends Element, Super> {
         ids?: I;
         prototype?: P;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET>>)): TagCreator<CET, Super> & P;
+    } & ThisType<AsyncGeneratedObject<CET>>)): TagCreator<CET, Super> & StaticMembers<P, Base>;
     <C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<Element>;
     }, P extends {}, S extends string | undefined, CET extends Element = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>>(_: {
@@ -51,7 +52,7 @@ interface ExtendedTag<Base extends Element, Super> {
         ids?: I;
         prototype?: P;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, Super> & P;
+    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, Super> & StaticMembers<P, Base>;
 }
 export interface TagCreator<Base extends Element, Super = never, CAT = PossiblyAsync<DeepPartial<Base>> & ThisType<Base>> {
     (attrs: CAT): Base & ImplicitElementMethods;

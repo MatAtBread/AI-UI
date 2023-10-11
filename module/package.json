@@ -36,6 +36,6 @@
     "clean": "rm -rf lib/* esm/*",
     "prepublishOnly": "npm run build"
   },
-  "types": "./esm/ai-ui.d.ts",
+  "types": "./esm/*.d.ts",
   "version": "0.9.4"
 }

@@ -89,6 +89,8 @@ type OverrideMembers<Override, Base> = Override extends Array<any>
     : Override[K] // Neither are objects - just accept the Override primitive in place of teh Base primitive
   };
 
+type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
+  
 interface ExtendedTag<Base extends Element, Super> {
   // Functional, with a private Instance
   <
@@ -109,7 +111,7 @@ interface ExtendedTag<Base extends Element, Super> {
     prototype?: P;
     styles?: S
   } & ThisType<AsyncGeneratedObject<CET>>))
-    : TagCreator<CET, Super> & P
+    : TagCreator<CET, Super> & StaticMembers<P, Base>
 
   // Declarative, with no state instance
   <
@@ -128,7 +130,7 @@ interface ExtendedTag<Base extends Element, Super> {
     prototype?: P;
     styles?: S
   } & ThisType<AsyncGeneratedObject<CET>>)
-    : TagCreator<CET, Super> & P
+    : TagCreator<CET, Super> & StaticMembers<P, Base>
 }
 
 export interface TagCreator<Base extends Element,
@@ -141,7 +143,7 @@ export interface TagCreator<Base extends Element,
   (attrs: CAT, ...children: ChildTags[]): Base & ImplicitElementMethods;
   (...children: ChildTags[]): Base & ImplicitElementMethods;
   /* It can also be extended */
-  extended: ExtendedTag<Base, TagCreator<Base, Super>>
+  extended: ExtendedTag<Base, TagCreator<Base, Super>>,
   /* It is based on a "super" TagCreator */
   super: TagCreator<Base>
   /* It has a function that exposes the differences between the tags it creates and its super */
@@ -278,7 +280,7 @@ const standandTags = [
   "wbr"
 ] as const;
 
-/* Members applied to EVERY tag created by PoJS, even base tags */
+/* Members applied to EVERY tag created, even base tags */
 interface PoElementMethods {
   get ids(): Record<string, Element | undefined>;
   when<S extends WhenParameters>(...what: S): WhenReturn<S>;
@@ -315,6 +317,9 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods & I
   }
 };
 
+const poStyleElt = document.createElement("STYLE");
+poStyleElt.id = "--ai-ui-extended-tag-styles";
+
 /* tag */
 const callStackSymbol = Symbol('callStack');
 
@@ -331,14 +336,14 @@ export const tag = <TagLoader>function <Tags extends string,
   type NamespacedElementBase = T1 extends string ? T1 extends '' ? HTMLElement : Element : HTMLElement;
 
   /* Work out which parameter is which. There are 4 variations:
-    tag()                                 []
-    tag(prototypes)                       [object]
-    tag(tags[])                           [string[]]
-    tag(tags[], prototypes)               [string[], object]
-    tag(namespace, tags[])                [string, string[]]
-    tag(namespace, tags[],prototypes)     [string, string[], object]
+    tag()                                       []
+    tag(prototypes)                             [object]
+    tag(tags[])                                 [string[]]
+    tag(tags[], prototypes)                     [string[], object]
+    tag(namespace | null, tags[])               [string | null, string[]]
+    tag(namespace | null, tags[],prototypes)    [string | null, string[], object]
   */
-  const [nameSpace, tags, prototypes] = typeof _1 === 'string'
+  const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
     ? [_1, _2 as Tags[], _3 as P]
     : Array.isArray(_1)
       ? [null, _1 as Tags[], _2 as P] 
@@ -368,9 +373,6 @@ export const tag = <TagLoader>function <Tags extends string,
   );
   if (prototypes)
     deepDefine(tagPrototypes, prototypes);
-
-  const poStyleElt = document.createElement("STYLE");
-  poStyleElt.id = "--po-extended-tag-styles";
 
   function nodes(...c: ChildTags[]) {
     const appended: (Node | ReturnType<typeof DomPromiseContainer>)[] = [];
@@ -470,7 +472,7 @@ export const tag = <TagLoader>function <Tags extends string,
   }
   if (!nameSpace) {
     tag.appender = appender;  // Legacy RTA support
-    tag.nodes = nodes;        // Preferred PoTS interface
+    tag.nodes = nodes;        // Preferred interface
   }
 
 
@@ -682,7 +684,7 @@ export const tag = <TagLoader>function <Tags extends string,
       return e as (NamespacedElementBase & PoElementMethods & ImplicitElementMethods);
     }
 
-    const extendTag = <TagCreator<Element>>Object.assign(extendTagFn, {
+    const extendTag = </*TagCreator<Element>*/any>Object.assign(extendTagFn, {
       super: this,
       overrides,
       extended,
@@ -714,7 +716,7 @@ export const tag = <TagLoader>function <Tags extends string,
     const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
 
     Object.defineProperty(extendTag, "name", { 
-      value: "<po-"+creatorName+" @"+callSite+">" 
+      value: "<ai-"+creatorName+" @"+callSite+">" 
     });
 
     return extendTag;
@@ -770,7 +772,7 @@ export const tag = <TagLoader>function <Tags extends string,
     }
 
     const includingExtender = <TagCreator<Element>><unknown>Object.assign(tagCreator, {
-      super: ()=>{ throw new Error("Can't invole native elemenet constructors directly. Use document.createElement().") },
+      super: ()=>{ throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement().") },
       extended, // How to extend this (base) tag
       valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>` }
     });
@@ -786,27 +788,29 @@ export const tag = <TagLoader>function <Tags extends string,
   return baseTagCreators;
 };
 
-const { "pots-container": PoTsContainer } = tag('', ["pots-container"]);
-const DomPromiseContainer = PoTsContainer.extended({
+const { "ai-ui-container": AsyncDOMContainer } = tag('', ["ai-ui-container"]);
+const DomPromiseContainer = AsyncDOMContainer.extended({
   styles: `
-  pots-container.promise {
+  ai-ui-container.promise {
     display: ${DEBUG ? 'inline' : 'none'};
     color: #888;
     font-size: 0.75em;
   }
-  pots-container.promise:after {
+  ai-ui-container.promise:after {
     content: "⋯";
   }`,
   prototype: {
     className: 'promise'
   },
   constructed() {
-    return PoTsContainer({ style: { display: 'none' } }, new Error("Constructed").stack?.replace(/^Error: /, ''));
+    return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG 
+      ? new Error("Constructed").stack?.replace(/^Error: /, '')
+      : undefined);
   }
 });
-const DyamicElementError = PoTsContainer.extended({
+const DyamicElementError = AsyncDOMContainer.extended({
   styles: `
-  pots-container.error {
+  ai-ui-container.error {
     display: block;
     color: #b33;
   }`,

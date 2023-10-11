@@ -158,18 +158,20 @@ const elementProtype = {
         return when(this, ...what);
     }
 };
+const poStyleElt = document.createElement("STYLE");
+poStyleElt.id = "--ai-ui-extended-tag-styles";
 /* tag */
 const callStackSymbol = Symbol('callStack');
 export const tag = function (_1, _2, _3) {
     /* Work out which parameter is which. There are 4 variations:
-      tag()                                 []
-      tag(prototypes)                       [object]
-      tag(tags[])                           [string[]]
-      tag(tags[], prototypes)               [string[], object]
-      tag(namespace, tags[])                [string, string[]]
-      tag(namespace, tags[],prototypes)     [string, string[], object]
+      tag()                                       []
+      tag(prototypes)                             [object]
+      tag(tags[])                                 [string[]]
+      tag(tags[], prototypes)                     [string[], object]
+      tag(namespace | null, tags[])               [string | null, string[]]
+      tag(namespace | null, tags[],prototypes)    [string | null, string[], object]
     */
-    const [nameSpace, tags, prototypes] = typeof _1 === 'string'
+    const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
         : Array.isArray(_1)
             ? [null, _1, _2]
@@ -194,8 +196,6 @@ export const tag = function (_1, _2, _3) {
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
     if (prototypes)
         deepDefine(tagPrototypes, prototypes);
-    const poStyleElt = document.createElement("STYLE");
-    poStyleElt.id = "--po-extended-tag-styles";
     function nodes(...c) {
         const appended = [];
         (function children(c) {
@@ -291,7 +291,7 @@ export const tag = function (_1, _2, _3) {
     }
     if (!nameSpace) {
         tag.appender = appender; // Legacy RTA support
-        tag.nodes = nodes; // Preferred PoTS interface
+        tag.nodes = nodes; // Preferred interface
     }
     /** Routine to *define* properties on a dest object from a src object **/
     function deepDefine(d, s) {
@@ -532,7 +532,7 @@ export const tag = function (_1, _2, _3) {
             : '?';
         const callSite = ((_d = (_c = (_b = (_a = new Error().stack) === null || _a === void 0 ? void 0 : _a.split('\n')[2]) === null || _b === void 0 ? void 0 : _b.match(/\((.*)\)/)) === null || _c === void 0 ? void 0 : _c[1]) !== null && _d !== void 0 ? _d : '?');
         Object.defineProperty(extendTag, "name", {
-            value: "<po-" + creatorName + " @" + callSite + ">"
+            value: "<ai-" + creatorName + " @" + callSite + ">"
         });
         return extendTag;
     }
@@ -570,7 +570,7 @@ export const tag = function (_1, _2, _3) {
             }
         };
         const includingExtender = Object.assign(tagCreator, {
-            super: () => { throw new Error("Can't invole native elemenet constructors directly. Use document.createElement()."); },
+            super: () => { throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement()."); },
             extended,
             valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>`; }
         });
@@ -582,15 +582,15 @@ export const tag = function (_1, _2, _3) {
     // @ts-ignore
     return baseTagCreators;
 };
-const { "pots-container": PoTsContainer } = tag('', ["pots-container"]);
-const DomPromiseContainer = PoTsContainer.extended({
+const { "ai-ui-container": AsyncDOMContainer } = tag('', ["ai-ui-container"]);
+const DomPromiseContainer = AsyncDOMContainer.extended({
     styles: `
-  pots-container.promise {
+  ai-ui-container.promise {
     display: ${DEBUG ? 'inline' : 'none'};
     color: #888;
     font-size: 0.75em;
   }
-  pots-container.promise:after {
+  ai-ui-container.promise:after {
     content: "⋯";
   }`,
     prototype: {
@@ -598,12 +598,14 @@ const DomPromiseContainer = PoTsContainer.extended({
     },
     constructed() {
         var _a;
-        return PoTsContainer({ style: { display: 'none' } }, (_a = new Error("Constructed").stack) === null || _a === void 0 ? void 0 : _a.replace(/^Error: /, ''));
+        return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG
+            ? (_a = new Error("Constructed").stack) === null || _a === void 0 ? void 0 : _a.replace(/^Error: /, '')
+            : undefined);
     }
 });
-const DyamicElementError = PoTsContainer.extended({
+const DyamicElementError = AsyncDOMContainer.extended({
     styles: `
-  pots-container.error {
+  ai-ui-container.error {
     display: block;
     color: #b33;
   }`,

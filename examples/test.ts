@@ -16,17 +16,18 @@ window.addEventListener('mousemove', function handle(e) {
 
 const Block = div.extended({
   styles: `.RedBlock {
+    border-radius: 10px;
     position: absolute;
-    zIndex: 99;
+    z-index: 99;
     width: 20px;
     height: 20px;
     background-color: red;
   }`,
   prototype:{
     className:'RedBlock',
-    style:{
+    style: {
       backgroundColor: 'magenta'
-    }
+    } //as Partial<CSSStyleDeclaration>
   }
 })
 
@@ -160,6 +161,8 @@ const App = div.extended({
 
       div(this.when('#lazy','@ready')(()=> this.ids.lazy.thing)),
 
+      Laziest.myAttr,
+
       Laziest({ id: 'lazy'}, 'Lovely!'), pre(Laziest.valueOf()),
       Laziest.super('Super!'), pre(Laziest.super.valueOf()),
       Laziest.super.super('Super duper!'), pre(Laziest.super.super.valueOf()),
@@ -169,18 +172,19 @@ const App = div.extended({
 });
 
 let app: ReturnType<typeof App>;
+const xy = mousePos.waitFor(done => setTimeout(done, 20)).map(({x,y}) => ({
+  left: `${x + 20}px`,
+  top: `${y + 20}px`
+}));
+
 document.body.append(
   app = App({ style: { border: '1px solid black' }}),
-  /*Block({
-    onclick(this: ReturnType<typeof span>) { this.remove() },
-    style: mousePos
-    .throttle(100)
-    .waitFor(done => setTimeout(done, 100))
-    .map(({x,y}) => ({
-      left: `${x + 20}px`,
-      top: `${y + 20}px`
-    }))
-  })*/
+  Block({
+    style: xy,
+    onclick(this: ReturnType<typeof span>) { 
+      this.remove();
+    }
+  })
 );
 
 async function *interval<T>(t: number, limit: number, fn:(n:number)=>T, terminate: 'complete' | 'error' = 'complete') {
