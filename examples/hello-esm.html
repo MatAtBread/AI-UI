@@ -1,8 +1,8 @@
 <body>
 </body>
 <script type="module">
-  import * as AIUI from '../module/esm/ai-ui.min.js';
-  const { div, button, span } = AIUI.tag(['div', 'button', 'span']);
+  import * as AIUI from '../module/esm/ai-ui.js';
+  const { div, button, span } = AIUI.tag();
 
   const ButtonCounter = button.extended(instance => ({
     constructed() {

@@ -158,10 +158,126 @@ interface TagLoader {
   /** @deprecated */
   appender(container: Node, before?: Node): (c: ChildTags) => (Node | (/*P &*/ (Element & PoElementMethods)))[];
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
-  <Tags extends keyof HTMLElementTagNameMap, P extends (/*Partial<HTMLElementTagNameMap[Tags]> &*/ OtherMembers)>(tags: Tags[], prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
   <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> };
   <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>;
 }
+
+const standandTags = [
+  "a",
+  "abbr",
+  "address",
+  "area",
+  "article",
+  "aside",
+  "audio",
+  "b",
+  "base",
+  "bdi",
+  "bdo",
+  "blockquote",
+  "body",
+  "br",
+  "button",
+  "canvas",
+  "caption",
+  "cite",
+  "code",
+  "col",
+  "colgroup",
+  "data",
+  "datalist",
+  "dd",
+  "del",
+  "details",
+  "dfn",
+  "dialog",
+  "div",
+  "dl",
+  "dt",
+  "em",
+  "embed",
+  "fieldset",
+  "figcaption",
+  "figure",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "head",
+  "header",
+  "hgroup",
+  "hr",
+  "html",
+  "i",
+  "iframe",
+  "img",
+  "input",
+  "ins",
+  "kbd",
+  "label",
+  "legend",
+  "li",
+  "link",
+  "main",
+  "map",
+  "mark",
+  "menu",
+  "meta",
+  "meter",
+  "nav",
+  "noscript",
+  "object",
+  "ol",
+  "optgroup",
+  "option",
+  "output",
+  "p",
+  "picture",
+  "pre",
+  "progress",
+  "q",
+  "rp",
+  "rt",
+  "ruby",
+  "s",
+  "samp",
+  "script",
+  "search",
+  "section",
+  "select",
+  "slot",
+  "small",
+  "source",
+  "span",
+  "strong",
+  "style",
+  "sub",
+  "summary",
+  "sup",
+  "table",
+  "tbody",
+  "td",
+  "template",
+  "textarea",
+  "tfoot",
+  "th",
+  "thead",
+  "time",
+  "title",
+  "tr",
+  "track",
+  "u",
+  "ul",
+  "var",
+  "video",
+  "wbr"
+] as const;
 
 /* Members applied to EVERY tag created by PoJS, even base tags */
 interface PoElementMethods {
@@ -206,7 +322,7 @@ const callStackSymbol = Symbol('callStack');
 export const tag = <TagLoader>function <Tags extends string,
   E extends Element,
   P extends (Partial<E> & OtherMembers),
-  T1 extends (string | Tags[]),
+  T1 extends (string | Tags[] | P),
   T2 extends (Tags[] | P)
 >(
   _1: T1,
@@ -215,11 +331,19 @@ export const tag = <TagLoader>function <Tags extends string,
 ): Record<string, TagCreator<P & Element>> {
   type NamespacedElementBase = T1 extends string ? T1 extends '' ? HTMLElement : Element : HTMLElement;
 
+  /* Work out which parameter is which. There are 4 variations:
+    tag()                                 []
+    tag(prototypes)                       [object]
+    tag(tags[])                           [string[]]
+    tag(tags[], prototypes)               [string[], object]
+    tag(namespace, tags[])                [string, string[]]
+    tag(namespace, tags[],prototypes)     [string, string[], object]
+  */
   const [nameSpace, tags, prototypes] = typeof _1 === 'string'
     ? [_1, _2 as Tags[], _3 as P]
-    : _1 === null || _1 === undefined
-      ? [null, _2 as Tags[], _3 as P]
-      : [null, _1, _2 as P];
+    : Array.isArray(_1)
+      ? [null, _1 as Tags[], _2 as P] 
+      : [null, standandTags, _1 as P];
 
   function isChildTag(x: any): x is ChildTags {
     return typeof x === 'string'
@@ -243,7 +367,9 @@ export const tag = <TagLoader>function <Tags extends string,
     null,
     Object.getOwnPropertyDescriptors(elementProtype), // We know it's not nested
   );
-  deepDefine(tagPrototypes, prototypes);
+  if (prototypes)
+    deepDefine(tagPrototypes, prototypes);
+
   const poStyleElt = document.createElement("STYLE");
   poStyleElt.id = "--po-extended-tag-styles";
 

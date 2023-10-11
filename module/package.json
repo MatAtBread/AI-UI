@@ -37,5 +37,5 @@
     "prepublishOnly": "npm run build"
   },
   "types": "./esm/ai-ui.d.ts",
-  "version": "0.9.2"
+  "version": "0.9.4"
 }

@@ -20,6 +20,120 @@ function asyncIterator(o) {
         return o;
     throw new Error("Not as async provider");
 }
+const standandTags = [
+    "a",
+    "abbr",
+    "address",
+    "area",
+    "article",
+    "aside",
+    "audio",
+    "b",
+    "base",
+    "bdi",
+    "bdo",
+    "blockquote",
+    "body",
+    "br",
+    "button",
+    "canvas",
+    "caption",
+    "cite",
+    "code",
+    "col",
+    "colgroup",
+    "data",
+    "datalist",
+    "dd",
+    "del",
+    "details",
+    "dfn",
+    "dialog",
+    "div",
+    "dl",
+    "dt",
+    "em",
+    "embed",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "footer",
+    "form",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "head",
+    "header",
+    "hgroup",
+    "hr",
+    "html",
+    "i",
+    "iframe",
+    "img",
+    "input",
+    "ins",
+    "kbd",
+    "label",
+    "legend",
+    "li",
+    "link",
+    "main",
+    "map",
+    "mark",
+    "menu",
+    "meta",
+    "meter",
+    "nav",
+    "noscript",
+    "object",
+    "ol",
+    "optgroup",
+    "option",
+    "output",
+    "p",
+    "picture",
+    "pre",
+    "progress",
+    "q",
+    "rp",
+    "rt",
+    "ruby",
+    "s",
+    "samp",
+    "script",
+    "search",
+    "section",
+    "select",
+    "slot",
+    "small",
+    "source",
+    "span",
+    "strong",
+    "style",
+    "sub",
+    "summary",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "template",
+    "textarea",
+    "tfoot",
+    "th",
+    "thead",
+    "time",
+    "title",
+    "tr",
+    "track",
+    "u",
+    "ul",
+    "var",
+    "video",
+    "wbr"
+];
 const elementProtype = {
     get ids() {
         return getElementIdMap(this, /*Object.create(this.defaults) ||*/ null);
@@ -47,11 +161,19 @@ const elementProtype = {
 /* tag */
 const callStackSymbol = Symbol('callStack');
 export const tag = function (_1, _2, _3) {
+    /* Work out which parameter is which. There are 4 variations:
+      tag()                                 []
+      tag(prototypes)                       [object]
+      tag(tags[])                           [string[]]
+      tag(tags[], prototypes)               [string[], object]
+      tag(namespace, tags[])                [string, string[]]
+      tag(namespace, tags[],prototypes)     [string, string[], object]
+    */
     const [nameSpace, tags, prototypes] = typeof _1 === 'string'
         ? [_1, _2, _3]
-        : _1 === null || _1 === undefined
-            ? [null, _2, _3]
-            : [null, _1, _2];
+        : Array.isArray(_1)
+            ? [null, _1, _2]
+            : [null, standandTags, _1];
     function isChildTag(x) {
         return typeof x === 'string'
             || typeof x === 'number'
@@ -70,7 +192,8 @@ export const tag = function (_1, _2, _3) {
     /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
       are not evaluated until called */
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
-    deepDefine(tagPrototypes, prototypes);
+    if (prototypes)
+        deepDefine(tagPrototypes, prototypes);
     const poStyleElt = document.createElement("STYLE");
     poStyleElt.id = "--po-extended-tag-styles";
     function nodes(...c) {
