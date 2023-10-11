@@ -64,11 +64,12 @@ type DeepPartial<T extends object> = {
 
 type PossiblyAsync<X> = X extends object
   ? X extends AsyncProvider<infer U>
-    ? PossiblyAsync<U> // X is an AsyncProvider, U is what it provides
-    : { // X is an object (but not an AsyncProvider), containing stuff
-      [K in keyof X]: PossiblyAsync<X[K]>
-    }
-  : X | AsyncProvider<X> // X is primitive
+    // X is an AsyncProvider, U is what it provides
+    ? PossiblyAsync<U> 
+    // X is an object (but not an AsyncProvider), containing stuff
+    : AsyncProvider<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]> }
+  // X is primitive
+  : X | AsyncProvider<X> | undefined 
 
 type AsyncGeneratedValue<X> = X extends AsyncProvider<infer Value> ? Value : X
 type AsyncGeneratedObject<X extends object> = {
@@ -135,7 +136,7 @@ interface ExtendedTag<Base extends Element, Super> {
 
 export interface TagCreator<Base extends Element,
   Super = never,
-  CAT = PossiblyAsync<DeepPartial<Base>> & ThisType<Base>> {
+  CAT = PossiblyAsync<Base> & ThisType<Base>> {
   /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
     The attributes are PossiblyAsync 
   */
@@ -557,7 +558,7 @@ export const tag = <TagLoader>function <Tags extends string,
                   }
 
                   if (!es.done) {
-                    if (typeof es.value === 'object') {
+                    if (typeof es.value === 'object' && es.value !== null) {
                       /*
                       THIS IS JUST A HACK: `style` has to be set member by member, eg:
                         e.style.color = 'blue'        --- works
@@ -576,8 +577,9 @@ export const tag = <TagLoader>function <Tags extends string,
                       else
                         d[k] = es.value;
                     } else {
-                      // Src is not an object - just assign it
-                      d[k] = es.value;
+                      // Src is not an object (or is null) - just assign it, unless it's undefined
+                      if (es.value !== undefined)
+                        d[k] = es.value;
                     }
                     ap.next().then(update).catch(error);
                   }

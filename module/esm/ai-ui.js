@@ -379,7 +379,7 @@ export const tag = function (_1, _2, _3) {
                                         return;
                                     }
                                     if (!es.done) {
-                                        if (typeof es.value === 'object') {
+                                        if (typeof es.value === 'object' && es.value !== null) {
                                             /*
                                             THIS IS JUST A HACK: `style` has to be set member by member, eg:
                                               e.style.color = 'blue'        --- works
@@ -399,8 +399,9 @@ export const tag = function (_1, _2, _3) {
                                                 d[k] = es.value;
                                         }
                                         else {
-                                            // Src is not an object - just assign it
-                                            d[k] = es.value;
+                                            // Src is not an object (or is null) - just assign it, unless it's undefined
+                                            if (es.value !== undefined)
+                                                d[k] = es.value;
                                         }
                                         ap.next().then(update).catch(error);
                                     }

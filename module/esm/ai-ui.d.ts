@@ -21,12 +21,9 @@ type IDS<I> = VSCodeEvaluateType<{
         [J in keyof I]?: I[J] extends (...a: any[]) => infer R ? R : never;
     };
 }>;
-type DeepPartial<T extends object> = {
-    [K in keyof T]?: T[K] extends object ? T[K] extends Function ? T[K] & DeepPartial<T[K]> : DeepPartial<T[K]> | null : T[K] | null;
-};
-type PossiblyAsync<X> = X extends object ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : {
-    [K in keyof X]: PossiblyAsync<X[K]>;
-} : X | AsyncProvider<X>;
+type PossiblyAsync<X> = X extends object ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : AsyncProvider<Partial<X>> | {
+    [K in keyof X]?: PossiblyAsync<X[K]>;
+} : X | AsyncProvider<X> | undefined;
 type AsyncGeneratedValue<X> = X extends AsyncProvider<infer Value> ? Value : X;
 type AsyncGeneratedObject<X extends object> = {
     [K in keyof X]: AsyncGeneratedValue<X[K]>;
@@ -54,7 +51,7 @@ interface ExtendedTag<Base extends Element, Super> {
         styles?: S;
     } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, Super> & StaticMembers<P, Base>;
 }
-export interface TagCreator<Base extends Element, Super = never, CAT = PossiblyAsync<DeepPartial<Base>> & ThisType<Base>> {
+export interface TagCreator<Base extends Element, Super = never, CAT = PossiblyAsync<Base> & ThisType<Base>> {
     (attrs: CAT): Base & ImplicitElementMethods;
     (attrs: CAT, ...children: ChildTags[]): Base & ImplicitElementMethods;
     (...children: ChildTags[]): Base & ImplicitElementMethods;

@@ -14,23 +14,6 @@ window.addEventListener('mousemove', function handle(e) {
   mousePos.push({x: e.clientX, y: e.clientY});
 });
 
-const Block = div.extended({
-  styles: `.RedBlock {
-    border-radius: 10px;
-    position: absolute;
-    z-index: 99;
-    width: 20px;
-    height: 20px;
-    background-color: red;
-  }`,
-  prototype:{
-    className:'RedBlock',
-    style: {
-      backgroundColor: 'magenta'
-    } //as Partial<CSSStyleDeclaration>
-  }
-})
-
 const Lazy = h2.extended((instance:{ myAttr: number }) => ({
   styles:`
   .Lazy {
@@ -171,12 +154,30 @@ const App = div.extended({
   }
 });
 
-let app: ReturnType<typeof App>;
-const xy = mousePos.waitFor(done => setTimeout(done, 20)).map(({x,y}) => ({
+const Block = div.extended({
+  styles: `.RedBlock {
+    border-radius: 10px;
+    position: absolute;
+    z-index: 99;
+    width: 20px;
+    height: 20px;
+    background-color: red;
+  }`,
+  prototype:{
+    className:'RedBlock',
+    style: {
+      backgroundColor: 'magenta'
+    } //as Partial<CSSStyleDeclaration>
+  }
+});
+
+const xy = mousePos.waitFor(done => setTimeout(done, 40)).map(({x,y}) => ({
   left: `${x + 20}px`,
   top: `${y + 20}px`
-}));
+} as Partial<CSSStyleDeclaration>));
 
+
+let app: ReturnType<typeof App>;
 document.body.append(
   app = App({ style: { border: '1px solid black' }}),
   Block({
