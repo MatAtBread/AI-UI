@@ -16,14 +16,14 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   | Array<ChildTags>
   | Iterable<ChildTags> // Iterable things that hold the above, like Arrays
 
-export type Instance<T extends {}> = T;
+export type Instance<T extends {} = Record<string,unknown>> = T;
 
 type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 
 function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
   return typeof o?.next === 'function';
 }
-function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
+export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
   return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
 }
 function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T> {
@@ -62,14 +62,13 @@ type DeepPartial<T extends object> = {
   : T[K] | null
 };
 
-type PossiblyAsync<X> = {
-  [K in keyof X]: X[K] extends AsyncProvider<X[K]>
-  ? X[K] | AsyncGeneratedValue<X[K]>
-  : X[K] | AsyncProvider<X[K]>
-  | (X[K] extends object
-    ? PossiblyAsync<X[K]>
-    : X[K])
-}
+type PossiblyAsync<X> = X extends object
+  ? X extends AsyncProvider<infer U>
+    ? PossiblyAsync<U> // X is an AsyncProvider, U is what it provides
+    : { // X is an object (but not an AsyncProvider), containing stuff
+      [K in keyof X]: PossiblyAsync<X[K]>
+    }
+  : X | AsyncProvider<X> // X is primitive
 
 type AsyncGeneratedValue<X> = X extends AsyncProvider<infer Value> ? Value : X
 type AsyncGeneratedObject<X extends object> = {
@@ -98,7 +97,7 @@ interface ExtendedTag<Base extends Element, Super> {
     P extends {},
     S extends string | undefined,
     X extends Instance<V>,
-    V,
+    V extends {},
     // @ts-ignore - the constraint "Element" fails here as overrides might hide the 
     // true nature of the underlying Element object, but in fact it IS an element (since
     // only "real" elements can be a base for an ExtendedTag), even tho the extended({})
@@ -146,7 +145,7 @@ export interface TagCreator<Base extends Element,
   /* It is based on a "super" TagCreator */
   super: TagCreator<Base>
   /* It has a function that exposes the differences between the tags it creates and its super */
-  overrides: <A extends Instance<unknown>>(a: A) => Overrides | null /* null for base tags */
+  overrides?: (<A extends Instance>(a: A) => Overrides) /* null for base tags */
   /* It has a name, which is helpful when debugging */
   readonly name: string
 }
@@ -291,7 +290,7 @@ interface ImplicitElementMethods {
 
 const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods & ImplicitElementMethods> = {
   get ids() {
-    return getElementIdMap(this, /*Object.create(this.defaults) ||*/ null);
+    return getElementIdMap(this, /*Object.create(this.defaults) ||*/);
   },
   set ids(v: any) {
     throw new Error('Cannot set ids on ' + this.valueOf());
@@ -401,7 +400,7 @@ export const tag = <TagLoader>function <Tags extends string,
       }
 
       if (isAsyncIter<ChildTags>(c)) {
-        const insertionStack = DEBUG ? ('\n' + new Error().stack.replace(/^Error: /, "Insertion :")) : '';
+        const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
         const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
         const dpm = DomPromiseContainer();
         appended.push(dpm);
@@ -412,7 +411,7 @@ export const tag = <TagLoader>function <Tags extends string,
           const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
           if (n[0].parentNode) {
             t = appender(n[0].parentNode, n[0])(DyamicElementError(errorValue.toString()));
-            n.forEach(e => e.parentNode.removeChild(e));
+            n.forEach(e => e.parentNode?.removeChild(e));
           }
           else
             console.warn("Can't report error", errorValue, t);
@@ -420,12 +419,12 @@ export const tag = <TagLoader>function <Tags extends string,
 
         const update = (es: IteratorResult<ChildTags>) => {
           if (!es.done) {
-            const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument.body.contains(e));
-            if (!n.length)
+            const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
+            if (!n.length || !n[0].parentNode)
               throw new Error("Element(s) no longer exist in document" + insertionStack);
 
             t = appender(n[0].parentNode, n[0])(es.value ?? DomPromiseContainer());
-            n.forEach(e => e.parentNode.removeChild(e));
+            n.forEach(e => e.parentNode?.removeChild(e));
             ap.next().then(update).catch(error);
           }
         };
@@ -453,6 +452,9 @@ export const tag = <TagLoader>function <Tags extends string,
         } else {
           // We're a text node - work backwards and insert *after* the preceeding Element
           const parent = before.parentElement;
+          if (!parent)
+            throw new Error("Parent is null");
+
           if (parent !== container) {
             console.warn("Container mismatch??");
           }
@@ -473,7 +475,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
 
   /** Routine to *define* properties on a dest object from a src object **/
-  function deepDefine(d: object, s: any): void {
+  function deepDefine(d: Record<string | symbol | number, any>, s: any): void {
     if (s === null || s === undefined || typeof s !== 'object' || s === d)
       return;
 
@@ -524,8 +526,8 @@ export const tag = <TagLoader>function <Tags extends string,
           // Copy the definition of the getter/setter
           Object.defineProperty(d, k, srcDesc);
         }
-      } catch (ex) {
-        console.warn("deepAssign", k, s[k], ex, ex.stack);
+      } catch (ex: unknown) {
+        console.warn("deepAssign", k, s[k], ex);
         throw ex;
       }
     }
@@ -534,7 +536,7 @@ export const tag = <TagLoader>function <Tags extends string,
   function assignProps(base: Element, props: Record<string, any>) {
     // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
     if (!(callStackSymbol in props)) {
-      (function assign(d: object, s: object | undefined): void {
+      (function assign(d: any, s: any): void {
         if (s === null || s === undefined || typeof s !== 'object')
           return;
         for (const [k, srcDesc] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
@@ -618,8 +620,8 @@ export const tag = <TagLoader>function <Tags extends string,
               Object.defineProperty(d, k, srcDesc);
             }
 
-          } catch (ex) {
-            console.warn("assignProps", k, s[k], ex, ex.stack);
+          } catch (ex: unknown) {
+            console.warn("assignProps", k, s[k], ex);
             throw ex;
           }
         }
@@ -636,12 +638,12 @@ export const tag = <TagLoader>function <Tags extends string,
       const eltNewDiv = NewDiv({attrs},...children)
   */
 
-  function extended(this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance<unknown>) => Overrides)) {
+  function extended(this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) {
     const overrides = (typeof _overrides !== 'function')
-      ? (instance: Instance<unknown>) => _overrides
+      ? (instance: Instance) => _overrides
       : _overrides
 
-    const staticInstance = {} as Instance<unknown>;
+    const staticInstance = {} as Instance;
     let staticExtensions: Overrides = overrides(staticInstance);
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
@@ -661,10 +663,10 @@ export const tag = <TagLoader>function <Tags extends string,
     } | ChildTags, ...children: ChildTags[]) => {
       const noAttrs = isChildTag(attrs) ;
       const newCallStack: Overrides[] = [];
-      const combinedAttrs: typeof attrs = { [callStackSymbol]: noAttrs ? newCallStack : attrs[callStackSymbol] ?? newCallStack };
+      const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack  };
       const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
       e.constructor = extendTag;
-      const ped = {} as Instance<unknown>;
+      const ped = {} as Instance;
       const tagDefinition = overrides(ped);
       combinedAttrs[callStackSymbol].push(tagDefinition);
       deepDefine(e, tagDefinition.prototype);
@@ -672,14 +674,15 @@ export const tag = <TagLoader>function <Tags extends string,
         if (!noAttrs)
           assignProps(e, attrs);
         while (newCallStack.length) {
-          const constructed = newCallStack.shift().constructed;
-          if (constructed) appender(e)(constructed.call(e))
+          const children = newCallStack.shift()?.constructed?.call(e);
+          if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
+            appender(e)(children);
         }
       }
       return e as (NamespacedElementBase & PoElementMethods & ImplicitElementMethods);
     }
 
-    const extendTag: TagCreator<Element> = Object.assign(extendTagFn, {
+    const extendTag = <TagCreator<Element>>Object.assign(extendTagFn, {
       super: this,
       overrides,
       extended,
@@ -690,11 +693,11 @@ export const tag = <TagLoader>function <Tags extends string,
     });
 
     const fullProto = {};
-    (function walkProto(creator: TagCreator<Element> & { super: TagCreator<Element> }) {
+    (function walkProto(creator: TagCreator<Element>) {
       if (creator?.super)
         walkProto(creator.super);
 
-      const proto = creator.overrides?.(staticInstance).prototype;
+      const proto = creator.overrides?.(staticInstance)?.prototype;
       if (proto) {
         deepDefine(fullProto, proto);
       }
@@ -704,9 +707,10 @@ export const tag = <TagLoader>function <Tags extends string,
 
     // Attempt to make up a meaningfu;l name for this extended tag
     const creatorName = staticExtensions.prototype
-      ? 'className' in staticExtensions.prototype ? staticExtensions.prototype.className
-        : 'classList' in staticExtensions.prototype ? staticExtensions.prototype.classList
-          : '?' : '?';
+      && 'className' in staticExtensions.prototype 
+      && typeof staticExtensions.prototype.className === 'string' 
+      ? staticExtensions.prototype.className
+      : '?';
     const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
 
     Object.defineProperty(extendTag, "name", { 
@@ -765,9 +769,8 @@ export const tag = <TagLoader>function <Tags extends string,
       }
     }
 
-    const includingExtender: TagCreator<Element> = Object.assign(tagCreator, {
-      super: null,  // Base tags don't have a `auper`
-      overrides: null,  // Base tags don't have overrides
+    const includingExtender = <TagCreator<Element>><unknown>Object.assign(tagCreator, {
+      super: ()=>{ throw new Error("Can't invole native elemenet constructors directly. Use document.createElement().") },
       extended, // How to extend this (base) tag
       valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>` }
     });
@@ -798,7 +801,7 @@ const DomPromiseContainer = PoTsContainer.extended({
     className: 'promise'
   },
   constructed() {
-    return PoTsContainer({ style: { display: 'none' } }, new Error("Constructed").stack.replace(/^Error: /, ''));
+    return PoTsContainer({ style: { display: 'none' } }, new Error("Constructed").stack?.replace(/^Error: /, ''));
   }
 });
 const DyamicElementError = PoTsContainer.extended({
@@ -817,7 +820,7 @@ export let enableOnRemovedFromDOM = function () {
   new MutationObserver(function (mutations) {
     mutations.forEach(function (m) {
       if (m.type === 'childList') {
-        [].slice.call(m.removedNodes).forEach(
+        m.removedNodes.forEach(
           removed => removed && removed instanceof Element &&
             [...removed.getElementsByTagName("*"), removed].filter(elt => !elt.ownerDocument.contains(elt)).forEach(
               elt => {
@@ -835,8 +838,8 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
   if (node.querySelectorAll) {
     node.querySelectorAll("[id]").forEach(function (elt) {
       if (elt.id) {
-        if (!ids[elt.id])
-          ids[elt.id] = elt;
+        if (!ids![elt.id])
+          ids![elt.id] = elt;
         //else console.warn("Shadowed element ID",elt.id,elt,ids[elt.id])
       }
     });

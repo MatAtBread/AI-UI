@@ -46,7 +46,7 @@ function whenEvent(container, what) {
         });
         eventObservations.set(eventName, new Set());
     }
-    const push = pushIterator(() => eventObservations.get(eventName).delete(details));
+    const push = pushIterator(() => { var _a; return (_a = eventObservations.get(eventName)) === null || _a === void 0 ? void 0 : _a.delete(details); });
     const details = {
         push,
         container,
@@ -120,8 +120,8 @@ export function when(container, ...sources) {
                         : (neverGonnaHappen());
                 const events = merged[Symbol.asyncIterator]();
                 ai.next = () => events.next();
-                ai.return = (...args) => { var _a; return (_a = events.return) === null || _a === void 0 ? void 0 : _a.call(events, args); };
-                ai.throw = (...args) => { var _a; return (_a = events.throw) === null || _a === void 0 ? void 0 : _a.call(events, args); };
+                ai.return = (value) => { var _a, _b; return (_b = (_a = events.return) === null || _a === void 0 ? void 0 : _a.call(events, value)) !== null && _b !== void 0 ? _b : Promise.resolve({ done: true, value }); };
+                ai.throw = (...args) => { var _a, _b; return (_b = (_a = events.throw) === null || _a === void 0 ? void 0 : _a.call(events, args)) !== null && _b !== void 0 ? _b : Promise.reject({ done: true, value: args[0] }); };
                 return { done: false, value: {} };
             }
         };

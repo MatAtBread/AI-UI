@@ -4,7 +4,7 @@ const DEBUG = false;
 function isAsyncIterator(o) {
     return typeof (o === null || o === void 0 ? void 0 : o.next) === 'function';
 }
-function isAsyncIterable(o) {
+export function isAsyncIterable(o) {
     return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
 }
 function isAsyncIter(o) {
@@ -136,7 +136,7 @@ const standandTags = [
 ];
 const elementProtype = {
     get ids() {
-        return getElementIdMap(this, /*Object.create(this.defaults) ||*/ null);
+        return getElementIdMap(this);
     },
     set ids(v) {
         throw new Error('Cannot set ids on ' + this.valueOf());
@@ -199,6 +199,7 @@ export const tag = function (_1, _2, _3) {
     function nodes(...c) {
         const appended = [];
         (function children(c) {
+            var _a;
             if (c === undefined || c === null)
                 return;
             if (isPromiseLike(c)) {
@@ -223,7 +224,7 @@ export const tag = function (_1, _2, _3) {
                 return;
             }
             if (isAsyncIter(c)) {
-                const insertionStack = DEBUG ? ('\n' + new Error().stack.replace(/^Error: /, "Insertion :")) : '';
+                const insertionStack = DEBUG ? ('\n' + ((_a = new Error().stack) === null || _a === void 0 ? void 0 : _a.replace(/^Error: /, "Insertion :"))) : '';
                 const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
                 const dpm = DomPromiseContainer();
                 appended.push(dpm);
@@ -232,7 +233,7 @@ export const tag = function (_1, _2, _3) {
                     const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
                     if (n[0].parentNode) {
                         t = appender(n[0].parentNode, n[0])(DyamicElementError(errorValue.toString()));
-                        n.forEach(e => e.parentNode.removeChild(e));
+                        n.forEach(e => { var _a; return (_a = e.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(e); });
                     }
                     else
                         console.warn("Can't report error", errorValue, t);
@@ -240,11 +241,11 @@ export const tag = function (_1, _2, _3) {
                 const update = (es) => {
                     var _a;
                     if (!es.done) {
-                        const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument.body.contains(e));
-                        if (!n.length)
+                        const n = (Array.isArray(t) ? t : [t]).filter(e => { var _a; return (_a = e.ownerDocument) === null || _a === void 0 ? void 0 : _a.body.contains(e); });
+                        if (!n.length || !n[0].parentNode)
                             throw new Error("Element(s) no longer exist in document" + insertionStack);
                         t = appender(n[0].parentNode, n[0])((_a = es.value) !== null && _a !== void 0 ? _a : DomPromiseContainer());
-                        n.forEach(e => e.parentNode.removeChild(e));
+                        n.forEach(e => { var _a; return (_a = e.parentNode) === null || _a === void 0 ? void 0 : _a.removeChild(e); });
                         ap.next().then(update).catch(error);
                     }
                 };
@@ -273,6 +274,8 @@ export const tag = function (_1, _2, _3) {
                 else {
                     // We're a text node - work backwards and insert *after* the preceeding Element
                     const parent = before.parentElement;
+                    if (!parent)
+                        throw new Error("Parent is null");
                     if (parent !== container) {
                         console.warn("Container mismatch??");
                     }
@@ -349,7 +352,7 @@ export const tag = function (_1, _2, _3) {
                 }
             }
             catch (ex) {
-                console.warn("deepAssign", k, s[k], ex, ex.stack);
+                console.warn("deepAssign", k, s[k], ex);
                 throw ex;
             }
         }
@@ -446,7 +449,7 @@ export const tag = function (_1, _2, _3) {
                         }
                     }
                     catch (ex) {
-                        console.warn("assignProps", k, s[k], ex, ex.stack);
+                        console.warn("assignProps", k, s[k], ex);
                         throw ex;
                     }
                 }
@@ -479,10 +482,10 @@ export const tag = function (_1, _2, _3) {
         // Here's where we actually create the tag, by accumulating all the base attributes and
         // (finally) assigning those specified by the instantiation
         const extendTagFn = (attrs, ...children) => {
-            var _a;
+            var _a, _b, _c;
             const noAttrs = isChildTag(attrs);
             const newCallStack = [];
-            const combinedAttrs = { [callStackSymbol]: noAttrs ? newCallStack : (_a = attrs[callStackSymbol]) !== null && _a !== void 0 ? _a : newCallStack };
+            const combinedAttrs = { [callStackSymbol]: (_a = (noAttrs ? newCallStack : attrs[callStackSymbol])) !== null && _a !== void 0 ? _a : newCallStack };
             const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
             e.constructor = extendTag;
             const ped = {};
@@ -493,9 +496,9 @@ export const tag = function (_1, _2, _3) {
                 if (!noAttrs)
                     assignProps(e, attrs);
                 while (newCallStack.length) {
-                    const constructed = newCallStack.shift().constructed;
-                    if (constructed)
-                        appender(e)(constructed.call(e));
+                    const children = (_c = (_b = newCallStack.shift()) === null || _b === void 0 ? void 0 : _b.constructed) === null || _c === void 0 ? void 0 : _c.call(e);
+                    if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
+                        appender(e)(children);
                 }
             }
             return e;
@@ -511,10 +514,10 @@ export const tag = function (_1, _2, _3) {
         });
         const fullProto = {};
         (function walkProto(creator) {
-            var _a;
+            var _a, _b;
             if (creator === null || creator === void 0 ? void 0 : creator.super)
                 walkProto(creator.super);
-            const proto = (_a = creator.overrides) === null || _a === void 0 ? void 0 : _a.call(creator, staticInstance).prototype;
+            const proto = (_b = (_a = creator.overrides) === null || _a === void 0 ? void 0 : _a.call(creator, staticInstance)) === null || _b === void 0 ? void 0 : _b.prototype;
             if (proto) {
                 deepDefine(fullProto, proto);
             }
@@ -523,9 +526,10 @@ export const tag = function (_1, _2, _3) {
         Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
         // Attempt to make up a meaningfu;l name for this extended tag
         const creatorName = staticExtensions.prototype
-            ? 'className' in staticExtensions.prototype ? staticExtensions.prototype.className
-                : 'classList' in staticExtensions.prototype ? staticExtensions.prototype.classList
-                    : '?' : '?';
+            && 'className' in staticExtensions.prototype
+            && typeof staticExtensions.prototype.className === 'string'
+            ? staticExtensions.prototype.className
+            : '?';
         const callSite = ((_d = (_c = (_b = (_a = new Error().stack) === null || _a === void 0 ? void 0 : _a.split('\n')[2]) === null || _b === void 0 ? void 0 : _b.match(/\((.*)\)/)) === null || _c === void 0 ? void 0 : _c[1]) !== null && _d !== void 0 ? _d : '?');
         Object.defineProperty(extendTag, "name", {
             value: "<po-" + creatorName + " @" + callSite + ">"
@@ -566,8 +570,7 @@ export const tag = function (_1, _2, _3) {
             }
         };
         const includingExtender = Object.assign(tagCreator, {
-            super: null,
-            overrides: null,
+            super: () => { throw new Error("Can't invole native elemenet constructors directly. Use document.createElement()."); },
             extended,
             valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>`; }
         });
@@ -594,7 +597,8 @@ const DomPromiseContainer = PoTsContainer.extended({
         className: 'promise'
     },
     constructed() {
-        return PoTsContainer({ style: { display: 'none' } }, new Error("Constructed").stack.replace(/^Error: /, ''));
+        var _a;
+        return PoTsContainer({ style: { display: 'none' } }, (_a = new Error("Constructed").stack) === null || _a === void 0 ? void 0 : _a.replace(/^Error: /, ''));
     }
 });
 const DyamicElementError = PoTsContainer.extended({
@@ -612,7 +616,7 @@ export let enableOnRemovedFromDOM = function () {
     new MutationObserver(function (mutations) {
         mutations.forEach(function (m) {
             if (m.type === 'childList') {
-                [].slice.call(m.removedNodes).forEach(removed => removed && removed instanceof Element &&
+                m.removedNodes.forEach(removed => removed && removed instanceof Element &&
                     [...removed.getElementsByTagName("*"), removed].filter(elt => !elt.ownerDocument.contains(elt)).forEach(elt => {
                         'onRemovedFromDOM' in elt && typeof elt.onRemovedFromDOM === 'function' && elt.onRemovedFromDOM();
                     }));

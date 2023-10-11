@@ -135,13 +135,13 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
     eventObservations.set(eventName, new Set());
   }
 
-  const push = pushIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName).delete(details));
+  const push = pushIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
   const details: EventObservation<Exclude<ExtractEventNames<EventName>, '@start' | '@ready'>> = {
     push,
     container,
     selector: selector || null
   };
-  eventObservations.get(eventName).add(details);
+  eventObservations.get(eventName)!.add(details);
   return push;
 }
 
@@ -157,8 +157,8 @@ async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
 /* Syntactic sugar: chainAsync decorates the specified so it can be mapped by a following function, or
   used directly as an iterable */
 function chainAsync<A extends AsyncIterable<X>, X>(src: A): MappableIterable<A> {
-  function mappableAsyncIterable<R>(mapper: (value: X) => R) {
-    return asyncExtras.map.call(src, mapper);
+  function mappableAsyncIterable(mapper: Parameters<typeof asyncExtras.map>[0]) {
+    return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
   }
 
   return Object.assign(withHelpers(mappableAsyncIterable as unknown as AsyncIterable<A>), {
@@ -221,8 +221,8 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
             : (neverGonnaHappen<WhenIteratedType<S>>());
         const events = merged[Symbol.asyncIterator]();
         ai.next = () => events.next();
-        ai.return = (...args: any[]) => events.return?.(args);
-        ai.throw = (...args: any[]) => events.throw?.(args);
+        ai.return = (value: any) => events.return?.(value) ?? Promise.resolve({ done: true as const, value });
+        ai.throw = (...args: any[]) => events.throw?.(args) ?? Promise.reject({ done: true as const, value: args[0] });
 
         return { done: false, value: {} };
       }

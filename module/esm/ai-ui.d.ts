@@ -4,8 +4,9 @@ type VSCodeEvaluateType<X> = [{
     [K in keyof X]: X[K];
 }][0];
 export type ChildTags = Node | number | string | boolean | undefined | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
-export type Instance<T extends {}> = T;
+export type Instance<T extends {} = Record<string, unknown>> = T;
 type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
+export declare function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T>;
 export declare function isPromiseLike<T>(x: any): x is PromiseLike<T>;
 type Overrides = {
     constructed?: () => (ChildTags | void | Promise<void>);
@@ -23,9 +24,9 @@ type IDS<I> = VSCodeEvaluateType<{
 type DeepPartial<T extends object> = {
     [K in keyof T]?: T[K] extends object ? T[K] extends Function ? T[K] & DeepPartial<T[K]> : DeepPartial<T[K]> | null : T[K] | null;
 };
-type PossiblyAsync<X> = {
-    [K in keyof X]: X[K] extends AsyncProvider<X[K]> ? X[K] | AsyncGeneratedValue<X[K]> : X[K] | AsyncProvider<X[K]> | (X[K] extends object ? PossiblyAsync<X[K]> : X[K]);
-};
+type PossiblyAsync<X> = X extends object ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : {
+    [K in keyof X]: PossiblyAsync<X[K]>;
+} : X | AsyncProvider<X>;
 type AsyncGeneratedValue<X> = X extends AsyncProvider<infer Value> ? Value : X;
 type AsyncGeneratedObject<X extends object> = {
     [K in keyof X]: AsyncGeneratedValue<X[K]>;
@@ -37,7 +38,7 @@ type OverrideMembers<Override, Base> = Override extends Array<any> ? Override : 
 interface ExtendedTag<Base extends Element, Super> {
     <C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<Element>;
-    }, P extends {}, S extends string | undefined, X extends Instance<V>, V, CET extends Element = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>>(_: ((i: Instance<V>) => {
+    }, P extends {}, S extends string | undefined, X extends Instance<V>, V extends {}, CET extends Element = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>>(_: ((i: Instance<V>) => {
         constructed?: C;
         ids?: I;
         prototype?: P;
@@ -58,7 +59,7 @@ export interface TagCreator<Base extends Element, Super = never, CAT = PossiblyA
     (...children: ChildTags[]): Base & ImplicitElementMethods;
     extended: ExtendedTag<Base, TagCreator<Base, Super>>;
     super: TagCreator<Base>;
-    overrides: <A extends Instance<unknown>>(a: A) => Overrides | null;
+    overrides?: (<A extends Instance>(a: A) => Overrides);
     readonly name: string;
 }
 type OtherMembers = {};

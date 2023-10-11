@@ -1,3 +1,4 @@
+import { isAsyncIterable } from "./ai-ui.js";
 import { DeferredPromise, deferred } from "./deferred.js";
 
 /* Things to suppliement the JS base AsyncIterable */
@@ -10,10 +11,12 @@ export type BroadcastIterator<T> = PushIterator<T>;
 
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers {}
 
-function wrapAsyncHelper<U, Args extends any[], R>(fn: (this: AsyncIterable<U>, ...args: Args) => AsyncIterable<R>) {
-  return function(this: AsyncIterable<U>, ...args:Args) { 
-    return withHelpers(fn.call(this, ...args) as AsyncExtraIterable<R>) 
-  }
+/* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
+  something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
+  the same arguments returns a AsyncExtraIterable<X>
+*/
+function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(fn: (this: AsyncIterable<T>, ...args: Args) => X) {
+  return function(this: AsyncIterable<T>, ...args:Args) { return withHelpers(fn.call(this, ...args)) }
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
@@ -37,41 +40,38 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   constructor(private readonly stop = () => { }) {
   }
 
-  [Symbol.asyncIterator]() {
+  [Symbol.asyncIterator](this: AsyncIterableIterator<T>) {
     return this;
   }
 
   next() {
-    let value: DeferredPromise<IteratorYieldResult<T>>;
     if (this._items.length) {
-      value = Promise.resolve({ done: false, value: this._items.shift() });
-    } else {
-      value = deferred();
-      this._pending.push(value);
-    }
+      return Promise.resolve({ done: false, value: this._items.shift()! });
+    } 
+    
+    const value = deferred<IteratorYieldResult<T>>();
+    this._pending.push(value);
     return value;
   }
 
   return() {
-    const value = { done: true, value: undefined };
+    const value = { done: true as const, value: undefined };
     if (this._pending) {
       try { this.stop() } catch (ex) { }
-      for (const p of this._pending)
-        p.reject(value);
-      this._pending = null;
-      this._items = null;
+      while(this._pending.length)
+        this._pending.shift()!.reject(value);
+      this._items.splice(0, this._items.length);
     }
     return Promise.resolve(value);
   }
 
   throw(...args: any[]) {
-    const value = { done: true, value: args[0] };
+    const value = { done: true as const, value: args[0] };
     if (this._pending) {
       try { this.stop() } catch (ex) { }
-      for (const p of this._pending)
-        p.reject(value);
-      this._pending = null;
-      this._items = null;
+      while(this._pending.length)
+        this._pending.shift()!.reject(value);
+      this._items.splice(0, this._items.length);
     }
     return Promise.resolve(value);
   }
@@ -82,7 +82,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
       return true;
     }
     if (this._pending.length) {
-      this._pending.shift().resolve({ done: false, value });
+      this._pending.shift()!.resolve({ done: false, value });
     } else {
       this._items.push(value);
     }
@@ -100,7 +100,8 @@ export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false)
     consumers -= 1;
     if (consumers === 0 && !bufferWhenNoConsumers) {
       try { stop() } catch (ex) { }
-      ai = null;
+      // This should never be referenced again, but if it is, it will throw
+      (ai as any) = null;
     }
   });
 
@@ -118,7 +119,8 @@ export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false)
     },
     close(ex?: Error) {
       ex ? ai.throw?.(ex) : ai.return?.();
-      ai = null;
+      // This should never be referenced again, but if it is, it will throw
+      (ai as any) = null;
     }
   });
 }
@@ -133,13 +135,14 @@ export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false)
 export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   let ai = new Set<QueueIteratableIterator<T>>();
 
-  return Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
+  return <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
     [Symbol.asyncIterator](): AsyncIterableIterator<T> {
       const added = new QueueIteratableIterator<T>(() => {
         ai.delete(added);
         if (ai.size === 0) {
           try { stop() } catch (ex) { }
-          ai = null;
+          // This should never be referenced again, but if it is, it will throw
+          (ai as any) = null;
         }
       });
       ai.add(added);
@@ -157,7 +160,8 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
       for (const q of ai.values()) {
         ex ? q.throw?.(ex) : q.return?.();
       }
-      ai = null;
+      // This should never be referenced again, but if it is, it will throw
+      (ai as any) = null;
     }
   });
 }
@@ -165,30 +169,33 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
 /* Merge asyncIterables into a single asyncIterable */
 
 /* TS hack to expose the return AsyncGenerator a generator of the union of the merged types */
-type CollapseIteratorTypes<T> = T[] extends AsyncIterable<infer U>[] ? AsyncIterable<U> : never;
+type CollapseIterableType<T> = T[] extends AsyncIterable<infer U>[] ? U : never;
+type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 
 export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
   const it = ai.map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
   const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
-  const results = [];
+  const results: CollapseIterableType<A[number]>[] = [];
   const forever = new Promise<any>(() => { });
   let count = promises.length;
   const merged: AsyncIterableIterator<A[number]> = {
     [Symbol.asyncIterator]() { return this },
     next() {
-      return count ? Promise.race(promises).then(({ idx, result }) => {
-        if (result.done) {
-          count--;
-          promises[idx] = forever;
-          results[idx] = result.value;
-          return { done: count === 0, value: result.value }
-        } else {
-          promises[idx] = it[idx].next().then(result => ({ idx, result }));
-          return result;
-        }
-      }).catch(ex => {
-        return this.throw?.(ex);
-      }) : Promise.reject({ done: true, value: new Error("Iterator merge complete") });
+      return count 
+        ? Promise.race(promises).then(({ idx, result }) => {
+          if (result.done) {
+            count--;
+            promises[idx] = forever;
+            results[idx] = result.value;
+            return { done: count === 0, value: result.value }
+          } else {
+            promises[idx] = it[idx].next().then(result => ({ idx, result }));
+            return result;
+          }
+        }).catch(ex => {
+          return this.throw?.(ex) ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
+        })
+      : Promise.reject({ done: true as const, value: new Error("Iterator merge complete") });
     },
     return() {
       const ex = new Error("Merge terminated");
@@ -210,7 +217,7 @@ export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
       return Promise.reject(ex);
     }
   };
-  return withHelpers(merged as unknown as CollapseIteratorTypes<A[number]>);
+  return withHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
 }
 
 
@@ -219,12 +226,18 @@ export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
   calling `bind(ai)` adds "standard" methods to the specified AsyncIterable
 */
 
+function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
+  return isAsyncIterable(i) 
+    && Object.keys(asyncExtras)
+    .every(k => (k in i) && (i as any)[k] === asyncExtras[k as keyof AsyncIterableHelpers]);
+}
+
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
-export function withHelpers<T>(ai: AsyncIterable<T>) {
-  if (!('map' in ai) || ai.map !== asyncExtras.map) {
-    Object.assign(ai, asyncExtras)
+export function withHelpers<A extends AsyncIterable<any>>(ai: A) {
+  if (!isExtraIterable(ai)) {
+    Object.assign(ai, asyncExtras);
   }
-  return ai as AsyncExtraIterable<T> & T;
+  return ai as A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never)
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
@@ -293,7 +306,7 @@ const forever = new Promise<any>(() => { });
 async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   let timer: Promise<{ debounced: number, value: U }> = forever;
-  let last: number;
+  let last = -1;
   try {
     while (true) {
       const p = await Promise.race([ai.next(), timer]);
@@ -360,10 +373,10 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
       return n;
     },
     return(value?: any) {
-      return ai.return?.(value);
+      return ai.return?.(value) ?? Promise.resolve({done: true as const, value });
     },
     throw(...args: any[]) {
-      return ai.throw?.(args);
+      return ai.throw?.(args) ?? Promise.resolve({done: true as const, value: args[0] })
     },
     get value() {
       return prev.value;
