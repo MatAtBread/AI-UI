@@ -1,0 +1,41 @@
+<html>
+<!--
+
+  This is a minimal loader to demonstrate Typescript examples in the AI-UI guide.
+
+  It is NOT recommended you do this in production code - it's simply so we can load,
+  transpile and execute basic examples in the browser. It is slow.
+
+  -->
+
+<head></head>
+
+<body>Loading Typescript...</body>
+<script src="https://unpkg.com/typescript@5.2.2/lib/typescript.js"></script>
+<script>
+  window.exports = {};
+
+  const tsFile = window.location.hash.slice(1);
+  fetch(tsFile)
+    .then(resp => resp.status === 200
+      ? resp.text()
+      : (() => { throw new Error(`HTTP status ${resp.status}: ${resp.statusText}\n${tsFile}`) })())
+    .then(tsCode => {
+      const jsCode = window.ts.transpile(tsCode, {
+        "skipLibCheck": true,
+        "lib": [
+          "lib.es2020.d.ts"
+        ],
+        "module": 6,
+        "target": 7
+      });
+      const script = document.createElement('script');
+      script.setAttribute('type', 'module')
+      script.append(jsCode);
+      document.body.innerHTML = '';
+      document.body.append(script);
+    })
+    .catch(error => alert(error.message));
+</script>
+
+</html>
