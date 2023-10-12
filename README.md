@@ -29,9 +29,17 @@ Think of it as a spreadsheet in your browser - you define the elements, styles a
 
 * HTML `<script>` tag
 ```
-  <script src="https://www.unpkg.com/@matatbread/ai-ui/lib/ai-ui.min.js"></script> 
+  <script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.min.js"></script> 
   <!-- defines global AIUI -->
 ```
+
+* CommonJS (for bundling or other environments)
+
+  Bundled source: "https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.min.cjs.js"
+```
+  const { tag } = require('@matatbread/ai-ui');
+```
+
 
 Get started with simple, easy to maintain web pages that work seamlessly with user-input, remote data sources and other dynamic sources of data and interaction without the complexity of a bespoke build or execution framework.
 

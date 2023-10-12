@@ -5,6 +5,9 @@ export type PushIterator<T> = AsyncExtraIterable<T> & {
 export type BroadcastIterator<T> = PushIterator<T>;
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers {
 }
+export declare function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T>;
+export declare function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T>;
+export declare function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
     map: <U, R>(this: AsyncIterable<U>, mapper: (o: U) => R | PromiseLike<R>) => AsyncIterable<Awaited<R>> & AsyncExtraIterable<Awaited<R>>;

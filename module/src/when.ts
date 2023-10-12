@@ -1,4 +1,4 @@
-import { isPromiseLike } from "./ai-ui.js";
+import { isPromiseLike } from './deferred.js';
 import { deferred } from "./deferred.js";
 import { PushIterator, pushIterator, withHelpers, asyncExtras, merge, AsyncExtraIterable } from "./iterators.js";
 

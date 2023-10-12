@@ -1,18 +1,10 @@
+import { isPromiseLike } from './deferred.js';
+import { isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
+/* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
+export * as Iterators from './iterators.js';
 const DEBUG = false;
-function isAsyncIterator(o) {
-    return typeof o?.next === 'function';
-}
-export function isAsyncIterable(o) {
-    return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
-}
-function isAsyncIter(o) {
-    return isAsyncIterable(o) || isAsyncIterator(o);
-}
-export function isPromiseLike(x) {
-    return x !== null && x !== undefined && typeof x.then === 'function';
-}
 function asyncIterator(o) {
     if (isAsyncIterable(o))
         return o[Symbol.asyncIterator]();

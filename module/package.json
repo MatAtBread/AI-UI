@@ -22,20 +22,26 @@
     "browser"
   ],
   "license": "MIT",
-  "main": "./lib/ai-ui.min.js",
+  "exports": {
+    ".": {
+      "require": "./dist/ai-ui.cjs.js",
+      "browser": "./dist/ai-ui.cjs.min.js",
+      "default": "./esm/ai-ui.js"
+    }
+  },
   "name": "@matatbread/ai-ui",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MatAtBread/AI-UI.git"
   },
   "scripts": {
-    "build": "npm run clean && npm run build-esm && npm run build-web-dev && npm run build-web",
+    "build": "npm run clean && npm run build-esm && npm run build-web && npm run build-web-dev",
     "build-esm": "tsc -p tsconfig.json",
-    "build-web": "webpack",
-    "build-web-dev": "webpack --config webpack.dev.js",
-    "clean": "rm -rf lib/* esm/*",
+    "build-web": "webpack && webpack --config webpack.cjs.js",
+    "build-web-dev": "webpack --config webpack.dev.js && webpack --config webpack.cjs-dev.js",
+    "clean": "rm -rf dist/* esm/*",
     "prepublishOnly": "npm run build"
   },
   "types": "./esm/*.d.ts",
-  "version": "0.9.4"
+  "version": "0.9.5"
 }

@@ -1,4 +1,4 @@
-import { isPromiseLike } from "./ai-ui.js";
+import { isPromiseLike } from './deferred.js';
 import { deferred } from "./deferred.js";
 import { pushIterator, withHelpers, asyncExtras, merge } from "./iterators.js";
 const eventObservations = new Map();

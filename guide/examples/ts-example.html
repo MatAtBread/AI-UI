@@ -16,16 +16,17 @@
   window.exports = {};
 
   const tsFile = window.location.hash.slice(1);
-  fetch(tsFile)
+  if (!tsFile)
+    document.body.append('No .ts file specified in the URL #');
+  else
+    fetch(tsFile)
     .then(resp => resp.status === 200
       ? resp.text()
       : (() => { throw new Error(`HTTP status ${resp.status}: ${resp.statusText}\n${tsFile}`) })())
     .then(tsCode => {
       const jsCode = window.ts.transpile(tsCode, {
         "skipLibCheck": true,
-        "lib": [
-          "lib.es2020.d.ts"
-        ],
+        "lib": [ "lib.es2020.d.ts" ],
         "module": 6,
         "target": 7
       }, tsFile);

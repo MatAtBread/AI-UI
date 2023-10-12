@@ -5,9 +5,11 @@ module.exports = {
    watch: false,
    output: {
       filename: 'ai-ui.min.js',
-      path: path.resolve(__dirname, 'lib'),
-      libraryTarget: 'var',
-      library: 'AIUI'
+      path: path.resolve(__dirname, 'dist'),
+      library:{
+         type: 'var',
+         name: 'AIUI'
+      }
    },
    resolve: {
       extensions: ['.ts'],

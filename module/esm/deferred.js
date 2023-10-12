@@ -8,3 +8,6 @@ export function deferred() {
     promise.reject = reject;
     return promise;
 }
+export function isPromiseLike(x) {
+    return x !== null && x !== undefined && typeof x.then === 'function';
+}

@@ -1,5 +1,10 @@
+import { isPromiseLike } from './deferred.js';
+import { isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
+
+/* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
+export * as Iterators from './iterators.js';
 
 const DEBUG = false;
 /* Types */
@@ -19,20 +24,6 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
 export type Instance<T extends {} = Record<string,unknown>> = T;
 
 type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
-
-function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
-  return typeof o?.next === 'function';
-}
-export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
-  return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
-}
-function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T> {
-  return isAsyncIterable(o) || isAsyncIterator(o);
-}
-
-export function isPromiseLike<T>(x: any): x is PromiseLike<T> {
-  return x !== null && x !== undefined && typeof x.then === 'function'
-}
 
 function asyncIterator<T>(o: AsyncIterator<T> | AsyncIterable<T>) {
   if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();

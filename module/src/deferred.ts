@@ -15,3 +15,7 @@ export function deferred<T>(): DeferredPromise<T> {
   promise.reject = reject;
   return promise;
 }
+
+export function isPromiseLike<T>(x: any): x is PromiseLike<T> {
+  return x !== null && x !== undefined && typeof x.then === 'function';
+}

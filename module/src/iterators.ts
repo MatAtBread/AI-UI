@@ -1,4 +1,3 @@
-import { isAsyncIterable } from "./ai-ui.js";
 import { DeferredPromise, deferred } from "./deferred.js";
 
 /* Things to suppliement the JS base AsyncIterable */
@@ -10,6 +9,15 @@ export type PushIterator<T> = AsyncExtraIterable<T> & {
 export type BroadcastIterator<T> = PushIterator<T>;
 
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers {}
+export function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
+  return typeof o?.next === 'function';
+}
+export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
+  return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
+}
+export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T> {
+  return isAsyncIterable(o) || isAsyncIterator(o);
+}
 
 /* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
   something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
@@ -427,4 +435,3 @@ async function consume<U>(this: AsyncIterable<U>, f: (u: U) => void): Promise<vo
   for await (const u of this)
     f(u);
 }
-

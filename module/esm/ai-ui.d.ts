@@ -1,13 +1,12 @@
 import { WhenParameters, WhenReturn } from './when.js';
 export { when } from './when.js';
+export * as Iterators from './iterators.js';
 type VSCodeEvaluateType<X> = [{
     [K in keyof X]: X[K];
 }][0];
 export type ChildTags = Node | number | string | boolean | undefined | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 export type Instance<T extends {} = Record<string, unknown>> = T;
 type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
-export declare function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T>;
-export declare function isPromiseLike<T>(x: any): x is PromiseLike<T>;
 type Overrides = {
     constructed?: () => (ChildTags | void | Promise<void>);
     ids?: {

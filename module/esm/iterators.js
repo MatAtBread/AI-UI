@@ -1,5 +1,13 @@
-import { isAsyncIterable } from "./ai-ui.js";
 import { deferred } from "./deferred.js";
+export function isAsyncIterator(o) {
+    return typeof o?.next === 'function';
+}
+export function isAsyncIterable(o) {
+    return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
+}
+export function isAsyncIter(o) {
+    return isAsyncIterable(o) || isAsyncIterator(o);
+}
 /* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
   something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
   the same arguments returns a AsyncExtraIterable<X>
