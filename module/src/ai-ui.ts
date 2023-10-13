@@ -9,9 +9,6 @@ export * as Iterators from './iterators.js';
 const DEBUG = false;
 /* Types */
 
-// A hack to make VSCode evaluate (and simplify) a type for display to the dev user
-type VSCodeEvaluateType<X> = [{ [K in keyof X]: X[K] }][0]
-
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
   | undefined   // A value that won't generate an element
@@ -25,35 +22,13 @@ export type Instance<T extends {} = Record<string,unknown>> = T;
 
 type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 
-function asyncIterator<T>(o: AsyncIterator<T> | AsyncIterable<T>) {
+function asyncIterator<T>(o: AsyncProvider<T>) {
   if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
   if (isAsyncIterator(o)) return o;
   throw new Error("Not as async provider");
 }
 
-type Overrides = {
-  constructed?: () => (ChildTags | void | Promise<void>);
-  ids?: { [id: string]: TagCreator<Element> }
-  prototype?: object;
-  styles?: string;
-}
-
-type IDS<I> = VSCodeEvaluateType<{
-  ids: {
-    [J in keyof I]?: I[J] extends (...a: any[]) => infer R ? R : never
-  }
-}>
-
-// Our version of DeepPartial, which includes functions that have other members
-type DeepPartial<T extends object> = {
-  [K in keyof T]?: T[K] extends object
-  ? T[K] extends Function
-  ? T[K] & DeepPartial<T[K]>
-  : DeepPartial<T[K]> | null
-  : T[K] | null
-};
-
-type PossiblyAsync<X> = X extends object
+type PossiblyAsync<X> = [X] extends [object]  // Not "naked" to prevent union distribution
   ? X extends AsyncProvider<infer U>
     // X is an AsyncProvider, U is what it provides
     ? PossiblyAsync<U> 
@@ -66,24 +41,30 @@ type AsyncGeneratedValue<X> = X extends AsyncProvider<infer Value> ? Value : X
 type AsyncGeneratedObject<X extends object> = {
   [K in keyof X]: AsyncGeneratedValue<X[K]>
 }
+type Overrides = {
+  constructed?: () => (ChildTags | void | Promise<void>);
+  ids?: { [id: string]: TagCreator<Element> }
+  prototype?: object;
+  styles?: string;
+}
+
+type IDS<I> = {
+  ids: {
+    [J in keyof I]?: I[J] extends (...a: any[]) => infer R ? R : never
+  }
+}
 
 type CommonKeys<A, B> = keyof A & keyof B;
 
-type OverrideMembers<Override, Base> = Override extends Array<any>
-  ? Override  // Arrays always override the base (TODO: check members?)
-  : Omit<Override & Base, CommonKeys<Override, Base>> & {
-    [K in CommonKeys<Override, Base>]: Override[K] extends object
-    ? Override[K] extends Function
-    ? Override[K] // An Function replaces anything
-    : Base[K] extends object
-    ? OverrideMembers<Override[K], Base[K]> // Both are objects - recurse
-    : Override[K] // An object replaces a non-object
-    : Override[K] // Neither are objects - just accept the Override primitive in place of teh Base primitive
+type OverrideMembers<Override extends object, Base extends object> 
+  = Omit<Override & Base, CommonKeys<Override, Base>> 
+  & {
+    [K in CommonKeys<Override, Base>]: Override[K] | Base[K]
   };
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
-  
-interface ExtendedTag<Base extends Element, Super> {
+
+type ExtendedTag<Base extends object, Super> = {
   // Functional, with a private Instance
   <
     C extends () => (ChildTags | void | Promise<void>),
@@ -92,7 +73,7 @@ interface ExtendedTag<Base extends Element, Super> {
     S extends string | undefined,
     X extends Instance<V>,
     V extends {},
-    CET extends Element = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
+    CET extends object = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
   >(_: ((i: Instance<V>) => {
     constructed?: C
     ids?: I
@@ -107,7 +88,7 @@ interface ExtendedTag<Base extends Element, Super> {
     I extends { [id: string]: TagCreator<Element> },
     P extends {},
     S extends string | undefined,
-    CET extends Element = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
+    CET extends object = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
   >(_: {
     constructed?: C
     ids?: I
@@ -117,32 +98,53 @@ interface ExtendedTag<Base extends Element, Super> {
     : TagCreator<CET, Super> & StaticMembers<P, Base>
 }
 
-export interface TagCreator<Base extends Element,
+type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
+export type TagCreator<Base extends object,
   Super = never,
-  CAT = PossiblyAsync<Base> & ThisType<Base>> {
+  CAT = PossiblyAsync<Base> & ThisType<Base>> = {
   /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
     The attributes are PossiblyAsync 
   */
-  (attrs: CAT): Base & ImplicitElementMethods;
-  (attrs: CAT, ...children: ChildTags[]): Base & ImplicitElementMethods;
-  (...children: ChildTags[]): Base & ImplicitElementMethods;
+  (...args: TagCreatorArgs<CAT>):
+    VSCodeEvaluateType<Base & ImplicitElementMethods>;
+
   /* It can also be extended */
   extended: ExtendedTag<Base, TagCreator<Base, Super>>,
   /* It is based on a "super" TagCreator */
   super: TagCreator<Base>
   /* It has a function that exposes the differences between the tags it creates and its super */
   overrides?: (<A extends Instance>(a: A) => Overrides) /* null for base tags */
-  /* It has a name, which is helpful when debugging */
+  /* It has a name (set to a class or definition location), which is helpful when debugging */
   readonly name: string
 }
 
-type OtherMembers = { /* [member: string]: unknown */ };
+// A hack to make VSCode evaluate (and simplify) a type for display to the dev user
+type VSCodeEvaluateType<X> = X extends Function ? X : [{ [K in keyof X]: X[K] }][0]
+
+/* A holder for prototypes specified when `tag(...p)` is invoked, which are always
+  applied (mixed in) when an element is created */
+type OtherMembers = { };
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
 interface TagLoader {
-  /** @deprecated */
+  /** @deprecated - Legacy function similar to Element.append/before/after */
   appender(container: Node, before?: Node): (c: ChildTags) => (Node | (/*P &*/ (Element & PoElementMethods)))[];
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
+
+  /*
+   Signatures for the tag loader. All params are optional in any combination, 
+   but must be in order:
+      tag(
+          ?nameSpace?: string,  // absent nameSpace implies HTML
+          ?tags?: string[],     // absent tags defaults to all common HTML tags
+          ?prototypes?: PrototypeConstraint // absent prototypes implies none are defined
+      )
+
+      eg:
+        tags()  // returns TagCreators for all HTML tags
+        tags(['div','button'], { myThing() {} })
+        tags('http://namespace',['Foreign'], { isForeign: true })
+  */
   <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
   <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
   <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> };
@@ -564,7 +566,7 @@ export const tag = <TagLoader>function <Tags extends string,
             appender(e)(children);
         }
       }
-      return e as (NamespacedElementBase & PoElementMethods & ImplicitElementMethods);
+      return e;
     }
 
     const extendTag = </*TagCreator<Element>*/any>Object.assign(extendTagFn, {

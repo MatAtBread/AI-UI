@@ -107,7 +107,6 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
           if (selector) {
             const nodes = container.querySelectorAll(selector);
             for (const n of nodes) {
-              //if (ev.target === n && container.contains(n))
               if ((ev.target === n || n.contains(ev.target as Node)) && container.contains(n))
                 push.push(ev)
             }

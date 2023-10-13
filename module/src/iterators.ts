@@ -286,7 +286,7 @@ async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | Promis
   }
 }
 
-async function *initially<U, I>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I> {
+async function *initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I> {
   yield initValue;
   for await (const u of this)
     yield u;

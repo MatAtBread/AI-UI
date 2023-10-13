@@ -118,15 +118,15 @@ const App = div.extended({
         style:{
           color: this.when('#text(keyup)',blinky('blink'))(e => typeof e === 'string' ? e : this.ids.text.value)
         },
-        onclick(this: ReturnType<typeof div>) { this.remove() }
+        onclick() { this.remove() }
       },'blink'),
       div({
         style: this.when(blinky('mapped'))(async b => ({color:b})),
-        onclick(this: ReturnType<typeof div>) { this.remove() }
+        onclick() { this.remove() }
       },'mapped'),
       this.when(blinky('div'))(
         s => div({
-          onclick(this: ReturnType<typeof div>) { this.remove() }, 
+          onclick() { this.remove() }, 
           style:{ color: s }
         },"div")
       ),
@@ -136,18 +136,18 @@ const App = div.extended({
       div({ style: { color: this.when(sleep(1000,'red')) }},"iter/promise ",this.when(sleep(1000,123))),
 
       mousePos.map(p => div({
-        onclick(this: ReturnType<typeof div>) { this.remove() }, 
+        onclick() { this.remove() }, 
       },
         "New div", JSON.stringify(p))
       ),
 
       div({
-        onclick(this: ReturnType<typeof div>) { this.remove() }, 
+        onclick() { this.remove() }, 
       },
         mousePos.map(p => ["Same div, new content", JSON.stringify(p)]).initially("...Move the mouse...")
       ),
       div({
-        onclick(this: ReturnType<typeof div>) { this.remove() }, 
+        onclick() { this.remove() }, 
         textContent: mousePos.map(p => 'Div.textContent ' + JSON.stringify(p))
       }),
 
@@ -181,7 +181,10 @@ const Block = div.extended({
 const xy = mousePos.waitFor(done => setTimeout(done, 40)).map(({x,y}) => ({
   left: `${x + 20}px`,
   top: `${y + 20}px`
-}));
+})).initially({
+  left: '50%',
+  top: '50%'
+});
 
 
 let app: ReturnType<typeof App>;
@@ -189,7 +192,7 @@ document.body.append(
   app = App({ style: { border: '1px solid black' }}),
   Block({
     style: xy,
-    onclick(this: ReturnType<typeof span>) { 
+    onclick() { 
       this.remove();
     }
   })

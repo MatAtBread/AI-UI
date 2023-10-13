@@ -17,7 +17,6 @@ function docEventHandler(ev) {
                     if (selector) {
                         const nodes = container.querySelectorAll(selector);
                         for (const n of nodes) {
-                            //if (ev.target === n && container.contains(n))
                             if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
                                 push.push(ev);
                         }

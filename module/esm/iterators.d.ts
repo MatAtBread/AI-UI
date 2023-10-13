@@ -25,7 +25,7 @@ export declare const asyncExtras: {
         done: boolean;
     } & AsyncExtraIterable<U_6>;
     broadcast: <U_7, X>(this: AsyncIterable<U_7>, pipe?: ((dest: AsyncIterable<U_7>) => AsyncIterable<X>) | undefined) => AsyncIterable<X> & AsyncExtraIterable<X>;
-    initially: <U_8, I>(this: AsyncIterable<U_8>, initValue: I) => AsyncIterable<U_8 | I> & AsyncExtraIterable<U_8 | I>;
+    initially: <U_8, I = U_8>(this: AsyncIterable<U_8>, initValue: I) => AsyncIterable<U_8 | I> & AsyncExtraIterable<U_8 | I>;
     consume: typeof consume;
 };
 export declare function pushIterator<T>(stop?: () => void, bufferWhenNoConsumers?: boolean): PushIterator<T>;
