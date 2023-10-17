@@ -51,7 +51,7 @@ const App = div.extended({
 document.body.appendChild(App());
 
 // A simple async function that pauses for the specified number of milliseocnds
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 

@@ -1,129 +1,23 @@
 import { isPromiseLike } from './deferred.js';
 import { isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
+import { AsyncProvider, ChildTags, Instance, Overrides, TagCreator } from './tags'
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
 
 const DEBUG = false;
-/* Types */
-
-export type ChildTags = Node // Things that are DOM nodes (including elements)
-  | number | string | boolean // Things that can be converted to text nodes via toString
-  | undefined   // A value that won't generate an element
-  // NB: we can't check the contained type at runtime, so we have to be liberal
-  // and wait for the de-containment to fail if it turns out to not be a `ChildTags`
-  | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> // Things that will resolve to any of the above
-  | Array<ChildTags>
-  | Iterable<ChildTags> // Iterable things that hold the above, like Arrays
-
-export type Instance<T extends {} = Record<string,unknown>> = T;
-
-type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
-
-function asyncIterator<T>(o: AsyncProvider<T>) {
-  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
-  if (isAsyncIterator(o)) return o;
-  throw new Error("Not as async provider");
-}
-
-type PossiblyAsync<X> = [X] extends [object]  // Not "naked" to prevent union distribution
-  ? X extends AsyncProvider<infer U>
-    // X is an AsyncProvider, U is what it provides
-    ? PossiblyAsync<U> 
-    // X is an object (but not an AsyncProvider), containing stuff
-    : AsyncProvider<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]> }
-  // X is primitive
-  : X | AsyncProvider<X> | undefined 
-
-type AsyncGeneratedValue<X> = X extends AsyncProvider<infer Value> ? Value : X
-type AsyncGeneratedObject<X extends object> = {
-  [K in keyof X]: AsyncGeneratedValue<X[K]>
-}
-type Overrides = {
-  constructed?: () => (ChildTags | void | Promise<void>);
-  ids?: { [id: string]: TagCreator<Element> }
-  prototype?: object;
-  styles?: string;
-}
-
-type IDS<I> = {
-  ids: {
-    [J in keyof I]?: I[J] extends (...a: any[]) => infer R ? R : never
-  }
-}
-
-type CommonKeys<A, B> = keyof A & keyof B;
-
-type OverrideMembers<Override extends object, Base extends object> 
-  = Omit<Override & Base, CommonKeys<Override, Base>> 
-  & {
-    [K in CommonKeys<Override, Base>]: Override[K] | Base[K]
-  };
-
-type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
-
-type ExtendedTag<Base extends object, Super> = {
-  // Functional, with a private Instance
-  <
-    C extends () => (ChildTags | void | Promise<void>),
-    I extends { [id: string]: TagCreator<Element> },
-    P extends {},
-    S extends string | undefined,
-    X extends Instance<V>,
-    V extends {},
-    CET extends object = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
-  >(_: ((i: Instance<V>) => {
-    constructed?: C
-    ids?: I
-    prototype?: P;
-    styles?: S
-  } & ThisType<AsyncGeneratedObject<CET>>))
-    : TagCreator<CET, Super> & StaticMembers<P, Base>
-
-  // Declarative, with no state instance
-  <
-    C extends () => (ChildTags | void | Promise<void>),
-    I extends { [id: string]: TagCreator<Element> },
-    P extends {},
-    S extends string | undefined,
-    CET extends object = VSCodeEvaluateType<OverrideMembers<P, Base> & IDS<I>>
-  >(_: {
-    constructed?: C
-    ids?: I
-    prototype?: P;
-    styles?: S
-  } & ThisType<AsyncGeneratedObject<CET>>)
-    : TagCreator<CET, Super> & StaticMembers<P, Base>
-}
-
-type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
-export type TagCreator<Base extends object,
-  Super = never,
-  CAT = PossiblyAsync<Base> & ThisType<Base>> = {
-  /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
-    The attributes are PossiblyAsync 
-  */
-  (...args: TagCreatorArgs<CAT>):
-    VSCodeEvaluateType<Base & ImplicitElementMethods>;
-
-  /* It can also be extended */
-  extended: ExtendedTag<Base, TagCreator<Base, Super>>,
-  /* It is based on a "super" TagCreator */
-  super: TagCreator<Base>
-  /* It has a function that exposes the differences between the tags it creates and its super */
-  overrides?: (<A extends Instance>(a: A) => Overrides) /* null for base tags */
-  /* It has a name (set to a class or definition location), which is helpful when debugging */
-  readonly name: string
-}
-
-// A hack to make VSCode evaluate (and simplify) a type for display to the dev user
-type VSCodeEvaluateType<X> = X extends Function ? X : [{ [K in keyof X]: X[K] }][0]
 
 /* A holder for prototypes specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
 type OtherMembers = { };
+
+/* Members applied to EVERY tag created, even base tags */
+interface PoElementMethods {
+  get ids(): Record<string, Element | undefined>;
+  when<S extends WhenParameters>(...what: S): WhenReturn<S>;
+}
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
 interface TagLoader {
@@ -162,17 +56,7 @@ const standandTags = [
   "title","tr","track","u","ul","var","video","wbr"
 ] as const;
 
-/* Members applied to EVERY tag created, even base tags */
-interface PoElementMethods {
-  get ids(): Record<string, Element | undefined>;
-  when<S extends WhenParameters>(...what: S): WhenReturn<S>;
-}
-
-interface ImplicitElementMethods {
-  constructor: TagCreator<Element>
-}
-
-const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods & ImplicitElementMethods> = {
+const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = {
   get ids() {
     return getElementIdMap(this, /*Object.create(this.defaults) ||*/);
   },
@@ -202,6 +86,28 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods & I
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";
 
+function asyncIterator<T>(o: AsyncProvider<T>) {
+  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
+  if (isAsyncIterator(o)) return o;
+  throw new Error("Not as async provider");
+}
+
+function isChildTag(x: any): x is ChildTags {
+  return typeof x === 'string'
+    || typeof x === 'number'
+    || typeof x === 'function'
+    || x instanceof Node
+    || x instanceof NodeList
+    || x instanceof HTMLCollection
+    || x === null
+    || x === undefined
+    // Can't actually test for the contained type, so we assume it's a ChildTag and let it fail at runtime
+    || Array.isArray(x)
+    || isPromiseLike(x)
+    || isAsyncIter(x)
+    || typeof x[Symbol.iterator] === 'function';
+}
+
 /* tag */
 const callStackSymbol = Symbol('callStack');
 
@@ -230,22 +136,6 @@ export const tag = <TagLoader>function <Tags extends string,
     : Array.isArray(_1)
       ? [null, _1 as Tags[], _2 as P] 
       : [null, standandTags, _1 as P];
-
-  function isChildTag(x: any): x is ChildTags {
-    return typeof x === 'string'
-      || typeof x === 'number'
-      || typeof x === 'function'
-      || x instanceof Node
-      || x instanceof NodeList
-      || x instanceof HTMLCollection
-      || x === null
-      || x === undefined
-      // Can't actually test for the contained type, so we assume it's a ChildTag and let it fail at runtime
-      || Array.isArray(x)
-      || isPromiseLike(x)
-      || isAsyncIter(x)
-      || typeof x[Symbol.iterator] === 'function';
-  }
 
   /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
     are not evaluated until called */
@@ -613,9 +503,9 @@ export const tag = <TagLoader>function <Tags extends string,
     [n: string]: TagCreator<P & Element & P & PoElementMethods>
   } = {};
 
-  function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<P & HTMLElementTagNameMap[K] & PoElementMethods & ImplicitElementMethods>;
-  function createTag<E extends Element>(k: string): TagCreator<P & E & PoElementMethods & ImplicitElementMethods>;
-  function createTag(k: string): TagCreator<P & NamespacedElementBase & PoElementMethods & ImplicitElementMethods> {
+  function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<P & HTMLElementTagNameMap[K] & PoElementMethods>;
+  function createTag<E extends Element>(k: string): TagCreator<P & E & PoElementMethods>;
+  function createTag(k: string): TagCreator<P & NamespacedElementBase & PoElementMethods> {
     if (baseTagCreators[k])
       // @ts-ignore
       return baseTagCreators[k];
@@ -652,7 +542,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
         // Append any children
         appender(e)(children);
-        return e as Element & ImplicitElementMethods;
+        return e;
       }
     }
 

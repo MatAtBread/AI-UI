@@ -1,15 +1,13 @@
 {
+  /* NB: This folder is NOT compiled. This tsconfig is just so the VSCode provides intellisense help in the files */
   "compilerOptions": {
-    "declaration": true,
+    "noEmit": true,
+    "declaration": false,
     "target": "ES2020",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
     "module": "ES2020",                                  /* Specify what module code is generated. */
-    "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
-    "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
     "strict": true,                                      /* Enable all strict type-checking options. */
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
-    "outDir": "./esm",
-    "lib": ["DOM","DOM.Iterable","ES2020"],
-    "typeRoots": []
+    "lib": ["DOM","DOM.Iterable","ES2020"]
   },
-  "include": [ "src/ai-ui.ts"]
+  "include": [ "*.ts"]
 }

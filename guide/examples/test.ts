@@ -9,7 +9,7 @@ const sleep = function <T>(millis: number, r?: T) {
   });
 };
 
-function mousemove(e) {
+function mousemove(e: MouseEvent) {
   if (!mousePos.push({x: e.clientX, y: e.clientY})) {
     console.log("mousPos closed!!");
   }
@@ -109,14 +109,14 @@ const App = div.extended({
       input({id:'text'}),
       this.when('@start','#text(keyup)')(e => ('type' in e) ? div({
         style:{
-          color: blinky(this.ids.text?.value)
+          color: blinky(this.ids.text!.value)
         }        
       },this.ids.text?.value || e.type) : '@start'),
       interval(250,10,n=>div(n),'error'),
       interval(333,10,n=>div(10-n),'complete'),
       div({
         style:{
-          color: this.when('#text(keyup)',blinky('blink'))(e => typeof e === 'string' ? e : this.ids.text.value)
+          color: this.when('#text(keyup)',blinky('blink'))(e => typeof e === 'string' ? e : this.ids.text!.value)
         },
         onclick() { this.remove() }
       },'blink'),
@@ -151,12 +151,14 @@ const App = div.extended({
         textContent: mousePos.map(p => 'Div.textContent ' + JSON.stringify(p))
       }),
 
-      div(this.when('#lazy','@ready')(()=> this.ids.lazy.thing)),
+      div(this.when('#lazy','@ready')(()=> this.ids.lazy!.thing)),
 
       Laziest({ id: 'lazy'}, 'Lovely!'), pre(Laziest.valueOf()),
       Laziest.super('Super!'), pre(Laziest.super.valueOf()),
       Laziest.super.super('Super duper!'), pre(Laziest.super.super.valueOf()),
-      Laziest.super.super.super('Super duper 2'), pre(Laziest.super.super.super.valueOf())
+      Laziest.super.super.super('Super duper 2'), pre(Laziest.super.super.super.valueOf()),
+
+      this.when('#lazy','@ready')(() => pre(this.ids.lazy!.constructor.name))
     ]
   }
 });
@@ -181,10 +183,7 @@ const Block = div.extended({
 const xy = mousePos.waitFor(done => setTimeout(done, 40)).map(({x,y}) => ({
   left: `${x + 20}px`,
   top: `${y + 20}px`
-})).initially({
-  left: '50%',
-  top: '50%'
-});
+}));
 
 
 let app: ReturnType<typeof App>;
@@ -192,9 +191,7 @@ document.body.append(
   app = App({ style: { border: '1px solid black' }}),
   Block({
     style: xy,
-    onclick() { 
-      this.remove();
-    }
+    onclick() { this.remove(); }
   })
 );
 

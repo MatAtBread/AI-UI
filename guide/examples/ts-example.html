@@ -35,6 +35,7 @@
       script.append(jsCode + '\n//# sourceURL=./'+tsFile);
       document.body.innerHTML = '';
       document.body.append(script);
+      console.log(jsCode)
     })
     .catch(error => alert(error.message));
 </script>

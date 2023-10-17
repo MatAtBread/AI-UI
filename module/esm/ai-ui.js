@@ -5,13 +5,6 @@ import { when } from './when.js';
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
 const DEBUG = false;
-function asyncIterator(o) {
-    if (isAsyncIterable(o))
-        return o[Symbol.asyncIterator]();
-    if (isAsyncIterator(o))
-        return o;
-    throw new Error("Not as async provider");
-}
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
     "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",
@@ -48,6 +41,28 @@ const elementProtype = {
 };
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";
+function asyncIterator(o) {
+    if (isAsyncIterable(o))
+        return o[Symbol.asyncIterator]();
+    if (isAsyncIterator(o))
+        return o;
+    throw new Error("Not as async provider");
+}
+function isChildTag(x) {
+    return typeof x === 'string'
+        || typeof x === 'number'
+        || typeof x === 'function'
+        || x instanceof Node
+        || x instanceof NodeList
+        || x instanceof HTMLCollection
+        || x === null
+        || x === undefined
+        // Can't actually test for the contained type, so we assume it's a ChildTag and let it fail at runtime
+        || Array.isArray(x)
+        || isPromiseLike(x)
+        || isAsyncIter(x)
+        || typeof x[Symbol.iterator] === 'function';
+}
 /* tag */
 const callStackSymbol = Symbol('callStack');
 export const tag = function (_1, _2, _3) {
@@ -64,21 +79,6 @@ export const tag = function (_1, _2, _3) {
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
-    function isChildTag(x) {
-        return typeof x === 'string'
-            || typeof x === 'number'
-            || typeof x === 'function'
-            || x instanceof Node
-            || x instanceof NodeList
-            || x instanceof HTMLCollection
-            || x === null
-            || x === undefined
-            // Can't actually test for the contained type, so we assume it's a ChildTag and let it fail at runtime
-            || Array.isArray(x)
-            || isPromiseLike(x)
-            || isAsyncIter(x)
-            || typeof x[Symbol.iterator] === 'function';
-    }
     /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
       are not evaluated until called */
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
