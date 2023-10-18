@@ -5,6 +5,7 @@ import { AsyncProvider, ChildTags, Instance, Overrides, TagCreator } from './tag
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
+export { ChildTags, Instance } from './tags'
 export * as Iterators from './iterators.js';
 
 const DEBUG = false;
