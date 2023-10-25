@@ -14,12 +14,10 @@ type SpecialWhenEvents = {
 type WhenEvents = GlobalEventHandlersEventMap & SpecialWhenEvents;
 type EventNameList<T extends string> = T extends keyof WhenEvents ? T : T extends `${infer S extends keyof WhenEvents},${infer R}` ? EventNameList<R> extends never ? never : `${S},${EventNameList<R>}` : never;
 type EventNameUnion<T extends string> = T extends keyof WhenEvents ? T : T extends `${infer S extends keyof WhenEvents},${infer R}` ? EventNameList<R> extends never ? never : S | EventNameList<R> : never;
-type WhenElement = `#${string}` | `.${string}`;
-type EventAttribute = `(${keyof GlobalEventHandlersEventMap})`;
-type CSSIdentifier = `${"." | "#"}${string}`;
-export type ValidWhenSelector = `${keyof SpecialWhenEvents}` | `${CSSIdentifier}${EventAttribute}` | EventAttribute | CSSIdentifier;
-type NakedWhenElement<T extends WhenElement> = T extends (`${string}(${string}` | `${string})${string}`) ? never : T;
-type ExtractEventNames<S> = S extends keyof SpecialWhenEvents ? S : S extends `${infer L}(${infer V})` ? EventNameUnion<V> extends never ? never : EventNameUnion<V> : S extends `${infer L}(${string})` ? never : S extends `${infer L extends WhenElement}` ? NakedWhenElement<L> extends never ? never : 'change' : never;
+type EventAttribute = `${keyof GlobalEventHandlersEventMap}`;
+type CSSIdentifier = `${"." | "#"}${string}` | `[${string}]`;
+export type ValidWhenSelector = `${keyof SpecialWhenEvents}` | `${EventAttribute}:${CSSIdentifier}` | EventAttribute | CSSIdentifier;
+type ExtractEventNames<S> = S extends keyof SpecialWhenEvents ? S : S extends `${infer V}:${infer L extends CSSIdentifier}` ? EventNameUnion<V> extends never ? never : EventNameUnion<V> : S extends `${infer L extends CSSIdentifier}` ? 'change' : never;
 type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];
 export declare function when<S extends WhenParameters>(container: Element, ...sources: S): WhenReturn<S>;
 export {};

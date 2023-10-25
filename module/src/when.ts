@@ -6,8 +6,8 @@ import { PushIterator, pushIterator, withHelpers, asyncExtras, merge, AsyncExtra
   `when(....)` is both an AsyncIterable of the events it can generate by observation, 
   and a function that can map those events to a specified type, eg:
   
-  this.when('#elemet(keyup)') => AsyncIterable<KeyboardEvent>
-  this.when('#elemet(keyup)')(e => e.target) => AsyncIterable<EventTarget>
+  this.when('keyup:#elemet') => AsyncIterable<KeyboardEvent>
+  this.when('#elemet')(e => e.target) => AsyncIterable<EventTarget>
 */
 // Varargs type passed to "when"
 export type WhenParameters = (
@@ -52,35 +52,32 @@ type EventNameUnion<T extends string> = T extends keyof WhenEvents
   ? EventNameList<R> extends never ? never : S | EventNameList<R>
   : never;
 
-type WhenElement = `#${string}` | `.${string}`;
-type EventAttribute = `(${keyof GlobalEventHandlersEventMap})`
-type CSSIdentifier = `${"." | "#"}${string}`
+
+type EventAttribute = `${keyof GlobalEventHandlersEventMap}`
+type CSSIdentifier = `${"." | "#"}${string}` | `[${string}]`
+
+/* ValidWhenSelectors are:
+    @start
+    @ready
+    event:selector
+    event           "this" element, event type='event'
+    selector        specificed selectors, implies "change" event
+*/    
+
 export type ValidWhenSelector = `${keyof SpecialWhenEvents}`
-  | `${CSSIdentifier}${EventAttribute}`
+  | `${EventAttribute}:${CSSIdentifier}`
   | EventAttribute
   | CSSIdentifier;
 
-type NakedWhenElement<T extends WhenElement> =
-  T extends (`${string}(${string}` | `${string})${string}`) ? never : T;
-
 type IsValidWhenSelector<S>
-  = S extends keyof SpecialWhenEvents ? S
-  : S extends `${infer L}(${infer V})`
-  ? EventNameUnion<V> extends never ? never : S
-  : S extends `${infer L}(${string})`
-  ? never
-  : S extends `${infer L extends WhenElement}`
-  ? NakedWhenElement<L> extends never ? never : S
-  : never;
+  = S extends ValidWhenSelector ? S : never;
 
 type ExtractEventNames<S>
   = S extends keyof SpecialWhenEvents ? S
-  : S extends `${infer L}(${infer V})`
+  : S extends `${infer V}:${infer L extends CSSIdentifier}`
   ? EventNameUnion<V> extends never ? never : EventNameUnion<V>
-  : S extends `${infer L}(${string})`
-  ? never
-  : S extends `${infer L extends WhenElement}`
-  ? NakedWhenElement<L> extends never ? never : 'change'
+  : S extends `${infer L extends CSSIdentifier}`
+  ? 'change'
   : never;
 
 type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];
@@ -122,9 +119,30 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
   }
 }
 
+function isCSSSelector(s: string): s is CSSIdentifier {
+  return Boolean(s && (s.startsWith('#') || s.startsWith('.') || (s.startsWith('[') && s.endsWith(']'))));
+}
+
+function parseWhenSelector<EventName extends string>(what: IsValidWhenSelector<EventName>): undefined | [CSSIdentifier | null, keyof GlobalEventHandlersEventMap] {
+  const parts = what.split(':');
+  if (parts.length === 1) {
+    if (isCSSSelector(parts[0]))
+      return [parts[0],"change"];
+    return [null, parts[0] as keyof GlobalEventHandlersEventMap];
+  } 
+  if (parts.length === 2) {
+    if (isCSSSelector(parts[1]) && !isCSSSelector(parts[0]))
+    return [parts[1], parts[0] as keyof GlobalEventHandlersEventMap]
+  }
+  return undefined;
+}
+
+function doThrow(message: string):never {
+  throw new Error(message);
+}
+
 function whenEvent<EventName extends string>(container: Element, what: IsValidWhenSelector<EventName>) {
-  const parts = what.match(/(.*)?\((.+)\)$/)?.slice(1, 3) || [what, 'change'];
-  const [selector, eventName] = parts as [string, keyof GlobalEventHandlersEventMap];
+  const [selector, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: "+what);
 
   if (!eventObservations.has(eventName)) {
     document.addEventListener(eventName, docEventHandler, {
@@ -135,7 +153,7 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   }
 
   const push = pushIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
-  const details: EventObservation<Exclude<ExtractEventNames<EventName>, '@start' | '@ready'>> = {
+  const details: EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>> = {
     push,
     container,
     selector: selector || null
@@ -168,7 +186,7 @@ function chainAsync<A extends AsyncIterable<X>, X>(src: A): MappableIterable<A> 
 function isValidWhenSelector(what: WhenParameters[number]): what is ValidWhenSelector {
   if (!what)
     throw new Error('Falsy async source will never be ready\n\n' + JSON.stringify(what));
-  return typeof what === 'string' && what[0] !== '@';
+  return typeof what === 'string' && what[0] !== '@' && Boolean(parseWhenSelector(what));
 }
 
 async function* once<T>(p: Promise<T>) {
@@ -177,28 +195,28 @@ async function* once<T>(p: Promise<T>) {
 
 export function when<S extends WhenParameters>(container: Element, ...sources: S): WhenReturn<S> {
   if (!sources || sources.length === 0) {
-    return chainAsync(whenEvent(container, "(change)")) as unknown as WhenReturn<S>;
+    return chainAsync(whenEvent(container, "change")) as unknown as WhenReturn<S>;
   }
 
   const iterators = sources.filter(what => typeof what !== 'string' || what[0] !== '@').map(what => typeof what === 'string'
     ? whenEvent(container, what)
     : what instanceof Element
-      ? whenEvent(what, "(change)")
+      ? whenEvent(what, "change")
       : isPromiseLike(what)
         ? once(what)
         : what);
 
-  const start: AsyncIterableIterator<{}> = {
-    [Symbol.asyncIterator]: () => start,
-    next() {
-      const d = deferred<IteratorReturnResult<{}>>();
-      requestAnimationFrame(() => d.resolve({ done: true, value: {} }));
-      return d;
-    }
-  };
-
-  if (sources.includes('@start'))
-    iterators.push(start)
+  if (sources.includes('@start')) {
+    const start: AsyncIterableIterator<{}> = {
+      [Symbol.asyncIterator]: () => start,
+      next() {
+        const d = deferred<IteratorReturnResult<{}>>();
+        requestAnimationFrame(() => d.resolve({ done: true, value: {} }));
+        return d;
+      }
+    };
+    iterators.push(start);
+  }
 
   if (sources.includes('@ready')) {
     const watchSelectors = sources.filter(isValidWhenSelector).map(what => what.split('(')[0]);

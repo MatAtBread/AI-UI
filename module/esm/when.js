@@ -33,9 +33,27 @@ function docEventHandler(ev) {
         }
     }
 }
+function isCSSSelector(s) {
+    return Boolean(s && (s.startsWith('#') || s.startsWith('.') || (s.startsWith('[') && s.endsWith(']'))));
+}
+function parseWhenSelector(what) {
+    const parts = what.split(':');
+    if (parts.length === 1) {
+        if (isCSSSelector(parts[0]))
+            return [parts[0], "change"];
+        return [null, parts[0]];
+    }
+    if (parts.length === 2) {
+        if (isCSSSelector(parts[1]) && !isCSSSelector(parts[0]))
+            return [parts[1], parts[0]];
+    }
+    return undefined;
+}
+function doThrow(message) {
+    throw new Error(message);
+}
 function whenEvent(container, what) {
-    const parts = what.match(/(.*)?\((.+)\)$/)?.slice(1, 3) || [what, 'change'];
-    const [selector, eventName] = parts;
+    const [selector, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: " + what);
     if (!eventObservations.has(eventName)) {
         document.addEventListener(eventName, docEventHandler, {
             passive: true,
@@ -74,32 +92,33 @@ function chainAsync(src) {
 function isValidWhenSelector(what) {
     if (!what)
         throw new Error('Falsy async source will never be ready\n\n' + JSON.stringify(what));
-    return typeof what === 'string' && what[0] !== '@';
+    return typeof what === 'string' && what[0] !== '@' && Boolean(parseWhenSelector(what));
 }
 async function* once(p) {
     yield p;
 }
 export function when(container, ...sources) {
     if (!sources || sources.length === 0) {
-        return chainAsync(whenEvent(container, "(change)"));
+        return chainAsync(whenEvent(container, "change"));
     }
     const iterators = sources.filter(what => typeof what !== 'string' || what[0] !== '@').map(what => typeof what === 'string'
         ? whenEvent(container, what)
         : what instanceof Element
-            ? whenEvent(what, "(change)")
+            ? whenEvent(what, "change")
             : isPromiseLike(what)
                 ? once(what)
                 : what);
-    const start = {
-        [Symbol.asyncIterator]: () => start,
-        next() {
-            const d = deferred();
-            requestAnimationFrame(() => d.resolve({ done: true, value: {} }));
-            return d;
-        }
-    };
-    if (sources.includes('@start'))
+    if (sources.includes('@start')) {
+        const start = {
+            [Symbol.asyncIterator]: () => start,
+            next() {
+                const d = deferred();
+                requestAnimationFrame(() => d.resolve({ done: true, value: {} }));
+                return d;
+            }
+        };
         iterators.push(start);
+    }
     if (sources.includes('@ready')) {
         const watchSelectors = sources.filter(isValidWhenSelector).map(what => what.split('(')[0]);
         const missing = watchSelectors.filter(sel => !container.querySelector(sel));
