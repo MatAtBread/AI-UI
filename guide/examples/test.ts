@@ -47,7 +47,7 @@ const Lazy = h2.extended((instance:{ myAttr: number }) => ({
   async constructed(){
     this.thing = String(this.myAttr);
     await sleep(1000);
-    return [" Zzz (promise) ", span(this.when('@start','(change)')(_ => instance.myAttr))];
+    return [" Zzz (promise) ", span(this.when('change')(_ => instance.myAttr).initially(instance.myAttr))];
   }
 }));
 
@@ -107,16 +107,16 @@ const App = div.extended({
   constructed(){
     return [
       input({id:'text'}),
-      this.when('@start','#text(keyup)')(e => ('type' in e) ? div({
+      this.when('keyup:#text').initially({start: "Enter some text"}).map(e => ('type' in e) ? div({
         style:{
           color: blinky(this.ids.text!.value)
         }        
-      },this.ids.text?.value || e.type) : '@start'),
+      },this.ids.text?.value || e.type) : e.start),
       interval(250,10,n=>div(n),'error'),
       interval(333,10,n=>div(10-n),'complete'),
       div({
         style:{
-          color: this.when('#text(keyup)',blinky('blink'))(e => typeof e === 'string' ? e : this.ids.text!.value)
+          color: this.when('keyup:#text',blinky('blink'))(e => typeof e === 'string' ? e : this.ids.text!.value)
         },
         onclick() { this.remove() }
       },'blink'),
