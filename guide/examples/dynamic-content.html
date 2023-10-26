@@ -1,0 +1,50 @@
+<head>
+  <script src="https://unpkg.com/@matatbread/ai-ui/dist/ai-ui.js"></script>
+</head>
+
+<body>
+</body>
+<script>
+  /* Specify what base tags you reference in your UI */
+  const { h2, div, button, span } = AIUI.tag(['h2', 'div', 'button', 'span']);
+
+  /* Define a _new_ tag type, called `App`, based on the standard "<div>" tag, that is composed of an h2 and div elements. It will generate markup like:
+  
+  <div>
+      <h2>Hello World</h2>
+      <div>Dunno</div>
+  </div>
+
+  */
+
+  const App = div.extended({
+    constructed() {
+      /* When constructed, this "div" tags contains some other tags: */
+      return [
+        h2("Hello World"),
+        div(clock())
+      ]
+    }
+  });
+
+  /* Add add it to the document so the user can see it! */
+  document.body.appendChild(App({
+    style:{
+      color: 'blue'
+    }
+  },
+  'Your first web page'));
+
+  /* A simple async "sleep" function */
+  function sleep(seconds) {
+    return new Promise(resolve => setTimeout(resolve, seconds * 1000))
+  }
+
+  /* The async generator that yields the time once a second */
+  async function *clock() {
+    while (true) {
+      yield new Date().toString();
+      await sleep(1);
+    }
+  }
+</script>
