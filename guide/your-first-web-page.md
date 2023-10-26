@@ -61,6 +61,9 @@ The final markup now looks like:
 </div>
 ```
 
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/your-first-web-page.html)
+
+
 Note that if you specify children when invoking the functions that creates your new tag, and you have a `constructed()` member, the children are appended before the `constructed()` is invoked, allowing you to modify, move or delete the specified children.
 
 Your new `App(...)` method is indistinguishable from the "base" methods returned by `AIUI.tag()`. This is intentional - you can compose new tags using your new tag function (although "App" might be a misleading name) and create instances of your new tag in _exactly the same way as you would any of the base tags_. You can even call `App.extended(...)` to derive a new version of your tag that has specialised or altered behaviour. All tag methods support **composition** (by returning contained tags from `constructed()`) and **inheritance** (via the `TagFunction.extended(...)`). The details of how to do this are presented in the corresponding sections of this guide. Both the base tag functions and your extended tag functions just return normal DOM nodes.

@@ -48,6 +48,8 @@ async function *clock() {
     }
   });
 ```
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content.html)
+
 
 When the async generator yields, it will update the content in place in the DOM. In this case, that means telling us the time every second.
 
@@ -81,6 +83,7 @@ const App = div.extended({
     }
   });
 ```
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content-2.html)
 
 In this example the generator yields a set of DOM elements that are all updated every second.
 
@@ -110,6 +113,7 @@ Let's update the App to display a new Chuck Morris joke every few seconds:
     }
   });
 ```
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content-3.html)
 
 AIUI will create the DOM synchronously, and when the Promise resolves, update it in situ with a "joke" abour Chuck Norris.
 
