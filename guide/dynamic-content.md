@@ -5,7 +5,7 @@ In the previous example, we created a new tag type called "App":
 ```javascript
   const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div("Dunno")
@@ -40,7 +40,7 @@ async function *clock() {
 ```javascript
   const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div(clock())
@@ -75,7 +75,7 @@ async function *clock() {
 
 const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div("This time is now: ",clock())
@@ -105,7 +105,7 @@ Let's update the App to display a new Chuck Morris joke every few seconds:
 ```javascript
   const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div(chuckJoke())
@@ -118,3 +118,27 @@ Let's update the App to display a new Chuck Morris joke every few seconds:
 AIUI will create the DOM synchronously, and when the Promise resolves, update it in situ with a "joke" abour Chuck Norris.
 
 A child node in AIUI can be a DOM Node, a collection of DOM Nodes (eg an array, a NodeList or HTMLCollection), a primitve with a `toString()` method (numbers, strings, booleans, etc) or a Promise or async iterable that produces any of the above.
+
+In order to tell a series of jokes, we can just wrap the Promise in an async generator:
+
+```javascript
+  async function *chuckJoke() {
+    while (true) {
+      /* In this example, we use Promises, rather than await, just to illustrate the alternative
+      JavaScript syntax */
+      yield fetch('https://api.chucknorris.io/jokes/random')
+        .then(response => response.json())
+        .then(fromJson => fromJson.value);
+      await sleep(5);
+    }
+  }
+
+```
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content-4.html)
+
+
+____
+
+| < Prev |                     |  Next > |
+|--------|:-------------------:|--------:|
+| [Your first web page](./your-first-web-page.md) | [Index](./index.md) | [Dynamic attributes](./dynamic-attributes.md) |

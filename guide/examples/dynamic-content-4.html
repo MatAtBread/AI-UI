@@ -22,7 +22,7 @@
       /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
-        div("This time is now: ",clock())
+        div(chuckJoke())
       ]
     }
   });
@@ -40,17 +40,14 @@
     return new Promise(resolve => setTimeout(resolve, seconds * 1000))
   }
 
-  /* The async generator that yields the time once a second */
-  async function *clock() {
+  async function *chuckJoke() {
     while (true) {
-      const now = new Date();
-      // Yield a DOM fragment, consisting of two spans and some text:
-      yield [
-        span({ style: { color: 'black' }},now.toTimeString()), 
-        " on ", 
-        span({ style: { color: 'magenta' }},now.toDateString())
-      ];
-      await sleep(1);
+      /* In this example, we use Promises, rather than await, just to illustrate the alternative
+      JavaScript syntax */
+      yield fetch('https://api.chucknorris.io/jokes/random')
+        .then(response => response.json())
+        .then(fromJson => fromJson.value);
+      await sleep(5);
     }
   }
 </script>

@@ -98,3 +98,8 @@ In the following sections, we'll add:
 
   Expand the standard DOM API with Promises & generators
   
+____
+
+| < Prev |                     |  Next > |
+|--------|:-------------------:|--------:|
+|        | [Index](./index.md) | [Dynamic content](./dynamic-content.md) |
