@@ -11,6 +11,7 @@ Using AI-UI in your web apps
 * [Extended 2: Adding methods & attributes with `prototype`](./prototype.md) _coming soon_
 * [Extended 3: Type-safe elements using `ids`](./ids.md) _coming soon_
 * [Extended 4: Defining element `styles`](./styles.md) _coming soon_
+* [Extended 5: Private element data, getters & setters](./instance.md) _coming soon_
 * [Link elements dynamically](./when.md) _coming soon_
 * [Advanced tag creation - SVG & more](./tag-creation.md) _coming soon_
 * [Augmenting the standard DOM API with AI-UI](./augment-dom-api.md) _coming soon_
