@@ -11,12 +11,12 @@ const { div } = AIUI.tag();
 document.body.append(
   div({
       style:{
-        backgroundColor: blink()
+        backgroundColor: blink() // An async generator that returns a CSS color
       }
     },
     'Set style.backgroundColor dynamically'),
     div({
-      style: style()
+      style: style()  // An async generator that returns a partial CSSStyleDeclaratuion
     },
     'Set entire style dynamically'),
 );
@@ -44,6 +44,31 @@ async function *style() {
   }
 }
 ```
+
+Unlike dynamic content, attributes cannot be specified as a Promise 
+```
+This design decision was taken as some attributes are actually useful as Promises. Although no standard DOM Node types have any "Promised" attributes, there are numerous examples of third-party components that do.
+```
+If you really need to specify a Promised attribute, wrap it in an async generator:
+```javascript
+async function *once(promise) {
+  yield promise;
+}
+
+document.body.append(div({
+  style:{
+    color: once(Promise.resolve('red')) /* The Promise is wrapped in an async iterable, and AIUI will set the attribute when it resolves */
+  }
+},))
+```
+
+This, and other ways to manipulate async iterators are discussed in the next section: Iterators
+
+____
+
+| < Prev |                     |  Next > |
+|--------|:-------------------:|--------:|
+| [Dynamic Content](./dynamic-content.md) | [Index](./index.md) | [Help with async iterators](./iterators.md) |
 
 
 

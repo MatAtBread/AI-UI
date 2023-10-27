@@ -41,7 +41,7 @@ So far, so what? Another way of declaring HTML? Not exactly ground-breaking.
 
 The `AIUI.tag()` function returns functions that create a standard DOM node of the specified name. These are just normal DOM nodes, created via [document.createElement](https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement), and therefore have all the features and behaviours of standard DOM nodes.
 
-Like the `div(....)` method (and all methods returned by `AIUI.tag()`), the new `App(...)` method optionally accepts an object specifying it's attributes as the first arguemnt, an optional list of children and returns a standard DOM node. So we could change the final line of the script to:
+Like the `div(....)` method (and all methods returned by `AIUI.tag()`), the new `App(...)` method optionally accepts an object specifying its attributes as the first arguemnt, an optional list of children and returns a standard DOM node. So we could change the final line of the script to:
 
 ```javascript
   document.body.appendChild(App({
