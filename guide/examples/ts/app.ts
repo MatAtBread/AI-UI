@@ -1,4 +1,4 @@
-import { tag } from '../../module/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js'
 
 const { h2, div, button, span } = tag();
 
