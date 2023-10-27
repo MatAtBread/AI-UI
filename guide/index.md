@@ -10,7 +10,7 @@ Using AI-UI in your web apps
 * [Derive variations of elements without having to copy/paste anything!](./index.md) _coming soon_
 * [Link elements dynamically](./when.md) _coming soon_
 * [Explore type-safe defintions using `ids` & `prototype`](./index.md) _coming soon_
-* [Augmenting the standard DOM API with AI-UI](./index.md) _coming soon_
+* [Augmenting the standard DOM API with AI-UI](./augment-dom-api.md) _coming soon_
 
 Development info
 

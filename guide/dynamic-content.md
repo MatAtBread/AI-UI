@@ -117,7 +117,14 @@ Let's update the App to display a new Chuck Morris joke every few seconds:
 
 AIUI will create the DOM synchronously, and when the Promise resolves, update it in situ with a "joke" abour Chuck Norris.
 
-A child node in AIUI can be a DOM Node, a collection of DOM Nodes (eg an array, a NodeList or HTMLCollection), a primitve with a `toString()` method (numbers, strings, booleans, etc) or a Promise or async iterable that produces any of the above.
+A child node, either passed to a tag creating function (like `div` or `App` above) or returned by a `constructed()` member of an `extended(...)` tag, can be:
+* a DOM Node
+* a collection of DOM Nodes, like an array, a NodeList or HTMLCollection)
+* a primitve with a `toString()` method (numbers, strings, booleans, etc) 
+* a Promise or async iterable that produces any of the above
+
+You can, if you wish, also [augment the standard DOM API](./augment-dom-api.md) so that most standard DOM APIs that accept DOM Nodes (such as [Element.append](https://developer.mozilla.org/en-US/docs/Web/API/Element/append)) can also accept any of the above.
+
 
 In order to tell a series of jokes, we can just wrap the Promise in an async generator:
 
@@ -142,3 +149,4 @@ ____
 | < Prev |                     |  Next > |
 |--------|:-------------------:|--------:|
 | [Your first web page](./your-first-web-page.md) | [Index](./index.md) | [Dynamic attributes](./dynamic-attributes.md) |
+
