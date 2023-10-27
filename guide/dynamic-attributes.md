@@ -45,19 +45,29 @@ async function *style() {
 }
 ```
 
-Unlike dynamic content, attributes cannot be specified as a Promise 
+Unlike dynamic content, attributes cannot be specified as a Promise
+
 ```
-This design decision was taken as some attributes are actually useful as Promises. Although no standard DOM Node types have any "Promised" attributes, there are numerous examples of third-party components that do.
+NOTE: This design decision was taken as some attributes are actually useful as
+Promises. Although no standard DOM Node types have any "Promised" attributes,
+there are numerous examples of third-party components that do.
 ```
+
 If you really need to specify a Promised attribute, wrap it in an async generator:
+
 ```javascript
+/* Like sleep, but resolves to the specified value */
+async function later(x, seconds) {
+  return new Promise(resolve => setTimeout(()=>resolve(x), seconds * 1000));
+}
+
 async function *once(promise) {
   yield promise;
 }
 
 document.body.append(div({
   style:{
-    color: once(Promise.resolve('red')) /* The Promise is wrapped in an async iterable, and AIUI will set the attribute when it resolves */
+    color: once(later('red',1)) /* The Promise is wrapped in an async iterable, and AIUI will set the color to 'red' when it resolves after a second */
   }
 },))
 ```

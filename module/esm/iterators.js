@@ -13,7 +13,7 @@ export function isAsyncIter(o) {
   the same arguments returns a AsyncExtraIterable<X>
 */
 function wrapAsyncHelper(fn) {
-    return function (...args) { return withHelpers(fn.call(this, ...args)); };
+    return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
 }
 export const asyncExtras = {
     map: wrapAsyncHelper(map),
@@ -142,7 +142,7 @@ export function broadcastIterator(stop = () => { }) {
                 }
             });
             ai.add(added);
-            return withHelpers(added);
+            return iterableHelpers(added);
         },
         push(value) {
             if (!ai?.size)
@@ -207,7 +207,7 @@ export const merge = (...ai) => {
             return Promise.reject(ex);
         }
     };
-    return withHelpers(merged);
+    return iterableHelpers(merged);
 };
 /*
   Extensions to the AsyncIterable:
@@ -219,11 +219,18 @@ function isExtraIterable(i) {
             .every(k => (k in i) && i[k] === asyncExtras[k]);
 }
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
-export function withHelpers(ai) {
+export function iterableHelpers(ai) {
     if (!isExtraIterable(ai)) {
         Object.assign(ai, asyncExtras);
     }
     return ai;
+}
+export function generatorHelpers(g) {
+    // @ts-ignore: TS type madness
+    return function (...args) {
+        // @ts-ignore: TS type madness
+        return iterableHelpers(g(...args));
+    };
 }
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
 async function* map(mapper) {

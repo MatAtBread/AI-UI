@@ -3,8 +3,7 @@
   "bugs": {
     "url": "https://github.com/MatAtBread/AI-UI/issues"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "description": "A tiny, genuinely functional, UI framework for building dynamic HTML pages",
   "devDependencies": {
     "ts-loader": "^9.5.0",
@@ -43,5 +42,5 @@
     "prepublishOnly": "npm run build"
   },
   "types": "./esm/*.d.ts",
-  "version": "0.9.9"
+  "version": "0.9.10"
 }

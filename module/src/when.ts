@@ -1,6 +1,6 @@
 import { isPromiseLike } from './deferred.js';
 import { deferred } from "./deferred.js";
-import { PushIterator, pushIterator, withHelpers, asyncExtras, merge, AsyncExtraIterable } from "./iterators.js";
+import { PushIterator, pushIterator, iterableHelpers, asyncExtras, merge, AsyncExtraIterable } from "./iterators.js";
 
 /*
   `when(....)` is both an AsyncIterable of the events it can generate by observation, 
@@ -178,7 +178,7 @@ function chainAsync<A extends AsyncIterable<X>, X>(src: A): MappableIterable<A> 
     return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
   }
 
-  return Object.assign(withHelpers(mappableAsyncIterable as unknown as AsyncIterable<A>), {
+  return Object.assign(iterableHelpers(mappableAsyncIterable as unknown as AsyncIterable<A>), {
     [Symbol.asyncIterator]: () => src[Symbol.asyncIterator]()
   }) as MappableIterable<A>;
 }

@@ -1,6 +1,6 @@
 import { isPromiseLike } from './deferred.js';
 import { deferred } from "./deferred.js";
-import { pushIterator, withHelpers, asyncExtras, merge } from "./iterators.js";
+import { pushIterator, iterableHelpers, asyncExtras, merge } from "./iterators.js";
 const eventObservations = new Map();
 function docEventHandler(ev) {
     const observations = eventObservations.get(ev.type);
@@ -85,7 +85,7 @@ function chainAsync(src) {
     function mappableAsyncIterable(mapper) {
         return asyncExtras.map.call(src, mapper);
     }
-    return Object.assign(withHelpers(mappableAsyncIterable), {
+    return Object.assign(iterableHelpers(mappableAsyncIterable), {
         [Symbol.asyncIterator]: () => src[Symbol.asyncIterator]()
     });
 }

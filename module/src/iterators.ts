@@ -24,7 +24,7 @@ export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterat
   the same arguments returns a AsyncExtraIterable<X>
 */
 function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(fn: (this: AsyncIterable<T>, ...args: Args) => X) {
-  return function(this: AsyncIterable<T>, ...args:Args) { return withHelpers(fn.call(this, ...args)) }
+  return function(this: AsyncIterable<T>, ...args:Args) { return iterableHelpers(fn.call(this, ...args)) }
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
@@ -154,7 +154,7 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
         }
       });
       ai.add(added);
-      return withHelpers(added);
+      return iterableHelpers(added);
     },
     push(value: T) {
       if (!ai?.size)
@@ -226,7 +226,7 @@ export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
       return Promise.reject(ex);
     }
   };
-  return withHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
+  return iterableHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
 }
 
 
@@ -242,11 +242,19 @@ function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
 }
 
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
-export function withHelpers<A extends AsyncIterable<any>>(ai: A) {
+export function iterableHelpers<A extends AsyncIterable<any>>(ai: A) {
   if (!isExtraIterable(ai)) {
     Object.assign(ai, asyncExtras);
   }
   return ai as A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never)
+}
+
+export function generatorHelpers<G extends (...args: A)=>AsyncGenerator<G1,G2,G3>, A extends any[], G1,G2,G3>(g:G): (...args: A)=>AsyncGenerator<G1,G2,G3> & AsyncExtraIterable<G1>{
+  // @ts-ignore: TS type madness
+  return function(...args:A) {
+    // @ts-ignore: TS type madness
+    return iterableHelpers(g(...args))
+  }
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
