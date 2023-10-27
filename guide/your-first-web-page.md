@@ -87,25 +87,27 @@ In the following sections, we'll add:
 
   Using async generators to update attributes
 
-* Composition: [Create new tags by combining existing ones](./index.md) _coming soon_
+* [Help with async iterators](./iterators.md)
 
-  Exploring `constructed()`, associating tags with `styles`
+  `map`, `filter` and other functions to make Javascript async iterables easy
 
-* Inheritance: [Derive variations of elements without having to copy/paste anything!](./index.md) _coming soon_
+* [Extended: Create new tags](./extended.md) _coming soon_
 
-  The `extended()` method, getters, setters and private instance data.
+  Creating tags from one or more other tags using `constructed()`, setting styles, ensuring type-safety with prototype and `ids`. Using private element data with getters & setters.
 
 * [Link elements dynamically](./when.md) _coming soon_
 
-  `when(...)` - turn your elements into "spreadsheet" cells where the content and appearance of any element can depend on any other.
+  `when(...)` - turn your elements into "spreadsheet" cells where the content and appearance of any element can depend on other elements and async data sources.
 
-* [Explore type-safe defintions using `ids` & `prototype`](./index.md) _coming soon_
+* [Advanced tag creation - SVG & more](./tag-creation.md) _coming soon_
 
-  Using `extended(...)` to give Typescript the help it needs to understand your tags
+  Markup namespaces and global prototypes
 
-* [Augmenting the standard DOM API with AI-UI](./index.md) _coming soon_
+* [Augmenting the standard DOM API with AI-UI](./augment-dom-api.md) _coming soon_
 
-  Expand the standard DOM API with Promises & generators
+  Making the standard W3C DOM API dynamic using Promises and async generators.
+
+* [TSX](./tsx.md) _coming soon_
   
 ____
 
