@@ -68,7 +68,7 @@ async function *once(promise) {
 
 document.body.append(div({
   style:{
-    color: once(later('red',1)) /* The Promise is wrapped in an async iterable, and AIUI will set the color to 'red' when it resolves after a second */
+    color: once(later('red',1)) /* The Promise is wrapped in an async iterable, and AI-UI will set the color to 'red' when it resolves after a second */
   }
 },))
 ```

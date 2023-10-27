@@ -115,7 +115,7 @@ Let's update the App to display a new Chuck Morris joke every few seconds. First
 ```
 [Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content-3.html)
 
-AIUI will create the DOM synchronously, and when the Promise resolves, update it in situ with a "joke" about Chuck Norris.
+AI-UI will create the DOM synchronously, and when the Promise resolves, update it in situ with a "joke" about Chuck Norris.
 
 A child node, either passed to a tag creating function (like `div` or `App` above) or returned by a `constructed()` member of an `extended(...)` tag, can be:
 
