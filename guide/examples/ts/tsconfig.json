@@ -9,5 +9,5 @@
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
     "lib": ["DOM","DOM.Iterable","ES2020"]
   },
-  "include": [ "*.ts"]
+  "include": [ "*.ts" ]
 }

@@ -41,7 +41,16 @@ So far, so what? Another way of declaring HTML? Not exactly ground-breaking.
 
 The `AIUI.tag()` function returns functions that create a standard DOM node of the specified name. These are just normal DOM nodes, created via [document.createElement](https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement), and therefore have all the features and behaviours of standard DOM nodes.
 
-Like the `div(....)` method (and all methods returned by `AIUI.tag()`), the new `App(...)` method optionally accepts an object specifying it's attributes as the first arguemnt, an optional list of children and returns a standard DOM node. So we could change the final line of the script to:
+Like the `div(....)` method (and all methods returned by `AIUI.tag()`), the new `App(...)` method optionally accepts an object specifying its attributes as the first arguemnt, an optional list of children and returns a standard DOM node.
+
+The general function signature of __any__ tag creation function is:
+```typescript
+TagFunctionName(attributes?: AttributesOfThisTag, ...children:(string | number | boolean | Node | Element | NodeList | HTMLCollection /* Or an array of any combination of the former */)[]): Element
+```
+> _Note: there some simplification here, the children can also be of some other types, as we'll see in [Dynamic content](./dynamic-content.md)_
+
+
+Let's change the final line of the script to:
 
 ```javascript
   document.body.appendChild(App({
@@ -64,9 +73,9 @@ The final markup now looks like:
 [Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/your-first-web-page.html)
 
 
-Note that if you specify children when invoking the functions that creates your new tag, and you have a `constructed()` member, the children are appended before the `constructed()` is invoked, allowing you to modify, move or delete the specified children.
+Note that if you specify children when invoking the functions that creates your new tag, and you have a `constructed()` member, the children are appended before `constructed()` is invoked, allowing you to modify, move or delete the specified children.
 
-Your new `App(...)` method is indistinguishable from the "base" methods returned by `AIUI.tag()`. This is intentional - you can compose new tags using your new tag function (although "App" might be a misleading name) and create instances of your new tag in _exactly the same way as you would any of the base tags_. You can even call `App.extended(...)` to derive a new version of your tag that has specialised or altered behaviour. All tag methods support **composition** (by returning contained tags from `constructed()`) and **inheritance** (via the `TagFunction.extended(...)`). The details of how to do this are presented in the corresponding sections of this guide. Both the base tag functions and your extended tag functions just return normal DOM nodes.
+Your new `App(...)` method is (alomst) indistinguishable from the "base" methods returned by `AIUI.tag()`. This is intentional - you can compose new tags using your new tag function (although "App" might be a misleading name) and create instances of your new tag in _exactly the same way as you would any of the base tags_. You can even call `App.extended(...)` to derive a new version of your tag that has specialised or altered behaviour. All tag methods support **composition** (by returning contained tags from `constructed()`) and **inheritance** (via the `TagFunction.extended(...)`). The details of how to do this are presented in the corresponding sections of this guide. Both the base tag functions and your extended tag functions just return normal a DOM node.
 
 In the following sections, we'll add:
 
@@ -98,3 +107,8 @@ In the following sections, we'll add:
 
   Expand the standard DOM API with Promises & generators
   
+____
+
+| < Prev | ^ |  Next > |
+|:-------|:-:|--------:|
+|        | [Index](./index.md) | [Dynamic content](./dynamic-content.md) |

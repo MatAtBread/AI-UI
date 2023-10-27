@@ -5,7 +5,7 @@ In the previous example, we created a new tag type called "App":
 ```javascript
   const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div("Dunno")
@@ -16,7 +16,7 @@ In the previous example, we created a new tag type called "App":
 
 A design goal of AI-UI is to make declarative HTML dynamic, without creating a spaghetti network of events, dependencies or deep references into the DOM, and do it using standard Javascript constructs.
 
-To achieve this, when specifying children, you can specify a JavaSscript [async iterable](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncIterator) that generates any other child.
+To achieve this, when specifying children, you can specify JavaScript [async iterables](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncIterator) that generate values that could be children (Nodes, Elements and primitives).
 
 The easiest way to do this is with an async generator. Let's add a function that updates the time every second:
 
@@ -40,7 +40,7 @@ async function *clock() {
 ```javascript
   const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div(clock())
@@ -75,7 +75,7 @@ async function *clock() {
 
 const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div("This time is now: ",clock())
@@ -85,11 +85,11 @@ const App = div.extended({
 ```
 [Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content-2.html)
 
-In this example the generator yields a set of DOM elements that are all updated every second.
+In this example the generator yields a set of DOM elements that are _all_ replaced every second.
 
 In additon to async generators, you can pass Promises (basically a generator that only goes off once, or you can look at an async iterable as a Promise that can resolve multiple times). Quite a few Web APIs return Promises, notably [fetch](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API)
 
-Let's update the App to display a new Chuck Morris joke every few seconds:
+Let's update the App to display a new Chuck Morris joke every few seconds. First, we'll get just one from the web
 
 ```javascript
   /* A function that uses `fetch` to get a Chuck Noris joke. You could write this without async/await easily */
@@ -105,7 +105,7 @@ Let's update the App to display a new Chuck Morris joke every few seconds:
 ```javascript
   const App = div.extended({
     constructed() {
-      /* When constructed, this "div" tags contains some other tags: */
+      /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
         div(chuckJoke())
@@ -115,6 +115,38 @@ Let's update the App to display a new Chuck Morris joke every few seconds:
 ```
 [Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content-3.html)
 
-AIUI will create the DOM synchronously, and when the Promise resolves, update it in situ with a "joke" abour Chuck Norris.
+AI-UI will create the DOM synchronously, and when the Promise resolves, update it in situ with a "joke" about Chuck Norris.
 
-A child node in AIUI can be a DOM Node, a collection of DOM Nodes (eg an array, a NodeList or HTMLCollection), a primitve with a `toString()` method (numbers, strings, booleans, etc) or a Promise or async iterable that produces any of the above.
+A child node, either passed to a tag creating function (like `div` or `App` above) or returned by a `constructed()` member of an `extended(...)` tag, can be:
+
+* a DOM Node
+* a collection of DOM Nodes, like an array, a NodeList or HTMLCollection
+* a primitve with a `toString()` method (numbers, strings, booleans, etc) 
+* a Promise or async iterable that resolves or yields any of the above
+
+You can, if you wish, also [augment the standard DOM API](./augment-dom-api.md) so that most standard DOM APIs that accept DOM Nodes (such as [Element.append](https://developer.mozilla.org/en-US/docs/Web/API/Element/append)) can also accept any of the above in addition to just DOM Nodes.
+
+In order to tell a series of jokes, we can just wrap the Promise in an async generator:
+
+```javascript
+  async function *chuckJoke() {
+    while (true) {
+      /* In this example, we use Promises, rather than await, just to illustrate the alternative
+      JavaScript syntax */
+      yield fetch('https://api.chucknorris.io/jokes/random')
+        .then(response => response.json())
+        .then(fromJson => fromJson.value);
+      await sleep(5);
+    }
+  }
+
+```
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content-4.html)
+
+
+____
+
+| < Prev | ^ |  Next > |
+|:-------|:-:|--------:|
+| [Your first web page](./your-first-web-page.md) | [Index](./index.md) | [Dynamic attributes](./dynamic-attributes.md) |
+

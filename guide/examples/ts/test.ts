@@ -1,5 +1,5 @@
-import { tag } from '../../module/esm/ai-ui.js';
-import { broadcastIterator, withHelpers } from '../../module/esm/iterators.js'
+import { tag } from '../../../module/esm/ai-ui.js';
+import { broadcastIterator, iterableHelpers } from '../../../module/esm/iterators.js'
 
 const { div, h2, input, span, pre, button } = tag();
 
@@ -131,7 +131,7 @@ const App = div.extended({
         },"div")
       ),
       div({ style: { color: 'red' }},"literal ",123),
-      div({ style: { color: self('red') }},"generator ", withHelpers(self(123)).map(x => " mapped:"+x)),
+      div({ style: { color: self('red') }},"generator ", iterableHelpers(self(123)).map(x => " mapped:"+x)),
       div({ style: { color: 'green' }},"promise ",sleep(1234,123)),
       div({ style: { color: this.when(sleep(1000,'red')) }},"iter/promise ",this.when(sleep(1000,123))),
 

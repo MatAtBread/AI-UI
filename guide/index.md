@@ -4,12 +4,17 @@ Using AI-UI in your web apps
 
 * [Your first web page](./your-first-web-page.md)
 * [Dynamic content](./dynamic-content.md)
-* [Dynamic attributes](./index.md)  _coming soon_
-* [Create new tags by combining existing ones](./index.md) _coming soon_
-* [Derive variations of elements without having to copy/paste anything!](./index.md) _coming soon_
+* [Dynamic attributes](./dynamic-attributes.md)
+* [Help with async iterators](./iterators.md)
+* [Extended: Create new tags](./extended.md) _coming soon_
+* [Extended 1: Composition with `constructed()`](./constructed.md) _coming soon_
+* [Extended 2: Adding methods & attributes with `prototype`](./prototype.md) _coming soon_
+* [Extended 3: Type-safe elements using `ids`](./ids.md) _coming soon_
+* [Extended 4: Defining element `styles`](./styles.md) _coming soon_
 * [Link elements dynamically](./when.md) _coming soon_
-* [Explore type-safe defintions using `ids` & `prototype`](./index.md) _coming soon_
-* [Augmenting the standard DOM API with AI-UI](./index.md) _coming soon_
+* [Advanced tag creation - SVG & more](./tag-creation.md) _coming soon_
+* [Augmenting the standard DOM API with AI-UI](./augment-dom-api.md) _coming soon_
+* [TSX](./tsx.md) _coming soon_
 
 Development info
 
