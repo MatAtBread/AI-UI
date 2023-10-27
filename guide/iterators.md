@@ -63,7 +63,7 @@ const helpedCount2 = generatorHelpers(async function *(limit) {
 });
 const counter2 = helpedCount2(10);
 
-// or called the intrinsic `count` and add helpers to the result:
+// or call the intrinsic `count` and add helpers to the result:
 const counter3 = iterableHelpers(count(10));
 ```
 In each case, the resulting async iterable will function just as a standard async interable:
@@ -93,7 +93,7 @@ for await (const x of counter3.map(num => num * num)) {
 function filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<boolean>): AsyncIterable<U>
 ```
 
-Filter the results of an async iterable. Only those vales returning `true` from the predicate are yielded to the consumer
+Filter the results of an async iterable. Only those vales returning `true` from the predicate are yielded to the consumer. The predicate can be asynchronous.
 ```javascript
 for await (const x of counter3.filter(num => num % 2 === 0)) {
   console.log(n); // Integers 0,2,4,6,8
@@ -107,7 +107,7 @@ function initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterabl
 Prepends a single value to a yieded sequence
 ```javascript
 for await (const x of counter3.initially('hello')) {
-  console.log(n); // 'hello',0,1,2,3,4,5,6,7,8,9
+  console.log(x); // 'hello',0,1,2,3,4,5,6,7,8,9
 }
 ```
 
@@ -123,10 +123,10 @@ Filters out yielded values which occur within `milliseconds` or the previously y
 function waitFor<U>(this: AsyncIterable<U>, cb: (done: (...a: unknown[]) => void) => void): AsyncIterable<U>
 ```
 
-Waits for a callback before yielded values as they arrive. For example, to yield on an animation frame:
+Waits for a callback before yielding values as they arrive. For example, to yield on the next animation frame:
 ```javascript
 for await (const x of counter3.waitFor(done => window.requestAnimationFrame(done)) {
-  // We've been scheduled to run during an anumation frame period
+  // We've been scheduled to run during an animation frame period
 }
 ```
 
@@ -157,6 +157,14 @@ b.consume(n => console.log("A",n));
 b.consume(n => console.log("B",n));
 
 ```
+
+Note that all the helpers (except consume) themselves return "helped" async iterables, so you can chain them together:
+```javascript
+for await (const n of counter3.filter(n => n % 2 === 1).map(n => n * n).initially(-1).waitFor(requestAnimationFrame)) {
+  console.log(n); // -1,1,9,25,49,81, all output during an animation frame
+}
+```
+
 
 In the following example, we use the same techniques as we did in [Dynamic content](./dynamic-content.md), but rather than making the generator return DOM Nodes, we map the raw "data" yielded by the generator into the required UI _within_ the static UI declaration. This helps us with "separation of concerns", where the async iterables generate data, and the UI specifies how it should be presented to the user.
 
@@ -233,6 +241,8 @@ const chuckJoke = generatorHelpers(async function *() {
 });
 
 ```
+
+Try the above code [example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/iterators.html)
 
 
 ____

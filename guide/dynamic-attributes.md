@@ -1,6 +1,6 @@
 ## Dynamic Attributes
 
-In the previous [example]((https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content.html)) we created a tag called App whose content was specified statically, but updated dynamically.
+In the previous [example](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content.html) we created a tag called App whose content was specified statically, but updated dynamically.
 
 We can also do the same with the attributes when creating an element. For example, following on from the clock example, we can dynamically update the style of an element.
 
@@ -44,6 +44,7 @@ async function *style() {
   }
 }
 ```
+Try the above code [example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-attributes.html)
 
 Unlike dynamic content, attributes cannot be specified as a Promise
 
