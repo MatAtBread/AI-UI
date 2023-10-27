@@ -100,6 +100,6 @@ In the following sections, we'll add:
   
 ____
 
-| < Prev |                     |  Next > |
-|--------|:-------------------:|--------:|
+| < Prev | ^ |  Next > |
+|:-------|:-:|--------:|
 |        | [Index](./index.md) | [Dynamic content](./dynamic-content.md) |

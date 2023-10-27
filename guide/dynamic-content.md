@@ -146,7 +146,7 @@ In order to tell a series of jokes, we can just wrap the Promise in an async gen
 
 ____
 
-| < Prev |                     |  Next > |
-|--------|:-------------------:|--------:|
+| < Prev | ^ |  Next > |
+|:-------|:-:|--------:|
 | [Your first web page](./your-first-web-page.md) | [Index](./index.md) | [Dynamic attributes](./dynamic-attributes.md) |
 

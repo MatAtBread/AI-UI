@@ -66,8 +66,8 @@ This, and other ways to manipulate async iterators are discussed in the next sec
 
 ____
 
-| < Prev |                     |  Next > |
-|--------|:-------------------:|--------:|
+| < Prev | ^ |  Next > |
+|:-------|:-:|--------:|
 | [Dynamic Content](./dynamic-content.md) | [Index](./index.md) | [Help with async iterators](./iterators.md) |
 
 
