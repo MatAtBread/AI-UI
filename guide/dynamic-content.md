@@ -1,4 +1,4 @@
-## Dynamic Content
+# Dynamic Content
 
 In the previous example, we created a new tag type called "App":
 
@@ -120,8 +120,9 @@ AI-UI will create the DOM synchronously, and when the Promise resolves, update i
 A child node, either passed to a tag creating function (like `div` or `App` above) or returned by a `constructed()` member of an `extended(...)` tag, can be:
 
 * a DOM Node
-* a collection of DOM Nodes, like an array, a NodeList or HTMLCollection
+* a collection of DOM Nodes, such as a NodeList or HTMLCollection
 * a primitve with a `toString()` method (numbers, strings, booleans, etc) 
+* an array of any of the above
 * a Promise or async iterable that resolves or yields any of the above
 
 You can, if you wish, also [augment the standard DOM API](./augment-dom-api.md) so that most standard DOM APIs that accept DOM Nodes (such as [Element.append](https://developer.mozilla.org/en-US/docs/Web/API/Element/append)) can also accept any of the above in addition to just DOM Nodes.

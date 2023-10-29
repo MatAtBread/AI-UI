@@ -1,15 +1,15 @@
-### AI-UI
+# AI-UI
 
 AI-UI ("Async Iterator User Interface") is a tiny, genuinely functional, UI framework for building dynamic HTML pages
 
-It has 4 main features:
+### It has 4 main features:
 
 * A simple mechanism for defining and using standard DOM elements, encouraging both composition _and_ inheritance
 * A super-cool syntax (`when`) for inter-component communication using standard DOM events, avoiding the spaghetti of event listeners and state management
-* Dynamic DOM attributes and contents via standard JS async constructs - set your styles & content with Promises and async iterables.
+* Dynamic DOM attributes and contents via _standard_ JS async constructs - set your styles & content with Promises and async iterables.
 * A set of extensions to the standard browser/JS async iterables & generators, like map, filter, throttle, broadcast...
 
-Design goals for AI-UI are:
+### Design goals for AI-UI are:
 
 * Full use and compatability with standard DOM elements, events and JS async constructs like Promises, generators & iterators - no Proxy voodoo, special compilation steps, additional syntax, virtual DOM or complex API to learn. Freely mix and match with _any_ existing UI library which renders HTML.
 * Tiny footprint (6Kb minified), zero dependencies
@@ -21,20 +21,20 @@ Think of it as a spreadsheet in your browser - you define the elements, styles a
 
 ## Use in a browser
 
-* ES6 import
+### ES6 import
 ```
   import * as AIUI from 'https://www.unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'; 
   // You can, of course, just import the members you need...
   import { tag } from 'https://www.unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'; 
 ```
 
-* HTML `<script>` tag
+### HTML `<script>` tag
 ```
   <script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.min.js"></script> 
   <!-- defines global AIUI -->
 ```
 
-* CommonJS (for bundling or other environments)
+### CommonJS (for bundling or other environments)
 
 Bundle source: `npm i @matatbread/ai-ui`
 ```
@@ -43,7 +43,9 @@ Bundle source: `npm i @matatbread/ai-ui`
 
 Get started with simple, easy to maintain web pages that work seamlessly with user-input, remote data sources and other dynamic sources of data and interaction without the complexity of a bespoke build or execution framework.
 
-Check out the [guide](https://github.com/MatAtBread/AI-UI/tree/main#readme) on GitHub, where you can jump straight to the tutorial with [your first web page](https://github.com/MatAtBread/AI-UI/blob/main/guide/your-first-web-page.md).
+* Check out the [guide](https://github.com/MatAtBread/AI-UI/tree/main#readme) on GitHub
+* Jump straight to the tutorial with [your first web page](https://github.com/MatAtBread/AI-UI/blob/main/guide/your-first-web-page.md)
+* See all the docs in the [index](https://github.com/MatAtBread/AI-UI/blob/main/guide/index.md)
 
 Interested in contributing? Please check out the [developers](https://github.com/MatAtBread/AI-UI/blob/main/guide/developers.md) page.
 

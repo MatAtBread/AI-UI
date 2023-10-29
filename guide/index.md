@@ -6,7 +6,7 @@ Using AI-UI in your web apps
 * [Dynamic content](./dynamic-content.md)
 * [Dynamic attributes](./dynamic-attributes.md)
 * [Help with async iterators](./iterators.md)
-* [Extended: Create new tags](./extended.md) _coming soon_
+* [Extended: Create new tags](./extended.md)
 * [Extended 1: Composition with `constructed()`](./constructed.md) _coming soon_
 * [Extended 2: Adding methods & attributes with `prototype`](./prototype.md) _coming soon_
 * [Extended 3: Type-safe elements using `ids`](./ids.md) _coming soon_

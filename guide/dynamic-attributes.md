@@ -1,4 +1,4 @@
-## Dynamic Attributes
+# Dynamic Attributes
 
 In the previous [example](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content.html) we created a tag called App whose content was specified statically, but updated dynamically.
 
