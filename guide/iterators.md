@@ -69,8 +69,8 @@ const counter3 = iterableHelpers(count(10));
 In each case, the resulting async iterable will function just as a standard async interable:
 
 ```javascript
-for await (const n of counter3 /* or counter1, or counter2 */) {
-  console.log(n); // Integers 0,1,2...9
+for await (const x of counter3 /* or counter1, or counter2 */) {
+  console.log(x); // Integers 0,1,2...9
 }
 ```
 ..but will now have the following additional propertied:
@@ -84,7 +84,7 @@ Maps the results of an async iterable. The mapper function can itself be asynchr
 
 ```javascript
 for await (const x of counter3.map(num => num * num)) {
-  console.log(n); // Integers 0,1,4...81
+  console.log(x); // Integers 0,1,4...81
 }
 ```
 
@@ -96,7 +96,7 @@ function filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<b
 Filter the results of an async iterable. Only those vales returning `true` from the predicate are yielded to the consumer. The predicate can be asynchronous.
 ```javascript
 for await (const x of counter3.filter(num => num % 2 === 0)) {
-  console.log(n); // Integers 0,2,4,6,8
+  console.log(x); // Integers 0,2,4,6,8
 }
 ```
 
@@ -111,7 +111,7 @@ for await (const x of counter3.initially('hello')) {
 }
 ```
 
-## throtlle
+## throttle
 ```typescript
 function throttle<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U>
 ```
@@ -120,22 +120,22 @@ Filters out yielded values which occur within `milliseconds` or the previously y
 
 ## waitFor
 ```typescript
-function waitFor<U>(this: AsyncIterable<U>, cb: (done: (...a: unknown[]) => void) => void): AsyncIterable<U>
+function waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncIterable<U>
 ```
 
 Waits for a callback before yielding values as they arrive. For example, to yield on the next animation frame:
 ```javascript
-for await (const x of counter3.waitFor(done => window.requestAnimationFrame(done)) {
+for await (const x of counter3.waitFor(done => window.requestAnimationFrame(done))) {
   // We've been scheduled to run during an animation frame period
 }
 ```
 
 ## consume
 ```typescript
-function consume<U>(this: AsyncIterable<U>, f: (u: U) => void): Promise<void>
+function consume<U>(this: AsyncIterable<U>, f?: ((u: U) => void | PromiseLike<void>) | undefined): Promise<void>
 ```
 
-Passes each yielded value to the specified function and returns on completion. Note: If the specified function is itself async, `consume` returns when the final value has been passed to the function, not when it has completed.
+Passes each yielded value to the specified function and returns on when the final iteration has been processed by the callback. The specified function can itself be synchronous, async (returning a Promise), `null` or `undefined`.
 
 ```javascript
 // Outputs all the values 0..9 and then continues
@@ -147,7 +147,8 @@ await counter3.consume(n => console.log(n));
 function broadcast<U, X>(this: AsyncIterable<U>, pipe?: (dest: AsyncIterable<U>) => AsyncIterable<X>): AsyncIterable<X>
 ```
 
-Queues the incoming yielded values so they can be replayed to multiple consumers
+Queues the incoming yielded values so they can be replayed to multiple consumers. The queue for each consumer commences when the consumer first calls the async iterator `next()` function, and the whole broadcast iterator terminates when either the producer or all consumers terminate.
+
 ```javascript
 const b = counter3.broadcast();
 

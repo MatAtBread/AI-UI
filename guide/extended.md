@@ -3,10 +3,11 @@
 You may remember from the definition of a *tag function* from [Your first web page](./your-first-web-page.md#the-general-function-signature-of-a-tag-creation-function-is):
 
 ```typescript
-TagFunctionName(attributes?: AttributesOfThisTag, 
+TagFunctionName(
+  attributes?: AttributesOfThisTag, 
   ...children:(string | number | boolean | Node | Element | NodeList | HTMLCollection 
   /* Or an array of any combination of the former */)[]
-  ): Element
+): Element
 ```
 
 `AIUI.tag(...)` returns *base tag functions* that create plain old DOM elements via [document.createElement](https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement). These all accept optional attributes for the DOM element, and an optional list of children (nodes, elements, primitives, collections, promises, async iterables...).
@@ -15,10 +16,10 @@ In additional, all tag functions have an `extended` member:
 
 ```typescript
 TagFunctionName.extended(spec:{
-    constructed?: ()=>undefined | ChildTags;
-    prototype?: object;
-    ids?: { [id: string]: TagCreator; };
-    styles?: string;
+  constructed?: ()=>undefined | ChildTags;
+  prototype?: object;
+  ids?: { [id: string]: TagCreator; };
+  styles?: string;
 })
 ```
 
@@ -27,24 +28,30 @@ TagFunctionName.extended(spec:{
 In the following sections, we'll meet each of these in detail:
 
 ## [constructed()](./constructed.md) 
-The `constructed()` method allows you to specify children, or modify any children passed by the tag function call, and carry out specific operations related to your new tag depending on the attributes passed.
+The `constructed()` method allows you to create children, or modify any children passed by the tag function call, and carry out specific operations related to your new tag depending on the attributes passed when it is created, before it is placed into the DOM.
 ## [prototype](./prototype.md) 
-The `prototype` object allows you to default and define additional attributes and methods on your new tag.
+The `prototype` object allows you to set values for existing attributes and define additional attributes and methods on your new tag.
 ## [ids](./ids.md) 
-The `ids` object associates DOM Element IDs with specific tag types, so that a type-aware IDE such as VSCode can correctly  prompt you when referencing the children that make up a tag composed of children.
+The `ids` object associates child DOM Element IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children.
 ## [styles](./styles.md) 
 The `styles` string will create specific CSS style rules for your tag.
 
-All of these members are optional, so the code:
+All of these members are optional, so the following code works, but your new tag isn't that special - it will behave just like the base `div` tag function.
 
 ```javascript
 const MySpecialDiv = div.extended({});
 ```
-...works, but your new tag isn't that special - it will behave just like the base `div` tag function.
 
-There is an additional `extended(...)` signature which provides a _"private"_ object associated with your element (via an internal closure):
+There is an additional `extended(...)` signature which provides a _"private"_ object associated with your element (via an internal closure) which you can find more details about why this is useful and how to use it in [Private element data, getters & setters](./instance.md). For now, we'll just use the simple, non-functional version of `extended()`.
 
-...you can find more details about why this is useful and how to use it in [Private element data, getters & setters](./instance.md)
+```typescript
+TagFunctionName.extended((privateInstanceData: MyPrivateInstance) => {
+  constructed?: ()=>undefined | ChildTags;
+  prototype?: object;
+  ids?: { [id: string]: TagCreator; };
+  styles?: string;
+})
+```
 
 # Example
 

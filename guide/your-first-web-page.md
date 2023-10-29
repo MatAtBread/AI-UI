@@ -47,7 +47,8 @@ In these docs, you'll see these kinds of functions (returned by `AIUI.tag()` or 
 
 ### The general function signature of a tag creation function is:
 ```typescript
-TagFunctionName(attributes?: AttributesOfThisTag, 
+TagFunctionName(
+  attributes?: AttributesOfThisTag, 
   ...children:(string | number | boolean | Node | Element | NodeList | HTMLCollection 
   /* Or an array of any combination of the former */)[]
   ): Element

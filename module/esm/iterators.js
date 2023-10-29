@@ -417,6 +417,8 @@ function broadcast(pipe = (x => x)) {
     };
 }
 async function consume(f) {
+    let last = undefined;
     for await (const u of this)
-        f(u);
+        last = f?.(u);
+    await last;
 }

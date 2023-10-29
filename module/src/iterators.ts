@@ -355,7 +355,7 @@ async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): Async
   }
 }
 
-async function* waitFor<U>(this: AsyncIterable<U>, cb: (done: (...a: unknown[]) => void) => void): AsyncIterable<U> {
+async function* waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   try {
     while (true) {
@@ -363,7 +363,7 @@ async function* waitFor<U>(this: AsyncIterable<U>, cb: (done: (...a: unknown[]) 
       if (p.done) {
         return ai.return?.(p.value);
       }
-      await new Promise(resolve => cb(resolve));
+      await new Promise<void>(resolve => cb(resolve));
       yield p.value;
     }
   } catch (ex) {
@@ -439,7 +439,9 @@ function broadcast<U, X>(this: AsyncIterable<U>, pipe: ((dest: AsyncIterable<U>)
   }
 }
 
-async function consume<U>(this: AsyncIterable<U>, f: (u: U) => void): Promise<void> {
+async function consume<U>(this: AsyncIterable<U>, f?: (u: U) => void | PromiseLike<void>): Promise<void> {
+  let last: unknown = undefined;
   for await (const u of this)
-    f(u);
+    last = f?.(u);
+  await last;
 }

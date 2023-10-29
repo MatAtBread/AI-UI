@@ -14,7 +14,7 @@ export declare const asyncExtras: {
     filter: <U_1>(this: AsyncIterable<U_1>, fn: (o: U_1) => boolean | PromiseLike<boolean>) => AsyncIterable<U_1> & AsyncExtraIterable<U_1>;
     throttle: <U_2>(this: AsyncIterable<U_2>, milliseconds: number) => AsyncIterable<U_2> & AsyncExtraIterable<U_2>;
     debounce: <U_3>(this: AsyncIterable<U_3>, milliseconds: number) => AsyncIterable<U_3> & AsyncExtraIterable<U_3>;
-    waitFor: <U_4>(this: AsyncIterable<U_4>, cb: (done: (...a: unknown[]) => void) => void) => AsyncIterable<U_4> & AsyncExtraIterable<U_4>;
+    waitFor: <U_4>(this: AsyncIterable<U_4>, cb: (done: (value: void | PromiseLike<void>) => void) => void) => AsyncIterable<U_4> & AsyncExtraIterable<U_4>;
     count: <U_5 extends {}, K extends string>(this: AsyncIterable<U_5>, field: K) => AsyncGenerator<Awaited<U_5> & {
         [x: string]: number;
     }, void, unknown> & AsyncExtraIterable<Awaited<U_5> & {
@@ -35,5 +35,5 @@ type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 export declare const merge: <A extends AsyncIterable<any>[]>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
 export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never);
 export declare function generatorHelpers<G extends (...args: A) => AsyncGenerator<G1, G2, G3>, A extends any[], G1, G2, G3>(g: G): (...args: A) => AsyncGenerator<G1, G2, G3> & AsyncExtraIterable<G1>;
-declare function consume<U>(this: AsyncIterable<U>, f: (u: U) => void): Promise<void>;
+declare function consume<U>(this: AsyncIterable<U>, f?: (u: U) => void | PromiseLike<void>): Promise<void>;
 export {};
