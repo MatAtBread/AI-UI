@@ -42,7 +42,7 @@ All of these members are optional, so the following code works, but your new tag
 const MySpecialDiv = div.extended({});
 ```
 
-There is an additional `extended(...)` signature which provides a _"private"_ object associated with your element (via an internal closure) which you can find more details about why this is useful and how to use it in [Private element data, getters & setters](./instance.md). For now, we'll just use the simple, non-functional version of `extended()`.
+There is an additional `extended(...)` signature which provides a _"private"_ object associated with your element (via an internal closure). You can find more details about why this is useful and how to use it in [Private element data, getters & setters](./instance.md). For now, we'll just use the simple, non-functional version of `extended()`.
 
 ```typescript
 TagFunctionName.extended((privateInstanceData: MyPrivateInstance) => {
@@ -58,6 +58,15 @@ TagFunctionName.extended((privateInstanceData: MyPrivateInstance) => {
 In order to explain how these four members interact and support each other, we're going to consider a new a example, web page that gets weather data from a remote source, creates charts for the user, and a QR codes that represent the chart that can be shared.
 
 We're going to do this by creating tags that encapsulate the data source, the chart UI and the QR cods, and show how we can statically layout and style the page, whilst ensuring the page remains dynamically updated according to user input.
+
+First, here is the weather:
+
+```typescript
+
+```
+
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/ts/ts-example.html#weather.ts)
+
 ____
 
 | < Prev | ^ |  Next > |
