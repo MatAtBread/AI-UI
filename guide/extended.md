@@ -65,7 +65,7 @@ First, here is the weather:
 
 ```
 
-[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/ts/ts-example.html#weather.ts)
+[Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/0.9.11/guide/examples/ts/ts-example.html#weather.ts)
 
 ____
 
