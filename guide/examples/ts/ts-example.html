@@ -28,14 +28,15 @@
         "skipLibCheck": true,
         "lib": [ "lib.es2020.d.ts" ],
         "module": 6,
-        "target": 7
+        "target": 7,
+        "inlineSourceMap": true
       }, tsFile);
       const script = document.createElement('script');
       script.setAttribute('type', 'module');
-      script.append(jsCode + '\n//# sourceURL=./'+tsFile);
+      script.append(jsCode + '\n//# sourceURL=./'+tsFile+'.js%20(transpiled)\n');
       document.body.innerHTML = '';
       document.body.append(script);
-      console.log(jsCode)
+      //console.log("Transpiled",tsFile,"\n",jsCode);
     })
     .catch(error => alert(error.message));
 </script>

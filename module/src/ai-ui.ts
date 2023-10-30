@@ -384,7 +384,10 @@ export const tag = <TagLoader>function <Tags extends string,
                         d[k] = value;
                       }
                     } else {
-                      assign(d[k], value);
+                      if (Object.getOwnPropertyDescriptor(d,k)?.set)
+                        d[k] = value;
+                      else
+                       assign(d[k], value);
                     }
                   }
 
