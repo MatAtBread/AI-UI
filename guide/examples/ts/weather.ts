@@ -87,39 +87,60 @@ const Location = input.extended({
 });
 
 const App = div.extended({
+  /* The `ids` member defines the *type* of the children of this tag by their id.
+
+  In this case, we declare that anything with the id:'weather' is a Chart tag. This allows
+  our IDE to correctly work out what attributes and methods the element supports at run-
+  time.
+
+  Note, the `ids` member will appear in the transpiled .js file, but in fact are unused at
+  run-time, the declarations merely serve to inform Typescript which ids are which 
+  types 
+  */
   ids:{
-    weather: Chart
+    weather: Chart,
+    location: Location
   },
   async constructed() {
-    /* When we're constructed, create a few children within the element by default.
+    /* When we're constructed, create a Location element and a Chart element.
       We also keep a reference to tha thing we're creating as we're using it in 
       am event handler. This is the common way to do this in DOM code, but is better 
       handled using `when`.
     */
-    const app = this;
+
     return [
       Location({
-        async onblur(e) {
+        id: 'location',
+        onblur:async () => {
           /* Note: this is the "obvious" way to do this (set the chart when the event
             fires), however AI-UI provides the `when` mechanism to make this much
-            simpler, cleaner, type-safe and, most usefully, separating the data & events from
-            the UI and layout, so that our "Location" tag doesn't have to ASSUME the 
-            nextElementSibling is a Chart. 
+            simpler and cleaner way, avoiding things like requiring the `app` closure
+            which is needed as `this` is hidden by the event handler definition.
             
             However, being just normal DOM elements, we choose to do it the "obvious" way 
-            to introduce new concepts in an appropriate place.
+            in order introduce new concepts in the appropriate places.
             
             See https://github.com/MatAtBread/AI-UI/blob/main/guide/when.md
           */
           try {
-            const geo = await getGeoInfo(this.value);
+            /* Here we use the `ids` member directly, and VSCode knows that the
+            child of the app called `location` is a Location.
+
+            Note that although the type of the child is known, the element might not actually 
+            exist in the DOM, so we use the non-null assertion operator (!) as we know (as 
+            opposed to testing at run-time) it exists in the case.
+            */
+            const geo = await getGeoInfo(this.ids.location!.value);
             const forecast = await getWeatherForecast(geo.results[0]);
 
-            app.ids.weather!.label = geo.results[0].name;
-            app.ids.weather!.xData = forecast.time.map(t => new Date().toDateString());
-            app.ids.weather!.yData = forecast.temperature_2m_max;
+            
+            /* Similarly, `weather` is a Chart */
+
+            this.ids.weather!.label = geo.results[0].name + ', ' + geo.results[0].country;
+            this.ids.weather!.xData = forecast.time.map(t => new Date().toDateString());
+            this.ids.weather!.yData = forecast.temperature_2m_max;
           } catch (ex) {
-            this.showError(true);
+            this.ids.location!.showError(true);
           }
         }
       }),
