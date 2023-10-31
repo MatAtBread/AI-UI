@@ -68,21 +68,70 @@ const Chart = img.extended({
   }
 });
 
+/* Define a weather-specific Chart. It's like a chart, but exposes a `geo` attribute
+that when set, fetches and displays the weather forecast for that location */
+const WeatherForecast = Chart.extended({
+  prototype:{
+    set geo(g: GeoInfo) {
+      /* Note: we can't use `await` here as setters can return values (even Promises) */
+      getWeatherForecast(g).then(forecast => {
+        this.label = g.name + ', ' + g.country;
+        this.xData = forecast.time.map(t => new Date().toDateString());
+
+        /* ...and setting the yData on a Chart will cause it to redraw the chart */
+        this.yData = forecast.temperature_2m_max;
+      });
+    }
+  }
+})
 /* Define a "Location" element that is like an input tag that defaults to 'block' display style,
-  and can indicate errors in a predefined way */
+  and can indicate errors in a predefined way.
+
+  In this revision of the code, we place the `onblur` within the context of the "Location" tag. It
+  is now the responsibility of this tag to resolve the name into GeoInfo, and expose that via a new
+  `geo` property. When the property is set, we dispatch a `change` event to indicate that the asynchronous
+  resolution of the fetch.
+
+  Additionally, this allows us to localise the error handling - the indication of the error no longer
+  leaks out to become the responsibility of the element containing the Location. The tag is now responsible
+  for handling input, asynchronous resolution and error handling without external knowledge of where it
+  is contained within the DOM, and without the rest of the DOM knowing about it's internals.
+*/
 const Location = input.extended({
   prototype: {
+    geo: null as null | GeoInfo,
     placeholder: 'Enter a town...',
     style: {
-      display: 'block'
-    },
-    showError(f: boolean) {
-      (this.style as any).backgroundColor = f ? '#fdd' : '';
+      display: 'block',
+      backgroundColor: ''
     },
     onkeydown() {
-      this.showError(false);
+      this.style.backgroundColor = '';
+    },
+    async onblur() {
+      try {
+        const g = await getGeoInfo(this.value);
+        this.geo = g?.results[0];
+        this.dispatchEvent(new Event('change'));
+      } catch (ex) {
+        this.style.backgroundColor = '#fdd';
+      }
     }
+  },
+  constructed() {
+    /* This is a bit of nastiness. Because we dispatch the 'change' event when the geo is 
+     resolved asynchronously, we need to consume the "normal" <input> change event so
+     anything that is listening to the change event doesn't get two - one for the text change
+     and one for the geo change.
 
+     Alternatives to this technique are to use a different (custom) event name, but in keeping
+     with the concept of treating "Location" as a specialised <input>, it is better to have 
+     identical interfaces, including event interfaces*/
+    this.addEventListener('change', (e) => {
+      if (e.isTrusted) e.stopImmediatePropagation();
+    }, {
+      capture: true
+    })
   }
 });
 
@@ -98,7 +147,7 @@ const App = div.extended({
   types 
   */
   ids:{
-    weather: Chart,
+    weather: WeatherForecast,
     location: Location
   },
   async constructed() {
@@ -111,42 +160,18 @@ const App = div.extended({
     return [
       Location({
         id: 'location',
-        onblur:async () => {
-          /* Note: this is the "obvious" way to do this (set the chart when the event
-            fires), however AI-UI provides the `when` mechanism to make this much
-            simpler and cleaner way, avoiding things like requiring the `app` closure
-            which is needed as `this` is hidden by the event handler definition.
-            
-            However, being just normal DOM elements, we choose to do it the "obvious" way 
-            in order introduce new concepts in the appropriate places.
-            
-            See https://github.com/MatAtBread/AI-UI/blob/main/guide/when.md
-          */
-          try {
-            /* Here we use the `ids` member directly, and VSCode knows that the
-            child of the app called `location` is a Location.
-
-            Note that although the type of the child is known, the element might not actually 
-            exist in the DOM, so we use the non-null assertion operator (!) as we know (as 
-            opposed to testing at run-time) it exists in the case.
-            */
-            const geo = await getGeoInfo(this.ids.location!.value);
-            const forecast = await getWeatherForecast(geo.results[0]);
-
-            
-            /* Similarly, `weather` is a Chart */
-
-            this.ids.weather!.label = geo.results[0].name + ', ' + geo.results[0].country;
-            this.ids.weather!.xData = forecast.time.map(t => new Date().toDateString());
-
-            /* ...and setting the yData on a Chart will cause it to redraw the chart */
-            this.ids.weather!.yData = forecast.temperature_2m_max;
-          } catch (ex) {
-            this.ids.location!.showError(true);
-          }
+        onchange:async () => {
+          /* Since the error detection and UI is now handled by the Location tag, we no
+          longer need an exception handler here. The "Location" tag will only emit a change
+          event when it has geo data, and the weather forecast deals with it's own rendering
+          
+          Our Location and WeatherForecast tags now encapsulate their own asynchronous\
+          logic for handling input, IO and UI, so we can set the value of the Location.geo
+          on the WaetherForecast.geo */
+          this.ids.weather!.geo = this.ids.location!.geo!;
         }
       }),
-      Chart({
+      WeatherForecast({
         id: 'weather',
         width: 600,
         height: 400
