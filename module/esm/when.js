@@ -120,8 +120,11 @@ export function when(container, ...sources) {
         iterators.push(start);
     }
     if (sources.includes('@ready')) {
-        const watchSelectors = sources.filter(isValidWhenSelector).map(what => what.split('(')[0]);
-        const missing = watchSelectors.filter(sel => !container.querySelector(sel));
+        const watchSelectors = sources.filter(isValidWhenSelector).map(what => parseWhenSelector(what)?.[0]);
+        function isMissing(sel) {
+            return Boolean(typeof sel === 'string' && !container.querySelector(sel));
+        }
+        const missing = watchSelectors.filter(isMissing);
         const ai = {
             [Symbol.asyncIterator]() { return ai; },
             async next() {

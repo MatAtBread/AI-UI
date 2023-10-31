@@ -219,9 +219,13 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
   }
 
   if (sources.includes('@ready')) {
-    const watchSelectors = sources.filter(isValidWhenSelector).map(what => what.split('(')[0]);
+    const watchSelectors = sources.filter(isValidWhenSelector).map(what => parseWhenSelector(what)?.[0]);
 
-    const missing = watchSelectors.filter(sel => !container.querySelector(sel));
+    function isMissing(sel: CSSIdentifier | null | undefined): sel is CSSIdentifier {
+      return Boolean(typeof sel === 'string' && !container.querySelector(sel));
+    }
+
+    const missing = watchSelectors.filter(isMissing);
 
     const ai: AsyncIterableIterator<any> = {
       [Symbol.asyncIterator]() { return ai },
