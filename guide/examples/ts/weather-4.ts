@@ -3,7 +3,10 @@ import { tag } from '../../../module/esm/ai-ui.js'
 
 const { div, img, input } = tag();
 
-/* With thanks to https://open-meteo.com/
+/* 
+  Some nice external HTTP resources, together with some Typescript descriptions of their responses
+
+  With thanks to https://open-meteo.com/
   Geocoding: https://geocoding-api.open-meteo.com/v1/search?name=Berlin&count=1&language=en&format=json
   Weather: https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m
 */
@@ -30,7 +33,7 @@ interface Forecast {
 }
 
 async function getGeoInfo(s: string): Promise<GeoInfoResponse> {
-  return fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(s)}&count=1&language=en&format=json`)
+  return fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(s)}&count=1&format=json`)
     .then(res => res.json())
 }
 
@@ -73,17 +76,18 @@ that when set, fetches and displays the weather forecast for that location */
 const WeatherForecast = Chart.extended({
   prototype:{
     set geo(g: GeoInfo) {
-      /* Note: we can't use `await` here as setters can't return values (even Promises) */
+      /* Note: we can't use `await` here as setters can't be generators or otherwise 
+        interrupt the execution of their caller, so we fall back to .then() */
       getWeatherForecast(g).then(forecast => {
         this.label = g.name + ', ' + g.country;
-        this.xData = forecast.time.map(t => new Date().toDateString());
+        this.xData = forecast.time.map(t => new Date(t * 1000).toDateString());
 
         /* ...and setting the yData on a Chart will cause it to redraw */
         this.yData = forecast.temperature_2m_max;
       });
     }
   }
-})
+});
 /* Define a "Location" element that is like an input tag that defaults to 'block' display style,
   and can indicate errors in a predefined way.
 
@@ -105,17 +109,25 @@ const Location = input.extended({
       display: 'block',
       backgroundColor: ''
     },
-    onkeydown() {
-      this.style.backgroundColor = '';
-    },
-    async onblur() {
+    async resolveGeo() {
       try {
         const g = await getGeoInfo(this.value);
-        this.geo = g?.results[0];
-        this.dispatchEvent(new CustomEvent('change', { detail: this.geo } ));
+        if (!this.geo || g?.results[0].id !== this.geo.id) {
+          this.geo = g?.results[0];
+          this.dispatchEvent(new Event('change'));
+        }
       } catch (ex) {
         this.style.backgroundColor = '#fdd';
       }
+    },
+    onkeydown(e: KeyboardEvent) {
+      this.style.backgroundColor = '';
+      if (e.key === 'Enter') {
+        this.resolveGeo();
+      }
+    },
+    async onblur() {
+      this.resolveGeo();
     }
   }
 });
@@ -134,19 +146,18 @@ const App = div.extended({
   ids:{
     location: Location
   },
-  async constructed() {
+  constructed() {
     /* When we're constructed, create a Location element and a Chart element.
       By using `this.when()`, we can specify the layout of our page without polluting
       it with events and references, simply making the WaetherForecase's geo attribute
       depend on 'locations's' geo attribute.
     */
-
     return [
       Location({ id: 'location' }),
       WeatherForecast({
         width: 600,
         height: 400,
-        geo: this.when('change:#location').filter(e => 'detail' in e).map(() => this.ids.location!.geo!)
+        geo: this.when('#location').filter(e => !e.isTrusted).map(() => this.ids.location!.geo!)
       })
     ]
   }
