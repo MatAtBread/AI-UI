@@ -15,10 +15,10 @@
 <script>
   window.exports = {};
 
-  const tsFile = window.location.hash.slice(1);
-  if (!tsFile)
-  document.body.textContent = 'No .ts file specified in the URL #';
-  else {
+  const tsFile = window.location.search.slice(1);
+  if (!tsFile) {
+    document.body.textContent = 'No .ts file specified';
+  } else {
     document.body.textContent = 'Loading '+tsFile;
     fetch(tsFile)
     .then(resp => resp.status === 200

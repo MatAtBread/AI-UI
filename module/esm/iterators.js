@@ -233,15 +233,16 @@ export function generatorHelpers(g) {
     };
 }
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
-async function* map(mapper) {
+async function* map(...mapper) {
     const ai = this[Symbol.asyncIterator]();
     try {
         while (true) {
             const p = await ai.next();
             if (p.done) {
-                return ai.return?.(mapper(p.value));
+                return ai.return?.(p.value);
             }
-            yield mapper(p.value);
+            for (const m of mapper)
+                yield m(p.value);
         }
     }
     catch (ex) {

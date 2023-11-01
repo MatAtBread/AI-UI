@@ -56,6 +56,9 @@ const Chart = img.extended({
     xData: [] as (string | number)[],
     set yData(d: number[]) {
       if (this.xData && this.label) {
+        this.style.opacity = '0.2';
+        this.onload = ()=> { this.style.opacity = '1'; this.onload = null };
+
         this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=` + encodeURIComponent(JSON.stringify({
           type: 'line',
           data: {
@@ -78,13 +81,16 @@ const WeatherForecast = Chart.extended({
     set geo(g: GeoInfo | undefined) {
       /* Note: we can't use `await` here as setters can't be generators or otherwise 
         interrupt the execution of their caller, so we fall back to .then() */
-      if (g) getWeatherForecast(g).then(forecast => {
-        this.label = g.name + ', ' + g.country;
-        this.xData = forecast.time.map(t => new Date(t * 1000).toDateString());
+      this.style.opacity = '0.2';
+      if (g) {
+        getWeatherForecast(g).then(forecast => {
+          this.label = g.name + ', ' + g.country;
+          this.xData = forecast.time.map(t => new Date(t * 1000).toDateString());
 
-        /* ...and setting the yData on a Chart will cause it to redraw */
-        this.yData = forecast.temperature_2m_max;
-      });
+          /* ...and setting the yData on a Chart will cause it to redraw */
+          this.yData = forecast.temperature_2m_max;
+        });
+      }
     }
   }
 });
@@ -151,7 +157,7 @@ const App = div.extended({
       WeatherForecast({
         width: 600,
         height: 400,
-        geo: this.when('#location').map(e => this.ids.location!.resolveGeo())
+        geo: this.when('#location').map(e => undefined, e => this.ids.location!.resolveGeo())
       })
     ]
   }

@@ -10,7 +10,7 @@ export declare function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>):
 export declare function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
-    map: <U, R>(this: AsyncIterable<U>, mapper: (o: U) => R | PromiseLike<R>) => AsyncIterable<Awaited<R>> & AsyncExtraIterable<Awaited<R>>;
+    map: <U, R>(this: AsyncIterable<U>, ...args: ((o: U) => R | PromiseLike<R>)[]) => AsyncIterable<Awaited<R>> & AsyncExtraIterable<Awaited<R>>;
     filter: <U_1>(this: AsyncIterable<U_1>, fn: (o: U_1) => boolean | PromiseLike<boolean>) => AsyncIterable<U_1> & AsyncExtraIterable<U_1>;
     throttle: <U_2>(this: AsyncIterable<U_2>, milliseconds: number) => AsyncIterable<U_2> & AsyncExtraIterable<U_2>;
     debounce: <U_3>(this: AsyncIterable<U_3>, milliseconds: number) => AsyncIterable<U_3> & AsyncExtraIterable<U_3>;

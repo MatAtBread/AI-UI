@@ -258,15 +258,16 @@ export function generatorHelpers<G extends (...args: A)=>AsyncGenerator<G1,G2,G3
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
-async function* map<U, R>(this: AsyncIterable<U>, mapper: (o: U) => R | PromiseLike<R>): AsyncIterable<Awaited<R>> {
+async function* map<U, R>(this: AsyncIterable<U>, ...mapper: ((o: U) => R | PromiseLike<R>)[]): AsyncIterable<Awaited<R>> {
   const ai = this[Symbol.asyncIterator]();
   try {
     while (true) {
       const p = await ai.next();
       if (p.done) {
-        return ai.return?.(mapper(p.value));
+        return ai.return?.(p.value);
       }
-      yield mapper(p.value);
+      for (const m of mapper)
+        yield m(p.value);
     }
   } catch (ex) {
     ai.throw?.(ex);

@@ -77,7 +77,7 @@ for await (const x of counter3 /* or counter1, or counter2 */) {
 
 ## map
 ```typescript
-function map<U, R>(this: AsyncIterable<U>, mapper: (o: U) => R | PromiseLike<R>): AsyncIterable<Awaited<R>>
+function map<U, R>(this: AsyncIterable<U>, ...mapper: ((o: U) => R | PromiseLike<R>)[]): AsyncIterable<Awaited<R>>
 ```
 
 Maps the results of an async iterable. The mapper function can itself be asynchronous.
@@ -87,6 +87,15 @@ for await (const x of counter3.map(num => num * num)) {
   console.log(x); // Integers 0,1,4...81
 }
 ```
+
+Note that `map` can accept multiple mappers, in which case each is invoked in turn and yielded to the next consumer:
+
+```javascript
+for await (const x of counter3.map(num => num, num => num * num)) {
+  console.log(x); // Integers 0,0,1,1,2,4,3,9,4,16,5,25...9,81
+}
+```
+
 
 ## filter
 ```typescript
