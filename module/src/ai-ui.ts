@@ -5,7 +5,7 @@ import { AsyncProvider, ChildTags, Instance, Overrides, TagCreator } from './tag
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
-export { ChildTags, Instance } from './tags'
+export { ChildTags, Instance, TagCreator } from './tags'
 export * as Iterators from './iterators.js';
 
 const DEBUG = false;
@@ -492,10 +492,10 @@ export const tag = <TagLoader>function <Tags extends string,
       && typeof staticExtensions.prototype.className === 'string' 
       ? staticExtensions.prototype.className
       : '?';
-    const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
+    const callSite = DEBUG ? ' @'+(new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?') : '';
 
     Object.defineProperty(extendTag, "name", { 
-      value: "<ai-"+creatorName+" @"+callSite+">" 
+      value: "<ai-" + creatorName.replace(/\s+/g,'-') + callSite+">" 
     });
 
     return extendTag;
