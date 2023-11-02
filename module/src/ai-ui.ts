@@ -423,9 +423,11 @@ export const tag = <TagLoader>function <Tags extends string,
     if ('prototype' in o && ('define' in o || 'override' in o))
       throw new Error("Illegal mix of overrides:" + Object.keys(o));
 
-    o.prototype = {};
-    deepDefine(o.prototype, o.override)
-    deepDefine(o.prototype, o.define);
+    if (!('prototype' in o)) {
+      o.prototype = {};
+      deepDefine(o.prototype, o.override)
+      deepDefine(o.prototype, o.define);
+    }
     return o;
   }
 
