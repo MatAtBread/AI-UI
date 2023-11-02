@@ -1,5 +1,4 @@
-import { tag } from '../../../module/esm/ai-ui.js'
-//import { tag } from 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js' // 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'
 
 const { div, img, input } = tag();
 
@@ -52,13 +51,18 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 
 const Chart = img.extended({
   prototype: {
+    // Overrides for existing attributes
+    style: {
+      transition: 'opacity 0.5s'
+    },
+    onload() { this.style.opacity = '1' },
+
+    // New property initialisations
     label: '',
     xData: [] as (string | number)[],
     set yData(d: number[]) {
       if (this.xData && this.label) {
         this.style.opacity = '0.2';
-        this.onload = ()=> { this.style.opacity = '1'; this.onload = null };
-
         this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=` + encodeURIComponent(JSON.stringify({
           type: 'line',
           data: {
@@ -78,6 +82,7 @@ const Chart = img.extended({
 that when set, fetches and displays the weather forecast for that location */
 const WeatherForecast = Chart.extended({
   prototype:{
+    // New property initialisations
     set geo(g: GeoInfo | undefined) {
       /* Note: we can't use `await` here as setters can't be generators or otherwise 
         interrupt the execution of their caller, so we fall back to .then() */
@@ -110,11 +115,6 @@ const WeatherForecast = Chart.extended({
 const Location = input.extended({
   prototype: {
     geo: null as null | GeoInfo,
-    placeholder: 'Enter a town...',
-    style: {
-      display: 'block',
-      backgroundColor: ''
-    },
     async resolveGeo() {
       try {
         const g = await getGeoInfo(this.value);
@@ -126,8 +126,16 @@ const Location = input.extended({
         this.style.backgroundColor = '#fdd';
       }
     },
-    onkeydown(e: KeyboardEvent) {
+
+    // Overrides for existing attributes
+    placeholder: 'Enter a town...',
+    style: {
+      display: 'block',
+      backgroundColor: ''
+    },
+    onkeydown(e) {
       this.style.backgroundColor = '';
+      this.geo
     }
   }
 });
@@ -157,7 +165,7 @@ const App = div.extended({
       WeatherForecast({
         width: 600,
         height: 400,
-        geo: this.when('#location').map(e => undefined, e => this.ids.location!.resolveGeo())
+        geo: this.when('#location').map(e => {console.log(e); return undefined}, e => this.ids.location!.resolveGeo()),
       })
     ]
   }

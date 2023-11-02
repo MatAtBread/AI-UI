@@ -60,19 +60,22 @@ type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
+type UntypedGlobalEventHandlers = {
+  [K in keyof GlobalEventHandlers]: (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0])=>void
+}
+
+type BasedOn<P,Base> = Partial<UntypedGlobalEventHandlers> & {
+  [K in keyof P]: K extends keyof Base 
+      ? Partial<Base[K]> 
+      : P[K]
+};
 interface ExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
     C extends () => (ChildTags | void | Promise<void>),
     I extends { [id: string]: TagCreator<any, any>; },
-    P extends {
-      [K in keyof P]:
-      K extends keyof GlobalEventHandlers
-      //        ? (e: { currentTarget: "XXX" } & Omit<Parameters<Exclude<GlobalEventHandlers[K],null | undefined>>[0],'currentTarget'>)=>any
-      ? (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0]) => any
-      : unknown
-    },
+    P extends BasedOn<P,Base>,
     S extends string | undefined,
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
     CET extends object = OverrideMembers<P, Base> & IDS<I>
@@ -88,22 +91,16 @@ interface ExtendedTag {
     BaseCreator extends TagCreator<any, any>,
     C extends () => (ChildTags | void | Promise<void>),
     I extends { [id: string]: TagCreator<any, any>; },
-    P extends {
-      [K in keyof P]:
-      K extends keyof GlobalEventHandlers
-      //        ? (e: { currentTarget: "XXX" } & Omit<Parameters<Exclude<GlobalEventHandlers[K],null | undefined>>[0],'currentTarget'>)=>any
-      ? (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0]) => any
-      : unknown
-    },
+    P extends BasedOn<P, Base>,
     S extends string | undefined,
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
-    CET extends object = OverrideMembers<P, Base> & IDS<I>
+    CET extends object = P & Base & IDS<I>
   >(this: BaseCreator, _: {
     constructed?: C;
     ids?: I;
     prototype?: P;
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET> & GlobalEventHandlers>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<AsyncGeneratedObject<CET> /*& GlobalEventHandlers*/>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
 }
 
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];

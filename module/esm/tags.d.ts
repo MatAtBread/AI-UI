@@ -31,12 +31,16 @@ type TypedEventHandlers<T> = {
 };
 type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers) ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> : T;
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
+type UntypedGlobalEventHandlers = {
+    [K in keyof GlobalEventHandlers]: (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0]) => void;
+};
+type BasedOn<P, Base> = Partial<UntypedGlobalEventHandlers> & {
+    [K in keyof P]: K extends keyof Base ? Partial<Base[K]> : P[K];
+};
 interface ExtendedTag {
     <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<any, any>;
-    }, P extends {
-        [K in keyof P]: K extends keyof GlobalEventHandlers ? (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0]) => any : unknown;
-    }, S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = OverrideMembers<P, Base> & IDS<I>>(this: BaseCreator, _: (instance: any) => {
+    }, P extends BasedOn<P, Base>, S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = OverrideMembers<P, Base> & IDS<I>>(this: BaseCreator, _: (instance: any) => {
         constructed?: C;
         ids?: I;
         prototype?: P;
@@ -44,14 +48,12 @@ interface ExtendedTag {
     } & ThisType<AsyncGeneratedObject<CET> & GlobalEventHandlers>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
     <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<any, any>;
-    }, P extends {
-        [K in keyof P]: K extends keyof GlobalEventHandlers ? (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0]) => any : unknown;
-    }, S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = OverrideMembers<P, Base> & IDS<I>>(this: BaseCreator, _: {
+    }, P extends BasedOn<P, Base>, S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: {
         constructed?: C;
         ids?: I;
         prototype?: P;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET> & GlobalEventHandlers>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
+    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
 }
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
 export interface TagCreator<Base extends object, Super extends (never | TagCreator<any, any>) = never, TypedBase = ReTypedEventHandlers<Base>> {
