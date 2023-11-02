@@ -53,7 +53,8 @@ const Chart = img.extended({
   prototype: {
     // Overrides for existing attributes
     style: {
-      transition: 'opacity 0.5s'
+      transition: 'opacity 0.5s',
+      opacity: '0.2'
     },
     onload() { this.style.opacity = '1' },
 
@@ -63,7 +64,8 @@ const Chart = img.extended({
     set yData(d: number[]) {
       if (this.xData && this.label) {
         this.style.opacity = '0.2';
-        this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=` + encodeURIComponent(JSON.stringify({
+        this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=` 
+          + encodeURIComponent(JSON.stringify({
           type: 'line',
           data: {
             labels: this.xData,
@@ -112,21 +114,24 @@ const WeatherForecast = Chart.extended({
   for handling input, asynchronous resolution and error handling without external knowledge of where it
   is contained within the DOM, and without the rest of the DOM knowing about it's internals.
 */
-const Location = input.extended({
+const Location = input.extended((inst:{ geo?: GeoInfo }) => ({
   prototype: {
-    geo: null as null | GeoInfo,
+    get geo() { return this.resolveGeo() },
+
+    /* We use this "internal" method as getters can be declared async, and we
+    want to use async/await, and TypeScript doesm't respect `ThisType` for getters/setters
+    */
     async resolveGeo() {
       try {
         const g = await getGeoInfo(this.value);
-        if (!this.geo || g?.results[0].id !== this.geo.id) {
-          this.geo = g?.results[0];
+        if (!inst.geo || g?.results[0].id !== inst.geo.id) {
+          inst.geo = g?.results[0];
         }
-        return this.geo;
+        return inst.geo;
       } catch (ex) {
         this.style.backgroundColor = '#fdd';
       }
     },
-
     // Overrides for existing attributes
     placeholder: 'Enter a town...',
     style: {
@@ -135,10 +140,9 @@ const Location = input.extended({
     },
     onkeydown(e) {
       this.style.backgroundColor = '';
-      this.geo
     }
   }
-});
+}));
 
 const App = div.extended({
   /* The `ids` member defines the *type* of the children of this tag by their id.
@@ -165,7 +169,7 @@ const App = div.extended({
       WeatherForecast({
         width: 600,
         height: 400,
-        geo: this.when('#location').map(e => {console.log(e); return undefined}, e => this.ids.location!.resolveGeo()),
+        geo: this.when('#location').map(e => this.ids.location!.geo),
       })
     ]
   }

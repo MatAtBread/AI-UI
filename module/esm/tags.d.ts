@@ -7,10 +7,6 @@ export type Instance<T extends {} = Record<string, unknown>> = T;
 type AsyncGeneratedObject<X extends object> = {
     [K in keyof X]: X[K] extends AsyncProvider<infer Value> ? Value : X[K];
 };
-type CommonKeys<A, B> = keyof A & keyof B;
-type OverrideMembers<Override extends object, Base extends object> = {
-    [K in CommonKeys<Override, Base>]: Override[K] | Base[K];
-} & Omit<Override & Base, CommonKeys<Override, Base>>;
 type IDS<I> = {
     ids: {
         [J in keyof I]?: I[J] extends (...a: any[]) => infer R ? R : never;
@@ -40,12 +36,12 @@ type BasedOn<P, Base> = Partial<UntypedGlobalEventHandlers> & {
 interface ExtendedTag {
     <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<any, any>;
-    }, P extends BasedOn<P, Base>, S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = OverrideMembers<P, Base> & IDS<I>>(this: BaseCreator, _: (instance: any) => {
+    }, P extends BasedOn<P, Base>, S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: (instance: any) => {
         constructed?: C;
         ids?: I;
         prototype?: P;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET> & GlobalEventHandlers>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
+    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
     <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<any, any>;
     }, P extends BasedOn<P, Base>, S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: {
