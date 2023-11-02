@@ -419,10 +419,22 @@ export const tag = <TagLoader>function <Tags extends string,
       const eltNewDiv = NewDiv({attrs},...children)
   */
 
+  function makeProto<T extends Overrides>(o: T) {
+    if ('prototype' in o && ('define' in o || 'override' in o))
+      throw new Error("Illegal mix of overrides:" + Object.keys(o));
+
+    o.prototype = {};
+    deepDefine(o.prototype, o.override)
+    deepDefine(o.prototype, o.define);
+    //delete o.override;
+    //delete o.define;
+    return o;
+  }
+
   function extended(this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) {
     const overrides = (typeof _overrides !== 'function')
-      ? (instance: Instance) => _overrides
-      : _overrides
+      ? (makeProto(_overrides),(instance: Instance) => _overrides)
+      : (instance: Instance) => makeProto(_overrides(instance))
 
     const staticInstance = {} as Instance;
     let staticExtensions: Overrides = overrides(staticInstance);
@@ -578,7 +590,7 @@ const DomPromiseContainer = AsyncDOMContainer.extended({
   ai-ui-container.promise:after {
     content: "⋯";
   }`,
-  prototype: {
+  override: {
     className: 'promise'
   },
   constructed() {
@@ -593,7 +605,7 @@ const DyamicElementError = AsyncDOMContainer.extended({
     display: block;
     color: #b33;
   }`,
-  prototype: {
+  override: {
     className: 'error'
   }
 });

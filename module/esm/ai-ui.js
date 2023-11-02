@@ -355,10 +355,20 @@ export const tag = function (_1, _2, _3) {
            ...later...
         const eltNewDiv = NewDiv({attrs},...children)
     */
+    function makeProto(o) {
+        if ('prototype' in o && ('define' in o || 'override' in o))
+            throw new Error("Illegal mix of overrides:" + Object.keys(o));
+        o.prototype = {};
+        deepDefine(o.prototype, o.override);
+        deepDefine(o.prototype, o.define);
+        //delete o.override;
+        //delete o.define;
+        return o;
+    }
     function extended(_overrides) {
         const overrides = (typeof _overrides !== 'function')
-            ? (instance) => _overrides
-            : _overrides;
+            ? (makeProto(_overrides), (instance) => _overrides)
+            : (instance) => makeProto(_overrides(instance));
         const staticInstance = {};
         let staticExtensions = overrides(staticInstance);
         /* "Statically" create any styles required by this widget */
@@ -481,7 +491,7 @@ const DomPromiseContainer = AsyncDOMContainer.extended({
   ai-ui-container.promise:after {
     content: "⋯";
   }`,
-    prototype: {
+    override: {
         className: 'promise'
     },
     constructed() {
@@ -496,7 +506,7 @@ const DyamicElementError = AsyncDOMContainer.extended({
     display: block;
     color: #b33;
   }`,
-    prototype: {
+    override: {
         className: 'error'
     }
 });

@@ -25,12 +25,6 @@ export type Instance<T extends {} = Record<string, unknown>> = T;
 type AsyncGeneratedObject<X extends object> = {
   [K in keyof X]: X[K] extends AsyncProvider<infer Value> ? Value : X[K]
 };
-type CommonKeys<A, B> = keyof A & keyof B;
-// Like an intersection, where common keys are in a union
-type OverrideMembers<Override extends object, Base extends object> = {
-  [K in CommonKeys<Override, Base>]: Override[K] | Base[K];
-  } &
-  Omit<Override & Base, CommonKeys<Override, Base>>;
 
 type IDS<I> = {
   ids: {
@@ -42,6 +36,8 @@ export type Overrides = {
   constructed?: () => (ChildTags | void | Promise<void>);
   ids?: { [id: string]: TagCreator<any, any>; };
   prototype?: object;
+  override?: object;
+  define?: object;
   styles?: string;
 };
 
@@ -64,12 +60,18 @@ type UntypedGlobalEventHandlers = {
   [K in keyof GlobalEventHandlers]: (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0])=>void
 }
 
+type DeepPartial<O> = {
+  [K in keyof O]?: O[K] extends object ? O[K] | DeepPartial<O[K]> : O[K]
+}
+
 type BasedOn<P,Base> = Partial<UntypedGlobalEventHandlers> & {
   [K in keyof P]: K extends keyof Base 
       ? Partial<Base[K]> 
       : P[K]
 };
-interface ExtendedTag {
+
+/* v0.9.x expects a `prototype` member to describe extensions, which combines overrides and new properties */
+/** @deprecated */ interface LegacyExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
@@ -78,13 +80,13 @@ interface ExtendedTag {
     P extends BasedOn<P,Base>,
     S extends string | undefined,
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
-    CET extends object = OverrideMembers<P, Base> & IDS<I>
+    CET extends object = P & Base & IDS<I>
   >(this: BaseCreator, _: (instance: any) => {
     constructed?: C;
     ids?: I;
-    prototype?: P;
+    /** @deprecated */ prototype?: P;
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET> & GlobalEventHandlers>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
 
   // Declarative, with no state instance
   <
@@ -98,9 +100,50 @@ interface ExtendedTag {
   >(this: BaseCreator, _: {
     constructed?: C;
     ids?: I;
-    prototype?: P;
+    /** @deprecated */ prototype?: P;
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET> /*& GlobalEventHandlers*/>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+}
+
+/* v0.10.x expects `override` and `define` members to describe extensions, which have nicer type definitions
+  which prevent redefinition of an existing property in `defined` and DeepPartial<Base> for `override`.
+ */
+interface ExtendedTag extends LegacyExtendedTag {
+  // Functional, with a private Instance
+  <
+    BaseCreator extends TagCreator<any, any>,
+    C extends () => (ChildTags | void | Promise<void>),
+    I extends { [id: string]: TagCreator<any, any>; },
+    O extends Partial<UntypedGlobalEventHandlers> & Omit<DeepPartial<Base>, keyof GlobalEventHandlers>,
+    D extends { [K in keyof D]: K extends keyof Base ? never : D[K] },
+    S extends string | undefined,
+    Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
+    CET extends object = D & Base & IDS<I>
+  >(this: BaseCreator, _: (instance: any) => {
+    constructed?: C;
+    ids?: I;
+    override?: O,
+    define?: D
+    styles?: S;
+  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<D, Base>
+
+  // Declarative, with no state instance
+  <
+    BaseCreator extends TagCreator<any, any>,
+    C extends () => (ChildTags | void | Promise<void>),
+    I extends { [id: string]: TagCreator<any, any>; },
+    O extends Partial<UntypedGlobalEventHandlers> & Omit<DeepPartial<Base>, keyof GlobalEventHandlers>,
+    D extends { [K in keyof D]: K extends keyof Base ? never : D[K] },
+    S extends string | undefined,
+    Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
+    CET extends object = D & Base & IDS<I>
+  >(this: BaseCreator, _: {
+    constructed?: C;
+    ids?: I;
+    override?: O,
+    define?: D
+    styles?: S;
+  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<D, Base>
 }
 
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
