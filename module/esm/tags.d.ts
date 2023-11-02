@@ -67,7 +67,7 @@ interface ExtendedTag extends LegacyExtendedTag {
         override?: O;
         define?: D;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<D, Base>;
+    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<O & D, Base>;
     <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void>), I extends {
         [id: string]: TagCreator<any, any>;
     }, O extends Partial<UntypedGlobalEventHandlers> & Omit<DeepPartial<Base>, keyof GlobalEventHandlers>, D extends {
@@ -78,7 +78,7 @@ interface ExtendedTag extends LegacyExtendedTag {
         override?: O;
         define?: D;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<D, Base>;
+    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<O & D, Base>;
 }
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
 export interface TagCreator<Base extends object, Super extends (never | TagCreator<any, any>) = never, TypedBase = ReTypedEventHandlers<Base>> {

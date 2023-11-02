@@ -6,17 +6,17 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   // NB: we can't check the contained type at runtime, so we have to be liberal
   // and wait for the de-containment to fail if it turns out to not be a `ChildTags`
   | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> // Things that will resolve to any of the above
-  | Array<ChildTags> 
+  | Array<ChildTags>
   | Iterable<ChildTags>; // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
 
 export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 
 type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent union distribution
-  ? X extends AsyncProvider<infer U> 
-    ? PossiblyAsync<U> 
-    : X extends Function 
-      ? X | AsyncProvider<X> 
-      : AsyncProvider<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; } 
+  ? X extends AsyncProvider<infer U>
+  ? PossiblyAsync<U>
+  : X extends Function
+  ? X | AsyncProvider<X>
+  : AsyncProvider<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; }
   : X | AsyncProvider<X> | undefined;
 
 export type Instance<T extends {} = Record<string, unknown>> = T;
@@ -35,7 +35,7 @@ type IDS<I> = {
 export type Overrides = {
   constructed?: () => (ChildTags | void | Promise<void>);
   ids?: { [id: string]: TagCreator<any, any>; };
-  prototype?: object;
+  prototype?: object; // The combined override & define
   override?: object;
   define?: object;
   styles?: string;
@@ -43,31 +43,31 @@ export type Overrides = {
 
 // Like GlobalEventHandlers, but with `this` and `event.currentTarget` specified
 type TypedEventHandlers<T> = {
-  [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) 
-    ? (this: T, event: Omit<E, 'currentTarget'> & {
-      currentTarget: T;
-    }) => R 
-    : never;
+  [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R))
+  ? (this: T, event: Omit<E, 'currentTarget'> & {
+    currentTarget: T;
+  }) => R
+  : never;
 };
 
 type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
-  ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> 
+  ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T>
   : T;
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
 type UntypedGlobalEventHandlers = {
-  [K in keyof GlobalEventHandlers]: (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0])=>void
+  [K in keyof GlobalEventHandlers]: (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0]) => void
 }
 
 type DeepPartial<O> = {
   [K in keyof O]?: O[K] extends object ? O[K] | DeepPartial<O[K]> : O[K]
 }
 
-type BasedOn<P,Base> = Partial<UntypedGlobalEventHandlers> & {
-  [K in keyof P]: K extends keyof Base 
-      ? Partial<Base[K]> 
-      : P[K]
+type BasedOn<P, Base> = Partial<UntypedGlobalEventHandlers> & {
+  [K in keyof P]: K extends keyof Base
+  ? Partial<Base[K]>
+  : P[K]
 };
 
 /* v0.9.x expects a `prototype` member to describe extensions, which combines overrides and new properties */
@@ -77,7 +77,7 @@ type BasedOn<P,Base> = Partial<UntypedGlobalEventHandlers> & {
     BaseCreator extends TagCreator<any, any>,
     C extends () => (ChildTags | void | Promise<void>),
     I extends { [id: string]: TagCreator<any, any>; },
-    P extends BasedOn<P,Base>,
+    P extends BasedOn<P, Base>,
     S extends string | undefined,
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
     CET extends object = P & Base & IDS<I>
@@ -125,7 +125,7 @@ interface ExtendedTag extends LegacyExtendedTag {
     override?: O,
     define?: D
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<D, Base>
+  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<O & D, Base>
 
   // Declarative, with no state instance
   <
@@ -143,80 +143,26 @@ interface ExtendedTag extends LegacyExtendedTag {
     override?: O,
     define?: D
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<D, Base>
+  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<O & D, Base>
 }
 
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
-export interface TagCreator<Base extends object, 
-  Super extends (never | TagCreator<any,any>) = never,
+export interface TagCreator<Base extends object,
+  Super extends (never | TagCreator<any, any>) = never,
   TypedBase = ReTypedEventHandlers<Base>
 > {
-    /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
-      The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
-    */
-    (...args: TagCreatorArgs<PossiblyAsync<TypedBase> & ThisType<TypedBase>>): TypedBase //& { constructor: TagCreator<Base,Super,TypedBase> }
+  /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
+    The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
+  */
+  (...args: TagCreatorArgs<PossiblyAsync<TypedBase> & ThisType<TypedBase>>): TypedBase //& { constructor: TagCreator<Base,Super,TypedBase> }
 
-    /* It can also be extended */
-    extended: ExtendedTag;
-    /* It is based on a "super" TagCreator */
-    super: Super
-    /* It has a function that exposes the differences between the tags it creates and its super */
-    overrides?: (<A extends Instance>(a: A) => Overrides); /* null for base tags */
+  /* It can also be extended */
+  extended: ExtendedTag;
+  /* It is based on a "super" TagCreator */
+  super: Super
+  /* It has a function that exposes the differences between the tags it creates and its super */
+  overrides?: (<A extends Instance>(a: A) => Overrides); /* null for base tags */
 
-    /* It has a name (set to a class or definition location), which is helpful when debugging */
-    readonly name: string;
-  };
-
-/* Some random tests/examples
-declare var div: TagCreator<HTMLDivElement, never>;
-
-const ee = div.extended({
-  constructed() {
-    this.foo;
-  },
-  ids:{
-    kid1: div
-  },
-  prototype: {
-    EE: 'EE' as const,
-    foo: 0
-  }
-});
-const ff = ee.extended({
-  constructed() {
-    this.foo = 123;
-    this.FF;
-    this.EE;
-  },
-  ids:{
-    kid2: ee
-  },
-  prototype:{
-    FF: 'BB' as const,
-    f() { return this.FF },
-    onclick(e) { this.FF; this.ids.kid2!.foo ; this.EE ; e.currentTarget!.FF },
-  }
-});
-
-ee().constructor({
-  EE: 'EE',
-})
-
-ff.super.super()
-ff.super.super.super
-
-ff().FF
-ff.super().EE
-ff.super.super().tagName
-ff.super.super.super
-
-const f2 = ff()
-f2.onclick = function(e) { this.FF === e.currentTarget.FF }
-
-const I = ff;
-
-I().onclick = function(e) { this.FF === e.currentTarget.FF }
-I({
-  onabort(e) { this; e.currentTarget.FF }
-})
-//*/
+  /* It has a name (set to a class or definition location), which is helpful when debugging */
+  readonly name: string;
+};

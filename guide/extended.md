@@ -29,8 +29,10 @@ In the following sections, we'll meet each of these in detail:
 
 ## [constructed()](./constructed.md) 
 The `constructed()` method allows you to create children, or modify any children passed by the tag function call, and carry out specific operations related to your new tag depending on the attributes passed when it is created, before it is placed into the DOM.
-## [prototype](./prototype.md) 
-The `prototype` object allows you to set values for existing attributes and define additional attributes and methods on your new tag.
+## [override](./override.md) 
+The `override` object allows you to set values for existing attributes, overriding any values they have in the tag this tag is extended from.
+## [define](./define.md) 
+The `define` object allows you to define new properties - attributes or methods - on this tag type. They cannot have the same name as any properties existing in the tag that this tag is extended from.
 ## [ids](./ids.md) 
 The `ids` object associates child DOM Element IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children.
 ## [styles](./styles.md) 

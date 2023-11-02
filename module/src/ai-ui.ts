@@ -426,8 +426,6 @@ export const tag = <TagLoader>function <Tags extends string,
     o.prototype = {};
     deepDefine(o.prototype, o.override)
     deepDefine(o.prototype, o.define);
-    //delete o.override;
-    //delete o.define;
     return o;
   }
 
@@ -504,10 +502,10 @@ export const tag = <TagLoader>function <Tags extends string,
       && typeof staticExtensions.prototype.className === 'string' 
       ? staticExtensions.prototype.className
       : '?';
-    const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
+    //const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
 
     Object.defineProperty(extendTag, "name", { 
-      value: "<ai-"+creatorName+" @"+callSite+">" 
+      value: "<ai-"+creatorName.replace(/\s+/g,'-')+">" // @"+callSite+">" 
     });
 
     return extendTag;
