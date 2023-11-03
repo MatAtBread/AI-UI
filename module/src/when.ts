@@ -101,15 +101,17 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
           observations.delete(o);
           push[Symbol.asyncIterator]().throw?.(new Error(msg));
         } else {
-          if (selector) {
-            const nodes = container.querySelectorAll(selector);
-            for (const n of nodes) {
-              if ((ev.target === n || n.contains(ev.target as Node)) && container.contains(n))
+          if (ev.target instanceof Node) {
+            if (selector) {
+              const nodes = container.querySelectorAll(selector);
+              for (const n of nodes) {
+                if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
+                  push.push(ev)
+              }
+            } else {
+              if ((ev.target === container || container.contains(ev.target)))
                 push.push(ev)
             }
-          } else {
-            if (ev.target === container)
-              push.push(ev)
           }
         }
       } catch (ex) {

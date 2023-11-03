@@ -1,22 +1,27 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 ;
 export {};
-/* Some random tests/examples
+/* Some random tests/examples * /
 declare var div: TagCreator<HTMLDivElement, never>;
 
 const ee = div.extended({
+  prototype: {
+    EE: 'EE' as const,
+    foo: 0
+  },
   constructed() {
     this.foo;
   },
   ids:{
     kid1: div
-  },
-  prototype: {
-    EE: 'EE' as const,
-    foo: 0
   }
 });
 const ff = ee.extended({
+  prototype: {
+    FF: 'BB' as const,
+    f() { return this.FF },
+    onclick(e) { this.FF; this.ids.kid2!.foo ; this.EE ; e.currentTarget!.FF },
+  },
   constructed() {
     this.foo = 123;
     this.FF;
@@ -24,11 +29,6 @@ const ff = ee.extended({
   },
   ids:{
     kid2: ee
-  },
-  prototype:{
-    FF: 'BB' as const,
-    f() { return this.FF },
-    onclick(e) { this.FF; this.ids.kid2!.foo ; this.EE ; e.currentTarget!.FF },
   }
 });
 
