@@ -16,21 +16,22 @@ In additional, all tag functions have an `extended` member:
 
 ```typescript
 TagFunctionName.extended(spec:{
-  constructed?: ()=>undefined | ChildTags;
   prototype?: object;
+  constructed?: ()=>undefined | ChildTags;
   ids?: { [id: string]: TagCreator; };
   styles?: string;
 })
 ```
-
-> _Note: there some simplification here, as the type `TagCreator` actually requires type parameters, and `prototype` does some type mapping to ensure `this` is correct within members, but the essential definitions are shown above_
+> _Note: there is some simplification here, as the type `TagCreator` actually requires type parameters, and `prototype` does some type mapping to ensure `this` is correct within members, but the essential definitions are shown above_
 
 In the following sections, we'll meet each of these in detail:
 
-## [constructed()](./constructed.md) 
-The `constructed()` method allows you to create children, or modify any children passed by the tag function call, and carry out specific operations related to your new tag depending on the attributes passed when it is created, before it is placed into the DOM.
 ## [prototype](./prototype.md) 
 The `prototype` object allows you to set values for existing attributes and define additional attributes and methods on your new tag.
+> _Note: Due to [this limitation in TypeScript](https://github.com/microsoft/TypeScript/issues/47599) you should declare the `prototype` field **before** the `constructed()` member to ensure all the prototype types are captured. This actually depends on the exact nature of your prototypes, such as whether it contains functions that aren't context free._
+
+## [constructed()](./constructed.md) 
+The `constructed()` method allows you to create children, or modify any children passed by the tag function call, and carry out specific operations related to your new tag depending on the attributes passed when it is created, before it is placed into the DOM.
 ## [ids](./ids.md) 
 The `ids` object associates child DOM Element IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children.
 ## [styles](./styles.md) 
@@ -46,8 +47,8 @@ There is an additional `extended(...)` signature which provides a _"private"_ ob
 
 ```typescript
 TagFunctionName.extended((privateInstanceData: MyPrivateInstance) => {
-  constructed?: ()=>undefined | ChildTags;
   prototype?: object;
+  constructed?: ()=>undefined | ChildTags;
   ids?: { [id: string]: TagCreator; };
   styles?: string;
 })

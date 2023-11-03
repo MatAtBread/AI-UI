@@ -67,9 +67,6 @@ const Lazier = Lazy.extended({
 });
 
 const Laziest = Lazier.extended({
-  constructed(){
-    this.thing = "100";
-  },
   prototype:{
     Laziest: true,
     className: `Laziest ${Lazier.className}`,
@@ -77,6 +74,9 @@ const Laziest = Lazier.extended({
     style:{
       borderLeft: '2px solid black'
     },
+  },
+  constructed(){
+    this.thing = "100";
   },
   styles:`
     .Laziest:hover {
