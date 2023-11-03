@@ -20,18 +20,16 @@ export type Overrides = {
     styles?: string;
     constructed?: () => (ChildTags | void | Promise<void>);
 };
+type UntypedEventHandlers = {
+    [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? null | ((event: E) => R) : GlobalEventHandlers[K];
+};
 type TypedEventHandlers<T> = {
-    [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? (this: T, event: Omit<E, 'currentTarget'> & {
-        currentTarget: T;
-    }) => R : never;
+    [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? null | ((this: T, event: E) => R) : GlobalEventHandlers[K];
 };
 type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers) ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> : T;
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
-type UntypedGlobalEventHandlers = {
-    [K in keyof GlobalEventHandlers]: (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0]) => void;
-};
-type BasedOn<P, Base> = Partial<UntypedGlobalEventHandlers> & {
-    [K in keyof P]: K extends keyof Base ? Partial<Base[K]> : P[K];
+type BasedOn<P, Base> = Partial<UntypedEventHandlers> & {
+    [K in keyof P]: K extends keyof Base ? Partial<Base[K]> | P[K] : P[K];
 };
 interface ExtendedTag {
     <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, I extends {

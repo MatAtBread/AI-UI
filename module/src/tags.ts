@@ -39,13 +39,28 @@ export type Overrides = {
   constructed?: () => (ChildTags | void | Promise<void>);
 };
 
-// Like GlobalEventHandlers, but with `this` and `event.currentTarget` specified
+// Like GlobalEventHandlers, but with `this` removed
+// Commented section was fixed add/removeEventListener, but causes issues elsewmhere
+type UntypedEventHandlers = {
+  [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) 
+    ? null | ((event: E) => R)
+    /*: GlobalEventHandlers[K] extends (event:infer E, listener:infer L, ...more:infer M) => infer R 
+      ? L extends (this: any, ev: infer V) => any 
+        ? (event: E, listener:(ev: V) => any, ...more: M) => R 
+        : (event: E, listener:L, ...more: M) => R */
+      : GlobalEventHandlers[K];
+}
+
+// Like GlobalEventHandlers, but with `this` specified
+// Commented section was fixed add/removeEventListener, but causes issues elsewmhere
 type TypedEventHandlers<T> = {
   [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) 
-    ? (this: T, event: Omit<E, 'currentTarget'> & {
-      currentTarget: T;
-    }) => R 
-    : never;
+    ? null | ((this: T, event: E) => R)
+    /*: GlobalEventHandlers[K] extends (event:infer E, listener: infer L, ...more:infer M) => infer R 
+      ? L extends (this: any, ev: infer V) => any 
+        ? (event: E, listener:(this: T, ev: V) => any, ...more: M) => R 
+        : (event: E, listener:L, ...more: M) => R */
+      : GlobalEventHandlers[K];
 };
 
 type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
@@ -54,15 +69,12 @@ type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
-type UntypedGlobalEventHandlers = {
-  [K in keyof GlobalEventHandlers]: (e: Parameters<Exclude<GlobalEventHandlers[K], null | undefined>>[0])=>void
-}
-
-type BasedOn<P,Base> = Partial<UntypedGlobalEventHandlers> & {
+type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
   [K in keyof P]: K extends keyof Base 
-      ? Partial<Base[K]> 
+      ? Partial<Base[K]> | P[K]
       : P[K]
 };
+
 interface ExtendedTag {
   // Functional, with a private Instance
   <
@@ -121,13 +133,31 @@ export interface TagCreator<Base extends object,
 /* Some random tests/examples * /
 declare var div: TagCreator<HTMLDivElement, never>;
 
+const e = div.extended({
+  constructed() {
+    this.foo;
+    this.bar()
+  },
+  prototype: {
+    EE: 'EE' as const,
+    foo: 0,
+    onabort(e) { this.EE; this.ids.kid1 ; this.EE },
+    bar() { return this.EE }
+  },
+  ids:{
+    kid1: div
+  }
+});
 const ee = div.extended({
   prototype: {
     EE: 'EE' as const,
-    foo: 0
+    foo: 0,
+    onabort(e) { this.EE; this.ids.kid1 ; this.EE },
+    bar() { return this.EE }
   },
   constructed() {
     this.foo;
+    this.bar()
   },
   ids:{
     kid1: div
@@ -137,12 +167,13 @@ const ff = ee.extended({
   prototype: {
     FF: 'BB' as const,
     f() { return this.FF },
-    onclick(e) { this.FF; this.ids.kid2!.foo ; this.EE ; e.currentTarget!.FF },
+    onclick(e) { this.FF; this.ids.kid2!.foo ; this.EE },
   },
   constructed() {
     this.foo = 123;
     this.FF;
     this.EE;
+    this.bar
   },
   ids:{
     kid2: ee
@@ -162,12 +193,12 @@ ff.super.super().tagName
 ff.super.super.super
 
 const f2 = ff()
-f2.onclick = function(e) { this.FF === e.currentTarget.FF }
+f2.onclick = function(e) { this.FF }
 
 const I = ff;
 
-I().onclick = function(e) { this.FF === e.currentTarget.FF }
+I().onclick = function(e) { this.FF }
 I({
-  onabort(e) { this; e.currentTarget.FF }
+  onabort(e) { this;}
 })
 //*/
