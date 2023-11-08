@@ -1,5 +1,4 @@
-import { tag } from '../../../module/esm/ai-ui.js'
-//import { tag } from 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js' // 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'
 
 const { div, img, input } = tag();
 
@@ -44,16 +43,27 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
   Define a "Chart" so it is like an image, but with additional attributes called `label`,
   `xData` and `yData`. 
 
-  When these are all set, draw a chart for the data within the image
+  When these are all set, draw a chart for the data within the image.
+  Use opacity to indicate we're loading
 */
 
 const Chart = img.extended({
   prototype: {
+    // Overrides for existing attributes
+    style: {
+      transition: 'opacity 0.5s',
+      opacity: '0.2'
+    },
+    onload() { this.style.opacity = '1' },
+
+    // New property initialisations
     label: '',
     xData: [] as (string | number)[],
     set yData(d: number[]) {
       if (this.xData && this.label) {
-        this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=` + encodeURIComponent(JSON.stringify({
+        this.style.opacity = '0.2';
+        this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=`
+          + encodeURIComponent(JSON.stringify({
           type: 'line',
           data: {
             labels: this.xData,
@@ -111,7 +121,7 @@ const App = div.extended({
     return [
       Location({
         id: 'location',
-        onblur:async () => {
+        onchange: async () => {
           /* Note: this is the "obvious" way to do this (set the chart when the event
             fires), however AI-UI provides the `when` mechanism to make this much
             simpler and cleaner way, avoiding things like requiring the `app` closure

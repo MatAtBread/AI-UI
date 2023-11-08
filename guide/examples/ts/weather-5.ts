@@ -2,10 +2,7 @@ import { tag } from '../../../module/esm/ai-ui.js' // 'https://unpkg.com/@matatb
 
 const { div, img, input } = tag();
 
-/* 
-  Some nice external HTTP resources, together with some Typescript descriptions of their responses
-
-  With thanks to https://open-meteo.com/
+/* With thanks to https://open-meteo.com/
   Geocoding: https://geocoding-api.open-meteo.com/v1/search?name=Berlin&count=1&language=en&format=json
   Weather: https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current=temperature_2m
 */
@@ -32,7 +29,7 @@ interface Forecast {
 }
 
 async function getGeoInfo(s: string): Promise<GeoInfoResponse> {
-  return fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(s)}&count=1&format=json`)
+  return fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(s)}&count=1&language=en&format=json`)
     .then(res => res.json())
 }
 
@@ -46,7 +43,8 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
   Define a "Chart" so it is like an image, but with additional attributes called `label`,
   `xData` and `yData`. 
 
-  When these are all set, draw a chart for the data within the image
+  When these are all set, draw a chart for the data within the image.
+  Use opacity to indicate we're loading
 */
 
 const Chart = img.extended({
@@ -104,7 +102,7 @@ const WeatherForecast = Chart.extended({
 /* Define a "Location" element that is like an input tag that defaults to 'block' display style,
   and can indicate errors in a predefined way.
 
-  In this revision of the code, we place the `onblur` within the context of the "Location" tag. It
+  In this revision of the code, we place the `onchange` within the context of the "Location" tag. It
   is now the responsibility of this tag to resolve the name into GeoInfo, and expose that via a new
   `geo` property. When the property is set, we dispatch a `change` event to indicate that the asynchronous
   resolution of the fetch.
@@ -118,7 +116,7 @@ const Location = input.extended((inst:{ geo?: GeoInfo }) => ({
   prototype: {
     get geo() { return this.resolveGeo() },
 
-    /* We use this "internal" method as getters can be declared async, and we
+    /* We use this "internal" method as getters can't be declared async, and we
     want to use async/await, and TypeScript doesm't respect `ThisType` for getters/setters
     */
     async resolveGeo() {
