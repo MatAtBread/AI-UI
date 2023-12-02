@@ -28,6 +28,7 @@ function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(f
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
+const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially };
 export const asyncExtras = {
   map: wrapAsyncHelper(map),
   filter: wrapAsyncHelper(filter),
@@ -173,6 +174,23 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
       (ai as any) = null;
     }
   });
+}
+
+export function defineIterableProperty<T extends object, N extends string | number | symbol, V>(o: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
+  const b = broadcastIterator<V>();
+  const extras = Object.fromEntries(Object.entries(asyncHelperFunctions).map(([k,f]) => [k, 
+    (b[Symbol.asyncIterator]() as any)[k]]
+  ));
+  let a = Object.assign(v as any, b, extras);
+  Object.defineProperty(o, name, {
+    get(): V { return a },
+    set(v: V) {
+      a = Object.assign(v as any, b, extras);
+      b.push(v);
+    },
+    enumerable: true
+  });
+  return o as any;
 }
 
 /* Merge asyncIterables into a single asyncIterable */

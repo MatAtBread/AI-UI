@@ -1,5 +1,7 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 
+import { AsyncExtraIterable, BroadcastIterator } from "./iterators";
+
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
   | undefined // A value that won't generate an element
@@ -34,6 +36,7 @@ type IDS<I> = {
 
 export type Overrides = {
   prototype?: object;
+  iterable?: object;
   ids?: { [id: string]: TagCreator<any, any>; };
   styles?: string;
   constructed?: () => (ChildTags | void | Promise<void>);
@@ -75,11 +78,23 @@ type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
       : P[K]
 };
 
+// TODO: Not working
+type NotInCommon<O> = {
+  [excess: string]: any;
+} & {
+  [K in keyof O]: never;
+} 
+
+type IterableProperties<IP> = {
+  [K in keyof IP]: AsyncExtraIterable<IP[K]> & IP[K]
+}
+
 interface ExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
+    IP extends NotInCommon<P>,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
@@ -87,15 +102,17 @@ interface ExtendedTag {
     CET extends object = P & Base & IDS<I>
   >(this: BaseCreator, _: (instance: any) => {
     prototype?: P;
+    iterable?: IP;
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<AsyncGeneratedObject<CET> & IterableProperties<IP>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
 
   // Declarative, with no state instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
+    IP extends NotInCommon<P>,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
@@ -103,10 +120,11 @@ interface ExtendedTag {
     CET extends object = P & Base & IDS<I>
   >(this: BaseCreator, _: {
     prototype?: P;
+    iterable?: IP;
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<AsyncGeneratedObject<CET> & IterableProperties<IP>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
 }
 
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];

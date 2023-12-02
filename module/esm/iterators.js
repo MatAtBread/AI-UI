@@ -15,6 +15,7 @@ export function isAsyncIter(o) {
 function wrapAsyncHelper(fn) {
     return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
 }
+const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially };
 export const asyncExtras = {
     map: wrapAsyncHelper(map),
     filter: wrapAsyncHelper(filter),
@@ -160,6 +161,21 @@ export function broadcastIterator(stop = () => { }) {
             ai = null;
         }
     });
+}
+export function defineIterableProperty(o, name, v) {
+    const b = broadcastIterator();
+    const extras = Object.fromEntries(Object.entries(asyncHelperFunctions).map(([k, f]) => [k,
+        b[Symbol.asyncIterator]()[k]]));
+    let a = Object.assign(v, b, extras);
+    Object.defineProperty(o, name, {
+        get() { return a; },
+        set(v) {
+            a = Object.assign(v, b, extras);
+            b.push(v);
+        },
+        enumerable: true
+    });
+    return o;
 }
 export const merge = (...ai) => {
     const it = ai.map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);

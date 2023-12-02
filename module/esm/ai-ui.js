@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
@@ -131,7 +131,7 @@ export const tag = function (_1, _2, _3) {
                         const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
                         if (!n.length || !n[0].parentNode)
                             throw new Error("Element(s) no longer exist in document" + insertionStack);
-                        t = appender(n[0].parentNode, n[0])(es.value ?? DomPromiseContainer());
+                        t = appender(n[0].parentNode, n[0])(es.value?.valueOf() ?? DomPromiseContainer());
                         n.forEach(e => e.parentNode?.removeChild(e));
                         ap.next().then(update).catch(error);
                     }
@@ -265,7 +265,8 @@ export const tag = function (_1, _2, _3) {
                                         return;
                                     }
                                     if (!es.done) {
-                                        if (typeof es.value === 'object' && es.value !== null) {
+                                        const value = es.value?.valueOf();
+                                        if (typeof value === 'object' && value !== null) {
                                             /*
                                             THIS IS JUST A HACK: `style` has to be set member by member, eg:
                                               e.style.color = 'blue'        --- works
@@ -280,14 +281,14 @@ export const tag = function (_1, _2, _3) {
                                             */
                                             const destDesc = Object.getOwnPropertyDescriptor(d, k);
                                             if (k === 'style' || !destDesc?.set)
-                                                assign(d[k], es.value);
+                                                assign(d[k], value);
                                             else
-                                                d[k] = es.value;
+                                                d[k] = value;
                                         }
                                         else {
                                             // Src is not an object (or is null) - just assign it, unless it's undefined
-                                            if (es.value !== undefined)
-                                                d[k] = es.value;
+                                            if (value !== undefined)
+                                                d[k] = value;
                                         }
                                         ap.next().then(update).catch(error);
                                     }
@@ -381,14 +382,21 @@ export const tag = function (_1, _2, _3) {
             const tagDefinition = overrides(ped);
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
+            const iterableKeys = tagDefinition.iterable && Object.keys(tagDefinition.iterable);
+            iterableKeys?.forEach(k => {
+                defineIterableProperty(e, k, tagDefinition.iterable[k]);
+            });
             if (combinedAttrs[callStackSymbol] === newCallStack) {
                 if (!noAttrs)
                     assignProps(e, attrs);
                 while (newCallStack.length) {
-                    const children = newCallStack.shift()?.constructed?.call(e);
+                    const base = newCallStack.shift();
+                    const children = base?.constructed?.call(e);
                     if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
                         appender(e)(children);
                 }
+                // @ts-ignore
+                iterableKeys?.forEach(k => e[k] = e[k].valueOf());
             }
             return e;
         };

@@ -1,3 +1,4 @@
+import { AsyncExtraIterable } from "./iterators";
 export type ChildTags = Node | number | string | boolean | undefined | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncProvider<X> : AsyncProvider<Partial<X>> | {
@@ -14,6 +15,7 @@ type IDS<I> = {
 };
 export type Overrides = {
     prototype?: object;
+    iterable?: object;
     ids?: {
         [id: string]: TagCreator<any, any>;
     };
@@ -31,23 +33,33 @@ type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 type BasedOn<P, Base> = Partial<UntypedEventHandlers> & {
     [K in keyof P]: K extends keyof Base ? Partial<Base[K]> | P[K] : P[K];
 };
+type NotInCommon<O> = {
+    [excess: string]: any;
+} & {
+    [K in keyof O]: never;
+};
+type IterableProperties<IP> = {
+    [K in keyof IP]: AsyncExtraIterable<IP[K]> & IP[K];
+};
 interface ExtendedTag {
-    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, I extends {
+    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, IP extends NotInCommon<P>, I extends {
         [id: string]: TagCreator<any, any>;
     }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: (instance: any) => {
         prototype?: P;
+        iterable?: IP;
         ids?: I;
         constructed?: C;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
-    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, I extends {
+    } & ThisType<AsyncGeneratedObject<CET> & IterableProperties<IP>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
+    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, IP extends NotInCommon<P>, I extends {
         [id: string]: TagCreator<any, any>;
     }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: {
         prototype?: P;
+        iterable?: IP;
         ids?: I;
         constructed?: C;
         styles?: S;
-    } & ThisType<AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
+    } & ThisType<AsyncGeneratedObject<CET> & IterableProperties<IP>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
 }
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
 export interface TagCreator<Base extends object, Super extends (never | TagCreator<any, any>) = never, TypedBase = ReTypedEventHandlers<Base>> {
