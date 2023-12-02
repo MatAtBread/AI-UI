@@ -34,7 +34,7 @@ type BasedOn<P, Base> = Partial<UntypedEventHandlers> & {
     [K in keyof P]: K extends keyof Base ? Partial<Base[K]> | P[K] : P[K];
 };
 type NotInCommon<O> = {
-    [excess: string]: any;
+    [excess: string]: string | symbol | number | bigint | boolean | undefined;
 } & {
     [K in keyof O]: never;
 };

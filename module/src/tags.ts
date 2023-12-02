@@ -80,7 +80,7 @@ type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
 
 // TODO: Not working
 type NotInCommon<O> = {
-  [excess: string]: any;
+  [excess: string]: string | symbol | number | bigint | boolean | undefined ;
 } & {
   [K in keyof O]: never;
 } 

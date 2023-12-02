@@ -7,9 +7,9 @@ const App = div.extended({
   iterable: {
     num: 100,
     rounded: false,
-    obj: {
+    /*obj: {
       abc: 123
-    }
+    }*/
   },
   styles:`button { margin: 0.5em; }`,
   constructed() {
@@ -29,7 +29,6 @@ const App = div.extended({
       div(this.num, ' ', this.num.waitFor(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
       div(this.num.map(n => -n)), // Dynamic - we map the value
-      div(this.obj.map(o => JSON.stringify(o)))
     ]
   }
 });

@@ -178,28 +178,24 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
 
 export function defineIterableProperty<T extends object, N extends string | number | symbol, V>(o: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
   const b = broadcastIterator<V>();
-  const extras: Record<string | symbol, PropertyDescriptor> = Object.fromEntries(Object.entries(asyncHelperFunctions).map(([k,f]) => [k, 
-    { value: (b[Symbol.asyncIterator]() as any)[k], enumerable: false, writable: false }]
+  const extras: Record<string | symbol, PropertyDescriptor> = Object.fromEntries(
+    Object.entries(asyncHelperFunctions).map(([k,f]) => [
+      k, { value: (b[Symbol.asyncIterator]() as any)[k], enumerable: false, writable: false }
+    ]
   ));
+  
   const broadcast = Object.getOwnPropertyDescriptors(b);
-  for (const x of [...Object.keys(broadcast), ...Object.getOwnPropertySymbols(broadcast)]) {
-    extras[x as any] = broadcast[x as any];
-    extras[x as any].writable = extras[x as any].enumerable = false;
+  for (const x of [...Object.keys(broadcast), ...Object.getOwnPropertySymbols(broadcast)] as any[]) {
+    extras[x] = broadcast[x];
+    extras[x].writable = extras[x].enumerable = false;
   }
-  
-  let a = Object.assign(v as any);
-  let base = Object.create(Object.getPrototypeOf(a), extras);
-  Object.setPrototypeOf(a, base);
-  
+
+  let a = Object.defineProperties(Object.assign(v as any), extras);  
   Object.defineProperty(o, name, {
     get(): V { return a },
     set(v: V) {
-      if (Object.getPrototypeOf(v) !== base) {
-        a = Object.assign(v as any);
-        base = Object.create(Object.getPrototypeOf(a), extras);
-        Object.setPrototypeOf(a, base);
-      }
-      b.push(v);
+      a = Object.defineProperties(Object.assign(v as any), extras);
+      b.push(v?.valueOf() as V);
     },
     enumerable: true
   });

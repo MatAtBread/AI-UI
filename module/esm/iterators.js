@@ -164,25 +164,20 @@ export function broadcastIterator(stop = () => { }) {
 }
 export function defineIterableProperty(o, name, v) {
     const b = broadcastIterator();
-    const extras = Object.fromEntries(Object.entries(asyncHelperFunctions).map(([k, f]) => [k,
-        { value: b[Symbol.asyncIterator]()[k], enumerable: false, writable: false }]));
+    const extras = Object.fromEntries(Object.entries(asyncHelperFunctions).map(([k, f]) => [
+        k, { value: b[Symbol.asyncIterator]()[k], enumerable: false, writable: false }
+    ]));
     const broadcast = Object.getOwnPropertyDescriptors(b);
     for (const x of [...Object.keys(broadcast), ...Object.getOwnPropertySymbols(broadcast)]) {
         extras[x] = broadcast[x];
         extras[x].writable = extras[x].enumerable = false;
     }
-    let a = Object.assign(v);
-    let base = Object.create(Object.getPrototypeOf(a), extras);
-    Object.setPrototypeOf(a, base);
+    let a = Object.defineProperties(Object.assign(v), extras);
     Object.defineProperty(o, name, {
         get() { return a; },
         set(v) {
-            if (Object.getPrototypeOf(v) !== base) {
-                a = Object.assign(v);
-                base = Object.create(Object.getPrototypeOf(a), extras);
-                Object.setPrototypeOf(a, base);
-            }
-            b.push(v);
+            a = Object.defineProperties(Object.assign(v), extras);
+            b.push(v?.valueOf());
         },
         enumerable: true
     });
