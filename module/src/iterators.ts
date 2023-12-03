@@ -45,6 +45,7 @@ export const asyncExtras = {
 class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   private _pending = [] as DeferredPromise<IteratorYieldResult<T>>[] | null;
   private _items = [] as T[] | null;
+  private $consumer: any = null;
 
   constructor(private readonly stop = () => { }) {
   }
@@ -54,6 +55,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   }
 
   next() {
+    this.$consumer = new Error().stack;
     if (this._items!.length) {
       return Promise.resolve({ done: false, value: this._items!.shift()! });
     } 
@@ -141,10 +143,11 @@ export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false)
   The iterators stops running when the number of consumers decreases to zero
 */
 
+(globalThis as any).bi = new Set<BroadcastIterator<any>>();
 export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   let ai = new Set<QueueIteratableIterator<T>>();
 
-  return <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
+  const b = <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
     [Symbol.asyncIterator](): AsyncIterableIterator<T> {
       const added = new QueueIteratableIterator<T>(() => {
         ai.delete(added);
@@ -174,28 +177,56 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
       (ai as any) = null;
     }
   });
+  (globalThis as any).bi.add(b);
+  return b;
 }
 
 export function defineIterableProperty<T extends object, N extends string | number | symbol, V>(o: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
-  const b = broadcastIterator<V>();
-  const extras: Record<string | symbol, PropertyDescriptor> = Object.fromEntries(
-    Object.entries(asyncHelperFunctions).map(([k,f]) => [
-      k, { value: (b[Symbol.asyncIterator]() as any)[k], enumerable: false, writable: false }
-    ]
-  ));
-  
-  const broadcast = Object.getOwnPropertyDescriptors(b);
-  for (const x of [...Object.keys(broadcast), ...Object.getOwnPropertySymbols(broadcast)] as any[]) {
-    extras[x] = broadcast[x];
-    extras[x].writable = extras[x].enumerable = false;
+  function initIterator() { 
+    const bi = broadcastIterator<V>();
+    extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
+    extras.push = { value: bi.push, enumerable: false, writable: false };
+    extras.close = { value: bi.close, enumerable: false, writable: false };
+    const b = bi[Symbol.asyncIterator]();
+    Object.keys(asyncHelperFunctions).map(k => 
+      // @ts-ignore
+      extras[k] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
+    )
+    Object.defineProperties(a, extras)
+    return b;
   }
+  const lazyAsyncMethod = (method: string) => function (this: unknown, ...args:any[]) {
+    initIterator();
+    return a[method].call(this,...args);
+    /*
+    const discard = initIterator()
+    const ret = a[method].call(this,...args)
+    //discard.return?.();
+    return ret;
+    */
+  }
+
+  const extras: Record<string | symbol, PropertyDescriptor> = {
+    [Symbol.asyncIterator]: {
+      enumerable: false, writable: true,
+      value: initIterator
+    }
+  };
+
+  [...Object.keys(asyncHelperFunctions),'push','cloase'].map(k => 
+    extras[k as keyof typeof extras] = { 
+      enumerable: false, 
+      writable: true,
+      value: lazyAsyncMethod(k)
+    }
+  )
 
   let a = Object.defineProperties(Object.assign(v as any), extras);  
   Object.defineProperty(o, name, {
     get(): V { return a },
     set(v: V) {
       a = Object.defineProperties(Object.assign(v as any), extras);
-      b.push(v?.valueOf() as V);
+      a.push(v?.valueOf() as V);
     },
     enumerable: true
   });

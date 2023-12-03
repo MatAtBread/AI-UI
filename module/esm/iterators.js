@@ -33,11 +33,13 @@ class QueueIteratableIterator {
         this.stop = stop;
         this._pending = [];
         this._items = [];
+        this.$consumer = null;
     }
     [Symbol.asyncIterator]() {
         return this;
     }
     next() {
+        this.$consumer = new Error().stack;
         if (this._items.length) {
             return Promise.resolve({ done: false, value: this._items.shift() });
         }
@@ -127,9 +129,10 @@ export function pushIterator(stop = () => { }, bufferWhenNoConsumers = false) {
 
   The iterators stops running when the number of consumers decreases to zero
 */
+globalThis.bi = new Set();
 export function broadcastIterator(stop = () => { }) {
     let ai = new Set();
-    return Object.assign(Object.create(asyncExtras), {
+    const b = Object.assign(Object.create(asyncExtras), {
         [Symbol.asyncIterator]() {
             const added = new QueueIteratableIterator(() => {
                 ai.delete(added);
@@ -161,23 +164,49 @@ export function broadcastIterator(stop = () => { }) {
             ai = null;
         }
     });
+    globalThis.bi.add(b);
+    return b;
 }
 export function defineIterableProperty(o, name, v) {
-    const b = broadcastIterator();
-    const extras = Object.fromEntries(Object.entries(asyncHelperFunctions).map(([k, f]) => [
-        k, { value: b[Symbol.asyncIterator]()[k], enumerable: false, writable: false }
-    ]));
-    const broadcast = Object.getOwnPropertyDescriptors(b);
-    for (const x of [...Object.keys(broadcast), ...Object.getOwnPropertySymbols(broadcast)]) {
-        extras[x] = broadcast[x];
-        extras[x].writable = extras[x].enumerable = false;
+    function initIterator() {
+        const bi = broadcastIterator();
+        extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
+        extras.push = { value: bi.push, enumerable: false, writable: false };
+        extras.close = { value: bi.close, enumerable: false, writable: false };
+        const b = bi[Symbol.asyncIterator]();
+        Object.keys(asyncHelperFunctions).map(k => 
+        // @ts-ignore
+        extras[k] = { value: b[k], enumerable: false, writable: false });
+        Object.defineProperties(a, extras);
+        return b;
     }
+    const lazyAsyncMethod = (method) => function (...args) {
+        initIterator();
+        return a[method].call(this, ...args);
+        /*
+        const discard = initIterator()
+        const ret = a[method].call(this,...args)
+        //discard.return?.();
+        return ret;
+        */
+    };
+    const extras = {
+        [Symbol.asyncIterator]: {
+            enumerable: false, writable: true,
+            value: initIterator
+        }
+    };
+    [...Object.keys(asyncHelperFunctions), 'push', 'cloase'].map(k => extras[k] = {
+        enumerable: false,
+        writable: true,
+        value: lazyAsyncMethod(k)
+    });
     let a = Object.defineProperties(Object.assign(v), extras);
     Object.defineProperty(o, name, {
         get() { return a; },
         set(v) {
             a = Object.defineProperties(Object.assign(v), extras);
-            b.push(v?.valueOf());
+            a.push(v?.valueOf());
         },
         enumerable: true
     });

@@ -78,23 +78,38 @@ type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
       : P[K]
 };
 
-// TODO: Not working
-type NotInCommon<O> = {
+// TODO: Not working - it should NOT allow members of O
+type IterablePropertyType<O> = {
   [excess: string]: string | symbol | number | bigint | boolean | undefined ;
-} & {
+} /*& {
   [K in keyof O]: never;
-} 
+} */
+
+/* IterableProperties can't be correctly typed in TS right now, either the declaratiin 
+  works for retrieval, or it works for assignments, but there's no TS syntax that
+  permits the correct type-checking at present.
+
+  See https://github.com/microsoft/TypeScript/issues/43826
+*/ 
 
 type IterableProperties<IP> = {
-  [K in keyof IP]: AsyncExtraIterable<IP[K]> & IP[K]
+  // Declaration for the getter (member reads)
+  // [K in keyof IP]: AsyncExtraIterable<IP[K]> & IP[K]
+  // Declaration for the setter (member assignment)
+  [K in keyof IP]: IP[K]
+
+  // We choose the above type description, meaning that when used as an AsyncIterable, it needs a cast:
+  //    (this.iterableProp as unknown as AsyncExtraIterable<type>).map|filter|...
+  // ...which works, but is very, very fugly
 }
 
+(function(){}).bind({});
 interface ExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
-    IP extends NotInCommon<P>,
+    IP extends IterablePropertyType<P>,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
@@ -106,13 +121,13 @@ interface ExtendedTag {
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET> & IterableProperties<IP>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
 
   // Declarative, with no state instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
-    IP extends NotInCommon<P>,
+    IP extends IterablePropertyType<P>,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
@@ -124,7 +139,7 @@ interface ExtendedTag {
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<AsyncGeneratedObject<CET> & IterableProperties<IP>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
 }
 
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
