@@ -467,7 +467,7 @@ export const tag = function (_1, _2, _3) {
         };
         const includingExtender = Object.assign(tagCreator, {
             super: () => { throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement()."); },
-            extended,
+            extended, // How to extend this (base) tag
             valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>`; }
         });
         Object.defineProperty(tagCreator, "name", { value: '<' + k + '>' });

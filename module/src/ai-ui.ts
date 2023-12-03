@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { BroadcastIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { AsyncProvider, ChildTags, Instance, Overrides, TagCreator } from './tags'
 
