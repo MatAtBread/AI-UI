@@ -104,7 +104,7 @@ Let's update the App to display a new Chuck Morris joke every few seconds. First
 ```
 ...and update our dynamic div's content:
 
-```javascript
+```diff
   const App = div.extended({
     constructed() {
       /* When constructed, this "div" tag contains some other tags: */
