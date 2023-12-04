@@ -48,11 +48,9 @@ Try the above code [example (right click and open in new tab)](https://raw.githa
 
 Unlike dynamic content, attributes cannot be specified as a Promise
 
-```
-NOTE: This design decision was taken as some attributes are actually useful as
-Promises. Although no standard DOM Node types have any "Promised" attributes,
-there are numerous examples of third-party components that do.
-```
+> NOTE: This design decision was taken as some attributes are actually useful as
+> Promises. Although no standard DOM Node types have any "Promised" attributes,
+> there are numerous examples of third-party components that do.
 
 If you really need to specify a Promised attribute, wrap it in an async generator:
 
