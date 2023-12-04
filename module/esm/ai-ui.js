@@ -382,6 +382,7 @@ export const tag = function (_1, _2, _3) {
             const tagDefinition = overrides(ped);
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
+            deepDefine(e, tagDefinition.declare);
             const iterableKeys = tagDefinition.iterable && Object.keys(tagDefinition.iterable);
             iterableKeys?.forEach(k => {
                 defineIterableProperty(e, k, tagDefinition.iterable[k]);
@@ -405,7 +406,7 @@ export const tag = function (_1, _2, _3) {
             overrides,
             extended,
             valueOf: () => {
-                const keys = Object.keys(staticExtensions.prototype || {});
+                const keys = [...Object.keys(staticExtensions.declare || {}) /*, ...Object.keys(staticExtensions.prototype || {})*/];
                 return `${extendTag.name}: {${keys.join(', ')}}\n \u21AA ${this.valueOf()}`;
             }
         });
@@ -413,12 +414,14 @@ export const tag = function (_1, _2, _3) {
         (function walkProto(creator) {
             if (creator?.super)
                 walkProto(creator.super);
-            const proto = creator.overrides?.(staticInstance)?.prototype;
+            const proto = creator.overrides?.(staticInstance);
             if (proto) {
-                deepDefine(fullProto, proto);
+                deepDefine(fullProto, proto?.prototype);
+                deepDefine(fullProto, proto?.declare);
             }
         })(this);
         deepDefine(fullProto, staticExtensions.prototype);
+        deepDefine(fullProto, staticExtensions.declare);
         Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
         // Attempt to make up a meaningfu;l name for this extended tag
         const creatorName = staticExtensions.prototype
@@ -505,7 +508,9 @@ const DyamicElementError = AsyncDOMContainer.extended({
     color: #b33;
   }`,
     prototype: {
-        className: 'error',
+        className: 'error'
+    },
+    declare: {
         error: undefined
     },
     constructed() {

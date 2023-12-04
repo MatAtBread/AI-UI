@@ -1,6 +1,6 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 
-import { AsyncExtraIterable, BroadcastIterator } from "./iterators";
+import { AsyncExtraIterable } from "./iterators";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
@@ -21,6 +21,8 @@ type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent union dis
       : AsyncProvider<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; } 
   : X | AsyncProvider<X> | undefined;
 
+type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
+
 export type Instance<T extends {} = Record<string, unknown>> = T;
 
 // Internal types supporting TagCreator
@@ -35,9 +37,10 @@ type IDS<I> = {
 };
 
 export type Overrides = {
-  prototype?: object;
-  iterable?: object;
-  ids?: { [id: string]: TagCreator<any, any>; };
+  prototype?: object; // Defaults for exitsting properties
+  iterable?: object;  // New 'hot' properties
+  declare?: object;   // New properties
+  ids?: { [id: string]: TagCreator<any, any>; };  // Descendant element types
   styles?: string;
   constructed?: () => (ChildTags | void | Promise<void>);
 };
@@ -75,7 +78,13 @@ type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
   [K in keyof P]: K extends keyof Base 
       ? Partial<Base[K]> | P[K]
-      : P[K]
+      : P[K];
+};
+
+type NotBasedOn<P,Base> = {
+  [K in keyof P]: K extends keyof Base 
+      ? never // All properties of P must not exist in Base
+      : P[K]; 
 };
 
 type Untyped<T> = {
@@ -109,54 +118,61 @@ type IterableProperties<IP> = {
     but casts it to a AsyncIterator before use.
   */
   [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
-
 }
 
-type ExtendedReturn<BaseCreator extends TagCreator<any,any,any>,P,I,C,S,IP,Base,CET extends object> = 
-(keyof IP & keyof Base) extends (never|undefined)
-  ? TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
-  : {
-    'Clashing iterable and base properties': keyof IP & keyof Base,
-  };
+type ExcessKeys<A,B> = keyof A extends (keyof A & keyof B)  ? never : Exclude<keyof A, keyof B>;
+
+type ExtendedReturn<BaseCreator extends TagCreator<any,any,any>,P,D,I,C,S,IP,Base,CET extends object> = 
+  (keyof IP & keyof Base) extends never 
+  ? ExcessKeys<P, Base> extends never
+    ? (keyof D & keyof Base) extends never 
+      ? TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+      : { 'Attempt to `declare` existing properties': (keyof D & keyof Base) }
+    : { '`prototype` has excess properties not in the base tag': ExcessKeys<P, Base> }
+  : { 'Clashing `iterable` and base properties': keyof IP & keyof Base };
 
 interface ExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
+    D extends object,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
     IP extends { [k: string]: string | symbol | number | bigint | boolean | undefined } = {},
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
-    CET extends object = P & Base & IDS<I>
+    CET extends object = D & P & Base & IDS<I>
   >(this: BaseCreator, _: (instance: any) => {
     prototype?: P;
+    declare?: D;
     iterable?: IP;
     ids?: I;
     constructed?: C;
     styles?: S;
   } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>)
-  : ExtendedReturn<BaseCreator,P,I,C,S,IP,Base,CET>;
+  : ExtendedReturn<BaseCreator,P,D,I,C,S,IP,Base,CET>;
 
   // Declarative, with no state instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
+    D extends object,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
     IP extends { [k: string]: string | symbol | number | bigint | boolean | undefined } = {},
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
-    CET extends object = P & Base & IDS<I>,
+    CET extends object = D & P & Base & IDS<I>,
   >(this: BaseCreator, _: {
     prototype?: P;
+    declare?: D;
     iterable?: IP;
     ids?: I;
     constructed?: C;
     styles?: S;
   } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>)
-  : ExtendedReturn<BaseCreator,P,I,C,S,IP,Base,CET>;
+  : ExtendedReturn<BaseCreator,P,D,I,C,S,IP,Base,CET>;
 }
 
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
@@ -180,75 +196,3 @@ export interface TagCreator<Base extends object,
     readonly name: string;
   };
 
-/* Some random tests/examples * /
-declare var div: TagCreator<HTMLDivElement, never>;
-
-const e = div.extended({
-  constructed() {
-    this.foo;
-    this.bar()
-  },
-  prototype: {
-    EE: 'EE' as const,
-    foo: 0,
-    onabort(e) { this.EE; this.ids.kid1 ; this.EE },
-    bar() { return this.EE }
-  },
-  ids:{
-    kid1: div
-  }
-});
-const ee = div.extended({
-  prototype: {
-    EE: 'EE' as const,
-    foo: 0,
-    onabort(e) { this.EE; this.ids.kid1 ; this.EE },
-    bar() { return this.EE }
-  },
-  constructed() {
-    this.foo;
-    this.bar()
-  },
-  ids:{
-    kid1: div
-  }
-});
-const ff = ee.extended({
-  prototype: {
-    FF: 'BB' as const,
-    f() { return this.FF },
-    onclick(e) { this.FF; this.ids.kid2!.foo ; this.EE },
-  },
-  constructed() {
-    this.foo = 123;
-    this.FF;
-    this.EE;
-    this.bar
-  },
-  ids:{
-    kid2: ee
-  }
-});
-
-ee().constructor({
-  EE: 'EE',
-})
-
-ff.super.super()
-ff.super.super.super
-
-ff().FF
-ff.super().EE
-ff.super.super().tagName
-ff.super.super.super
-
-const f2 = ff()
-f2.onclick = function(e) { this.FF }
-
-const I = ff;
-
-I().onclick = function(e) { this.FF }
-I({
-  onabort(e) { this;}
-})
-//*/

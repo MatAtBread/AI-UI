@@ -3,15 +3,17 @@ import { tag } from '../../../module/esm/ai-ui.js';
 /* Specify what base tags you reference in your UI */
 const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
 
+//type Q = typeof App['Info']
+
 const App = div.extended({
   iterable: {
     num: 100,
     rounded: false as boolean
   },
-  /*computed:{
-    borderRadius() { return this.rounded.map!(f => f ? '1em': '').broadcast(x => x) }
-  }*/
-  prototype:{
+  prototype: {
+    id: 'mat',
+  },
+  declare:{
     reset() {
       this.num = 0;
     }
@@ -20,6 +22,7 @@ const App = div.extended({
   constructed() {
     this.style
     /* When constructed, this "div" tag contains some other tags: */
+//    const borderRadius = this.when('#rounded')(_ => this.ids.rounded.checked ? '1em': '').broadcast();
     const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast();
     return [
       h2("Hello World"),
