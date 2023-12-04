@@ -24,7 +24,7 @@ export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterat
   the same arguments returns a AsyncExtraIterable<X>
 */
 function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(fn: (this: AsyncIterable<T>, ...args: Args) => X) {
-  return function(this: AsyncIterable<T>, ...args:Args) { return iterableHelpers(fn.call(this, ...args)) }
+  return function(this: Partial<AsyncIterable<T>>, ...args:Args) { return iterableHelpers(fn.call(this as AsyncIterable<T>, ...args)) }
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
@@ -143,7 +143,6 @@ export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false)
   The iterators stops running when the number of consumers decreases to zero
 */
 
-(globalThis as any).bi = new Set<BroadcastIterator<any>>();
 export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   let ai = new Set<QueueIteratableIterator<T>>();
 
@@ -177,7 +176,6 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
       (ai as any) = null;
     }
   });
-  (globalThis as any).bi.add(b);
   return b;
 }
 
@@ -198,12 +196,6 @@ export function defineIterableProperty<T extends object, N extends string | numb
   const lazyAsyncMethod = (method: string) => function (this: unknown, ...args:any[]) {
     initIterator();
     return a[method].call(this,...args);
-    /*
-    const discard = initIterator()
-    const ret = a[method].call(this,...args)
-    //discard.return?.();
-    return ret;
-    */
   }
 
   const extras: Record<string | symbol, PropertyDescriptor> = {
@@ -213,7 +205,7 @@ export function defineIterableProperty<T extends object, N extends string | numb
     }
   };
 
-  [...Object.keys(asyncHelperFunctions),'push','cloase'].map(k => 
+  [...Object.keys(asyncHelperFunctions),'push','close'].map(k => 
     extras[k as keyof typeof extras] = { 
       enumerable: false, 
       writable: true,

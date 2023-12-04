@@ -1,3 +1,4 @@
+import { AsyncExtraIterable } from "./iterators";
 export type ChildTags = Node | number | string | boolean | undefined | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncProvider<X> : AsyncProvider<Partial<X>> | {
@@ -36,7 +37,7 @@ type IterablePropertyType<O> = {
     [excess: string]: string | symbol | number | bigint | boolean | undefined;
 };
 type IterableProperties<IP> = {
-    [K in keyof IP]: IP[K];
+    [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
 };
 interface ExtendedTag {
     <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, IP extends IterablePropertyType<P>, I extends {

@@ -78,6 +78,12 @@ type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
       : P[K]
 };
 
+type Untyped<T> = {
+  [K in keyof T]: any;
+};
+
+type NoOverlap<O,P> = Untyped<O> extends Untyped<Partial<P>> ? never : O;
+
 // TODO: Not working - it should NOT allow members of O
 type IterablePropertyType<O> = {
   [excess: string]: string | symbol | number | bigint | boolean | undefined ;
@@ -86,24 +92,33 @@ type IterablePropertyType<O> = {
 } */
 
 /* IterableProperties can't be correctly typed in TS right now, either the declaratiin 
-  works for retrieval, or it works for assignments, but there's no TS syntax that
-  permits the correct type-checking at present.
+  works for retrieval (the getter), or it works for assignments (the setter), but there's
+  no TS syntax that permits correct type-checking at present.
 
+  Ideally, it would be:
+
+  type IterableProperties<IP> = {
+    get [K in keyof IP](): AsyncExtraIterable<IP[K]> & IP[K]
+    set [K in keyof IP](v: IP[K])
+  }
   See https://github.com/microsoft/TypeScript/issues/43826
 */ 
 
 type IterableProperties<IP> = {
-  // Declaration for the getter (member reads)
-  // [K in keyof IP]: AsyncExtraIterable<IP[K]> & IP[K]
-  // Declaration for the setter (member assignment)
-  [K in keyof IP]: IP[K]
+  /* We choose the following type description to avoid the issues above. Because the AsyncExtraIterable
+    is Partial it can be omitted from assignments:
+      this.prop = value;  // Valid, as long as valus has the same type as the prop
+    ...and when retrieved it will be the value type, and optionally the async iterator:
+      Div(this.prop) ; // the value
+      this.prop.map!(....)  // the iterator (not the trailing '!' to assert non-null value)
 
-  // We choose the above type description, meaning that when used as an AsyncIterable, it needs a cast:
-  //    (this.iterableProp as unknown as AsyncExtraIterable<type>).map|filter|...
-  // ...which works, but is very, very fugly
+    This relies on a hack to `wrapAsyncHelper` in iterators.ts when *acceots* a Partial<AsyncIterator> 
+    but casts it to a AsyncIterator before use.
+  */
+  [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
+
 }
 
-(function(){}).bind({});
 interface ExtendedTag {
   // Functional, with a private Instance
   <

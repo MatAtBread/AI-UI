@@ -165,7 +165,7 @@ export const tag = <TagLoader>function <Tags extends string,
           g = n;
         }, x => {
           console.warn(x);
-          appender(g[0])(DyamicElementError(x.toString()));
+          appender(g[0])(DyamicElementError({error: x}));
         });
         return;
       }
@@ -186,7 +186,7 @@ export const tag = <TagLoader>function <Tags extends string,
           ap.return?.(errorValue);
           const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
           if (n[0].parentNode) {
-            t = appender(n[0].parentNode, n[0])(DyamicElementError(errorValue.toString()));
+            t = appender(n[0].parentNode, n[0])(DyamicElementError({error: errorValue}));
             n.forEach(e => e.parentNode?.removeChild(e));
           }
           else
@@ -361,7 +361,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 const error = (errorValue: any) => {
                   ap.return?.(errorValue);
                   console.warn("Dynamic attribute error", errorValue, k, d, base);
-                  appender(base)(DyamicElementError(errorValue.toString()));
+                  appender(base)(DyamicElementError({error: errorValue}));
                 }
                 ap.next().then(update).catch(error);
               } 
@@ -602,7 +602,15 @@ const DyamicElementError = AsyncDOMContainer.extended({
     color: #b33;
   }`,
   prototype: {
-    className: 'error'
+    className: 'error',
+    error: undefined as any
+  },
+  constructed(){
+    return (typeof this.error === 'object') 
+      ? this.error instanceof Error 
+        ? this.error.message 
+        : JSON.stringify(this.error) 
+      : String(this.error); 
   }
 });
 

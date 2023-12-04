@@ -1,5 +1,4 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
-(function () { }).bind({});
 ;
 export {};
 /* Some random tests/examples * /

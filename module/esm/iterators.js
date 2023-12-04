@@ -129,7 +129,6 @@ export function pushIterator(stop = () => { }, bufferWhenNoConsumers = false) {
 
   The iterators stops running when the number of consumers decreases to zero
 */
-globalThis.bi = new Set();
 export function broadcastIterator(stop = () => { }) {
     let ai = new Set();
     const b = Object.assign(Object.create(asyncExtras), {
@@ -164,7 +163,6 @@ export function broadcastIterator(stop = () => { }) {
             ai = null;
         }
     });
-    globalThis.bi.add(b);
     return b;
 }
 export function defineIterableProperty(o, name, v) {
@@ -183,12 +181,6 @@ export function defineIterableProperty(o, name, v) {
     const lazyAsyncMethod = (method) => function (...args) {
         initIterator();
         return a[method].call(this, ...args);
-        /*
-        const discard = initIterator()
-        const ret = a[method].call(this,...args)
-        //discard.return?.();
-        return ret;
-        */
     };
     const extras = {
         [Symbol.asyncIterator]: {
@@ -196,7 +188,7 @@ export function defineIterableProperty(o, name, v) {
             value: initIterator
         }
     };
-    [...Object.keys(asyncHelperFunctions), 'push', 'cloase'].map(k => extras[k] = {
+    [...Object.keys(asyncHelperFunctions), 'push', 'close'].map(k => extras[k] = {
         enumerable: false,
         writable: true,
         value: lazyAsyncMethod(k)

@@ -17,7 +17,7 @@ const App = div.extended({
   styles:`button { margin: 0.5em; }`,
   constructed() {
     /* When constructed, this "div" tag contains some other tags: */
-    const borderRadius = (this.rounded as unknown as AsyncExtraIterable<boolean>).map(f => f ? '1em': '').broadcast(x => x);
+    const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast(x => x);
     return [
       h2("Hello World"),
       input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded.checked }}),
@@ -29,11 +29,11 @@ const App = div.extended({
         style: { borderRadius },
         onclick: () => this.num -= 1
       }, '-'),
-      div(this.num), // NOT dynamic, as it evaluates to a number
-      div(this.num), // NOT dynamic, as it evaluates to a number
-      div(this.num, ' ', (this.num as unknown as AsyncExtraIterable<number>).waitFor(done => setTimeout(done, 500))),
+      div(this.num), 
+      div(typeof this.num), // NOT 'number' as it's boxed
+      div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
-      div((this.num as unknown as AsyncExtraIterable<number>).map(n => "It's: "+n)), // Dynamic - we map the value
+      div(this.num.map!(n => "It's: "+n)), // Dynamic - we map the value
     ]
   }
 });
