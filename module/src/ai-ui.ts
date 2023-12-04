@@ -8,7 +8,8 @@ export { when } from './when.js';
 export { ChildTags, Instance, TagCreator } from './tags'
 export * as Iterators from './iterators.js';
 
-const DEBUG = true;
+// @ts-ignore
+const DEBUG = globalThis.DEBUG == '*' || globalThis.DEBUG == true || globalThis.DEBUG?.includes?.('AI-UI') || false;
 
 /* A holder for prototypes specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
@@ -40,8 +41,10 @@ interface TagLoader {
         tags(['div','button'], { myThing() {} })
         tags('http://namespace',['Foreign'], { isForeign: true })
   */
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
   <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> };
   <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>;
 }

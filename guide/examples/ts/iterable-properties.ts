@@ -3,9 +3,12 @@ import { tag } from '../../../module/esm/ai-ui.js';
 /* Specify what base tags you reference in your UI */
 const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
 
-//type Q = typeof App['Info']
-
 const App = div.extended({
+  declare:{
+    reset() {
+      this.num = 0;
+    }
+  },
   iterable: {
     num: 100,
     rounded: false as boolean
@@ -13,19 +16,16 @@ const App = div.extended({
   override: {
     id: 'mat',
   },
-  declare:{
-    reset() {
-      this.num = 0;
-    }
+  ids:{
+    rounded: input
   },
   styles:`button { margin: 0.5em; }`,
   constructed() {
     /* When constructed, this "div" tag contains some other tags: */
-//    const borderRadius = this.when('#rounded')(_ => this.ids.rounded.checked ? '1em': '').broadcast();
     const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast();
     return [
       h2("Hello World"),
-      input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded.checked }}),
+      input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded!.checked }}),
       button({ 
         style: { borderRadius },
         onclick: () => this.num = this.num + 1 
@@ -36,6 +36,7 @@ const App = div.extended({
       }, '-'),
       this.rounded.map!(f => f ? div("ABC") : div("def")),
       div(this.num), 
+      div(this.num.map!(n => JSON.stringify({n}))), 
       div(typeof this.num), // NOT 'number' as it's boxed
       div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number

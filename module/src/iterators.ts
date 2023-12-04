@@ -211,16 +211,31 @@ export function defineIterableProperty<T extends object, N extends string | numb
     }
   )
 
-  let a = Object.defineProperties(Object.assign(v as any), extras);  
+  let a = Object.defineProperties(box(v), extras);  
   Object.defineProperty(o, name, {
     get(): V { return a },
     set(v: V) {
-      a = Object.defineProperties(Object.assign(v as any), extras);
+      a = Object.defineProperties(box(v), extras);
       a.push(v?.valueOf() as V);
     },
     enumerable: true
   });
   return o as any;
+}
+
+function box(a: any) {
+  if (a===null || a===undefined)
+    return Object.create(null,{ valueOf: { value() { return a }}});
+  switch (typeof a) {
+    case 'object':
+      return {...a};
+    case 'bigint':
+    case 'boolean':
+    case 'number':
+    case 'string':
+      return Object.assign(a as any); // Boxes types, including BigInt
+  }
+  throw new TypeError('Iterbale properties cannot be '+typeof a);
 }
 
 /* Merge asyncIterables into a single asyncIterable */

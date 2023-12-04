@@ -191,16 +191,30 @@ export function defineIterableProperty(o, name, v) {
         writable: true,
         value: lazyAsyncMethod(k)
     });
-    let a = Object.defineProperties(Object.assign(v), extras);
+    let a = Object.defineProperties(box(v), extras);
     Object.defineProperty(o, name, {
         get() { return a; },
         set(v) {
-            a = Object.defineProperties(Object.assign(v), extras);
+            a = Object.defineProperties(box(v), extras);
             a.push(v?.valueOf());
         },
         enumerable: true
     });
     return o;
+}
+function box(a) {
+    if (a === null || a === undefined)
+        return Object.create(null, { valueOf: { value() { return a; } } });
+    switch (typeof a) {
+        case 'object':
+            return { ...a };
+        case 'bigint':
+        case 'boolean':
+        case 'number':
+        case 'string':
+            return Object.assign(a); // Boxes types, including BigInt
+    }
+    throw new TypeError('Iterbale properties cannot be ' + typeof a);
 }
 export const merge = (...ai) => {
     const it = ai.map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);

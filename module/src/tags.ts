@@ -140,7 +140,7 @@ interface ExtendedTag {
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
-    IP extends object /*{ [k: string]: string | symbol | number | bigint | boolean | undefined }*/ = {},
+    IP extends { [k: string]: string | number | bigint | boolean | object | undefined } = {},
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
     CET extends object = D & O & P & Base & IDS<I>
   >(this: BaseCreator, _: (instance: any) => {
@@ -163,7 +163,7 @@ interface ExtendedTag {
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
-    IP extends object /*{ [k: string]: string | symbol | number | bigint | boolean | undefined }*/ = {},
+    IP extends { [k: string]: string | number | bigint | boolean | object | undefined } = {},
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
     CET extends object = D & P & Base & IDS<I>,
   >(this: BaseCreator, _: {

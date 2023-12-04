@@ -4,7 +4,8 @@ import { when } from './when.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
-const DEBUG = true;
+// @ts-ignore
+const DEBUG = globalThis.DEBUG == '*' || globalThis.DEBUG == true || globalThis.DEBUG?.includes?.('AI-UI') || false;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
     "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",

@@ -55,7 +55,9 @@ type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O, D, IP, 
 interface ExtendedTag {
     <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, O extends BasedOn<O, Base>, D extends object, I extends {
         [id: string]: TagCreator<any, any>;
-    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, IP extends object = {}, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = D & O & P & Base & IDS<I>>(this: BaseCreator, _: (instance: any) => {
+    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, IP extends {
+        [k: string]: string | number | bigint | boolean | object | undefined;
+    } = {}, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = D & O & P & Base & IDS<I>>(this: BaseCreator, _: (instance: any) => {
         /** @deprecated */ prototype?: P;
         override?: O;
         declare?: D;
@@ -66,7 +68,9 @@ interface ExtendedTag {
     } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
     <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, O extends BasedOn<O, Base>, D extends object, I extends {
         [id: string]: TagCreator<any, any>;
-    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, IP extends object = {}, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = D & P & Base & IDS<I>>(this: BaseCreator, _: {
+    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, IP extends {
+        [k: string]: string | number | bigint | boolean | object | undefined;
+    } = {}, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = D & P & Base & IDS<I>>(this: BaseCreator, _: {
         /** @deprecated */ prototype?: P;
         override?: O;
         declare?: D;
