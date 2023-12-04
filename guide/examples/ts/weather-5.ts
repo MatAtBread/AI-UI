@@ -55,7 +55,8 @@ const Chart = img.extended({
       opacity: '0.2'
     },
     onload() { this.style.opacity = '1' },
-
+  },
+  declare:{
     // New property initialisations
     label: '',
     xData: [] as (string | number)[],
@@ -81,7 +82,7 @@ const Chart = img.extended({
 /* Define a weather-specific Chart. It's like a chart, but exposes a `geo` attribute
 that when set, fetches and displays the weather forecast for that location */
 const WeatherForecast = Chart.extended({
-  prototype:{
+  declare:{
     // New property initialisations
     set geo(g: GeoInfo | undefined) {
       /* Note: we can't use `await` here as setters can't be generators or otherwise 
@@ -113,7 +114,7 @@ const WeatherForecast = Chart.extended({
   is contained within the DOM, and without the rest of the DOM knowing about it's internals.
 */
 const Location = input.extended((inst:{ geo?: GeoInfo }) => ({
-  prototype: {
+  declare: {
     get geo() { return this.resolveGeo() },
 
     /* We use this "internal" method as getters can't be declared async, and we
@@ -130,6 +131,8 @@ const Location = input.extended((inst:{ geo?: GeoInfo }) => ({
         this.style.backgroundColor = '#fdd';
       }
     },
+  },
+  prototype: {
     // Overrides for existing attributes
     placeholder: 'Enter a town...',
     style: {

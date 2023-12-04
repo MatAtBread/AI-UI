@@ -33,13 +33,11 @@ class QueueIteratableIterator {
         this.stop = stop;
         this._pending = [];
         this._items = [];
-        this.$consumer = null;
     }
     [Symbol.asyncIterator]() {
         return this;
     }
     next() {
-        this.$consumer = new Error().stack;
         if (this._items.length) {
             return Promise.resolve({ done: false, value: this._items.shift() });
         }

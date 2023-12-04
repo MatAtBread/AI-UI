@@ -29,17 +29,19 @@ const Lazy = h2.extended((instance:{ myAttr: number }) => ({
   ids: {
     test: span
   },
-  prototype:{
+  declare:{
     Lazy: true,
-    className: 'Lazy',
     myAttr: 57,
-    myMethod(n: number) { instance.myAttr = n },
-    onclick() { this.thing = String(Number(this.thing)-1) },
     get thing() { return String(instance.myAttr) },
     set thing(v:string) { 
       instance.myAttr = Number(v);
       this.dispatchEvent(new Event('change'))
     },
+    myMethod(n: number) { instance.myAttr = n },
+  },
+  prototype:{
+    className: 'Lazy',
+    onclick() { this.thing = String(Number(this.thing)-1) },
     style:{
       borderBottom: '2px solid black'
     }
@@ -53,11 +55,13 @@ const Lazy = h2.extended((instance:{ myAttr: number }) => ({
 
 const Lazier = Lazy.extended({
   prototype:{
-    Lazier: true,
     className: `Lazier Lazy`,
     style:{
       borderRight: '2px solid black'
     },
+  },
+  declare:{
+    Lazier: true
   },
   styles:`
     .Lazier {
@@ -68,12 +72,14 @@ const Lazier = Lazy.extended({
 
 const Laziest = Lazier.extended({
   prototype:{
-    Laziest: true,
     className: `Laziest ${Lazier.className}`,
     onclick() { this.thing = String(Number(this.thing)+1) },
     style:{
       borderLeft: '2px solid black'
     },
+  },
+  declare:{
+    Laziest: true
   },
   constructed(){
     this.thing = "100";

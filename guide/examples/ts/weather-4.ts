@@ -51,7 +51,7 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 */
 
 const Chart = img.extended({
-  prototype: {
+  declare: {
     label: '',
     xData: [] as (string | number)[],
     set yData(d: number[]) {
@@ -74,7 +74,7 @@ const Chart = img.extended({
 /* Define a weather-specific Chart. It's like a chart, but exposes a `geo` attribute
 that when set, fetches and displays the weather forecast for that location */
 const WeatherForecast = Chart.extended({
-  prototype:{
+  declare:{
     set geo(g: GeoInfo) {
       /* Note: we can't use `await` here as setters can't be generators or otherwise 
         interrupt the execution of their caller, so we fall back to .then() */
@@ -102,13 +102,8 @@ const WeatherForecast = Chart.extended({
   is contained within the DOM, and without the rest of the DOM knowing about it's internals.
 */
 const Location = input.extended({
-  prototype: {
+  declare:{
     geo: null as null | GeoInfo,
-    placeholder: 'Enter a town...',
-    style: {
-      display: 'block',
-      backgroundColor: ''
-    },
     async resolveGeo() {
       try {
         const g = await getGeoInfo(this.value);
@@ -119,6 +114,13 @@ const Location = input.extended({
       } catch (ex) {
         this.style.backgroundColor = '#fdd';
       }
+    }
+  },
+  prototype: {
+    placeholder: 'Enter a town...',
+    style: {
+      display: 'block',
+      backgroundColor: ''
     },
     onkeydown(e: KeyboardEvent) {
       this.style.backgroundColor = '';

@@ -10,7 +10,7 @@ const App = div.extended({
     num: 100,
     rounded: false as boolean
   },
-  prototype: {
+  override: {
     id: 'mat',
   },
   declare:{
@@ -20,7 +20,6 @@ const App = div.extended({
   },
   styles:`button { margin: 0.5em; }`,
   constructed() {
-    this.style
     /* When constructed, this "div" tag contains some other tags: */
 //    const borderRadius = this.when('#rounded')(_ => this.ids.rounded.checked ? '1em': '').broadcast();
     const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast();
@@ -35,11 +34,12 @@ const App = div.extended({
         style: { borderRadius },
         onclick: () => this.num -= 1
       }, '-'),
+      this.rounded.map!(f => f ? div("ABC") : div("def")),
       div(this.num), 
       div(typeof this.num), // NOT 'number' as it's boxed
       div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
-      div(this.num.map!(n => "It's: "+n)), // Dynamic - we map the value
+      div(this.num.map!(n => "-ve: "+(-n))), // Dynamic - we map the value
     ]
   }
 });

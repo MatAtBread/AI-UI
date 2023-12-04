@@ -4,7 +4,7 @@ import { when } from './when.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
-const DEBUG = false;
+const DEBUG = true;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
     "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",
@@ -382,6 +382,7 @@ export const tag = function (_1, _2, _3) {
             const tagDefinition = overrides(ped);
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
+            deepDefine(e, tagDefinition.override);
             deepDefine(e, tagDefinition.declare);
             const iterableKeys = tagDefinition.iterable && Object.keys(tagDefinition.iterable);
             iterableKeys?.forEach(k => {
@@ -417,17 +418,19 @@ export const tag = function (_1, _2, _3) {
             const proto = creator.overrides?.(staticInstance);
             if (proto) {
                 deepDefine(fullProto, proto?.prototype);
+                deepDefine(fullProto, proto?.override);
                 deepDefine(fullProto, proto?.declare);
             }
         })(this);
         deepDefine(fullProto, staticExtensions.prototype);
+        deepDefine(fullProto, staticExtensions.override);
         deepDefine(fullProto, staticExtensions.declare);
         Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
         // Attempt to make up a meaningfu;l name for this extended tag
-        const creatorName = staticExtensions.prototype
-            && 'className' in staticExtensions.prototype
-            && typeof staticExtensions.prototype.className === 'string'
-            ? staticExtensions.prototype.className
+        const creatorName = fullProto
+            && 'className' in fullProto
+            && typeof fullProto.className === 'string'
+            ? fullProto.className
             : '?';
         const callSite = DEBUG ? ' @' + (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?') : '';
         Object.defineProperty(extendTag, "name", {
@@ -492,7 +495,7 @@ const DomPromiseContainer = AsyncDOMContainer.extended({
   ai-ui-container.promise:after {
     content: "⋯";
   }`,
-    prototype: {
+    override: {
         className: 'promise'
     },
     constructed() {
@@ -507,7 +510,7 @@ const DyamicElementError = AsyncDOMContainer.extended({
     display: block;
     color: #b33;
   }`,
-    prototype: {
+    override: {
         className: 'error'
     },
     declare: {

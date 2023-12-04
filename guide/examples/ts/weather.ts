@@ -55,7 +55,8 @@ const Chart = img.extended({
       opacity: '0.2'
     },
     onload() { this.style.opacity = '1' },
-
+  },
+  declare:{
     // New property initialisations
     label: '',
     xData: [] as (string | number)[],
@@ -81,18 +82,19 @@ const Chart = img.extended({
 /* Define a "Location" element that is like an input tag that defaults to 'block' display style,
   and can indicate errors in a predefined way */
 const Location = input.extended({
+  declare:{
+    showError(f: boolean) {
+      (this.style as any).backgroundColor = f ? '#fdd' : '';
+    }
+  },
   prototype: {
     placeholder: 'Enter a town...',
     style: {
       display: 'block'
     },
-    showError(f: boolean) {
-      (this.style as any).backgroundColor = f ? '#fdd' : '';
-    },
     onkeydown() {
       this.showError(false);
     }
-
   }
 });
 

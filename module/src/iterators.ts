@@ -45,7 +45,6 @@ export const asyncExtras = {
 class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   private _pending = [] as DeferredPromise<IteratorYieldResult<T>>[] | null;
   private _items = [] as T[] | null;
-  private $consumer: any = null;
 
   constructor(private readonly stop = () => { }) {
   }
@@ -55,7 +54,6 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   }
 
   next() {
-    this.$consumer = new Error().stack;
     if (this._items!.length) {
       return Promise.resolve({ done: false, value: this._items!.shift()! });
     } 

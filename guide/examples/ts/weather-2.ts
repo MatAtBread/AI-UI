@@ -48,7 +48,7 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 */
 
 const Chart = img.extended({
-  prototype: {
+  declare: {
     label: '',
     xData: [] as (string | number)[],
     set yData(d: number[]) {
@@ -82,8 +82,10 @@ const Chart = img.extended({
   is contained within the DOM, and without the rest of the DOM knowing about it's internals.
 */
 const Location = input.extended({
-  prototype: {
+  declare: {
     geo: null as null | GeoInfo,
+  },
+  prototype:{
     placeholder: 'Enter a town...',
     style: {
       display: 'block',
