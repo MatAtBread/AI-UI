@@ -8,6 +8,9 @@ const App = div.extended({
     num: 100,
     rounded: false as boolean
   },
+  /*computed:{
+    borderRadius() { return this.rounded.map!(f => f ? '1em': '').broadcast(x => x) }
+  }*/
   prototype:{
     reset() {
       this.num = 0;
@@ -17,7 +20,7 @@ const App = div.extended({
   constructed() {
     this.style
     /* When constructed, this "div" tag contains some other tags: */
-    const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast(x => x);
+    const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast();
     return [
       h2("Hello World"),
       input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded.checked }}),

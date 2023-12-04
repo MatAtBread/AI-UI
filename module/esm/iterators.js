@@ -438,7 +438,7 @@ function retain() {
         }
     };
 }
-function broadcast(pipe = (x => x)) {
+function broadcast() {
     const ai = this[Symbol.asyncIterator]();
     const b = broadcastIterator(() => ai.return?.());
     (function update() {
@@ -455,8 +455,7 @@ function broadcast(pipe = (x => x)) {
     })();
     return {
         [Symbol.asyncIterator]() {
-            const dest = pipe(b);
-            return dest[Symbol.asyncIterator]();
+            return b[Symbol.asyncIterator]();
         }
     };
 }

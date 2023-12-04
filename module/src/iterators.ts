@@ -467,7 +467,7 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
   }
 }
 
-function broadcast<U, X>(this: AsyncIterable<U>, pipe: ((dest: AsyncIterable<U>) => AsyncIterable<X>) = (x => x as unknown as AsyncIterable<X>)): AsyncIterable<X> {
+function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   const b = broadcastIterator<U>(() => ai.return?.());
   (function update() {
@@ -484,8 +484,7 @@ function broadcast<U, X>(this: AsyncIterable<U>, pipe: ((dest: AsyncIterable<U>)
 
   return {
     [Symbol.asyncIterator]() {
-      const dest = pipe(b);
-      return dest[Symbol.asyncIterator]();
+      return b[Symbol.asyncIterator]();
     }
   }
 }

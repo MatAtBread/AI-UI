@@ -24,7 +24,7 @@ export declare const asyncExtras: {
         value: U_6;
         done: boolean;
     } & AsyncExtraIterable<U_6>;
-    broadcast: <U_7, X>(this: Partial<AsyncIterable<U_7>>, pipe?: ((dest: AsyncIterable<U_7>) => AsyncIterable<X>) | undefined) => AsyncIterable<X> & AsyncExtraIterable<X>;
+    broadcast: <U_7>(this: Partial<AsyncIterable<U_7>>) => AsyncIterable<U_7> & AsyncExtraIterable<U_7>;
     initially: <U_8, I = U_8>(this: Partial<AsyncIterable<U_8>>, initValue: I) => AsyncIterable<U_8 | I> & AsyncExtraIterable<U_8 | I>;
     consume: typeof consume;
 };
