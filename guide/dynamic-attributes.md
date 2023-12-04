@@ -48,15 +48,13 @@ Try the above code [example (right click and open in new tab)](https://raw.githa
 
 Unlike dynamic content, attributes cannot be specified as a Promise
 
-> NOTE: This design decision was taken as some attributes are actually useful as
-> Promises. Although no standard DOM Node types have any "Promised" attributes,
-> there are numerous examples of third-party components that do.
+> _NOTE: This design decision was taken as some attributes are actually useful as Promises. Although no standard DOM Node types have any "Promised" attributes, there are numerous examples of third-party components that do._
 
 If you really need to specify a Promised attribute, wrap it in an async generator:
 
 ```javascript
 /* Like sleep, but resolves to the specified value */
-async function later(x, seconds) {
+function later(x, seconds) {
   return new Promise(resolve => setTimeout(()=>resolve(x), seconds * 1000));
 }
 
@@ -67,6 +65,20 @@ async function *once(promise) {
 document.body.append(div({
   style:{
     color: once(later('red',1)) /* The Promise is wrapped in an async iterable, and AI-UI will set the color to 'red' when it resolves after a second */
+  }
+},))
+```
+Of course, in the above case, if the function is yours (rather than a 3rd party function that returns a Promise), you coukd just use an async generator, which doesn't need wrapping:
+```javascript
+/* Like sleep, but resolves to the specified value */
+async function *later(x, seconds) {
+  await sleep(seconds);
+  yield x;
+}
+
+document.body.append(div({
+  style:{
+    color: later('red',1) 
   }
 },))
 ```

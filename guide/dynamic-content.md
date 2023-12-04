@@ -37,7 +37,7 @@ async function *clock() {
 
 ...and replace "Dunno" with the time:
 
-```javascript
+```diff
   const App = div.extended({
     constructed() {
       /* When constructed, this "div" tag contains some other tags: */
