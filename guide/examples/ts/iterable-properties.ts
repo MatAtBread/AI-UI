@@ -1,5 +1,4 @@
 import { tag } from '../../../module/esm/ai-ui.js';
-import { AsyncExtraIterable } from '../../../module/esm/iterators.js';
 
 /* Specify what base tags you reference in your UI */
 const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
@@ -16,6 +15,7 @@ const App = div.extended({
   },
   styles:`button { margin: 0.5em; }`,
   constructed() {
+    this.style
     /* When constructed, this "div" tag contains some other tags: */
     const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast(x => x);
     return [

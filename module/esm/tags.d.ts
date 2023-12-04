@@ -33,31 +33,35 @@ type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 type BasedOn<P, Base> = Partial<UntypedEventHandlers> & {
     [K in keyof P]: K extends keyof Base ? Partial<Base[K]> | P[K] : P[K];
 };
-type IterablePropertyType<O> = {
-    [excess: string]: string | symbol | number | bigint | boolean | undefined;
-};
 type IterableProperties<IP> = {
     [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
 };
+type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, I, C, S, IP, Base, CET extends object> = (keyof IP & keyof Base) extends (never | undefined) ? TagCreator<CET, BaseCreator> & StaticMembers<P, Base> : {
+    'Clashing iterable and base properties': keyof IP & keyof Base;
+};
 interface ExtendedTag {
-    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, IP extends IterablePropertyType<P>, I extends {
+    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, I extends {
         [id: string]: TagCreator<any, any>;
-    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: (instance: any) => {
+    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, IP extends {
+        [k: string]: string | symbol | number | bigint | boolean | undefined;
+    } = {}, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: (instance: any) => {
         prototype?: P;
         iterable?: IP;
         ids?: I;
         constructed?: C;
         styles?: S;
-    } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
-    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, IP extends IterablePropertyType<P>, I extends {
+    } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): ExtendedReturn<BaseCreator, P, I, C, S, IP, Base, CET>;
+    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, I extends {
         [id: string]: TagCreator<any, any>;
-    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: {
+    }, C extends () => (ChildTags | void | Promise<void>), S extends string | undefined, IP extends {
+        [k: string]: string | symbol | number | bigint | boolean | undefined;
+    } = {}, Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, CET extends object = P & Base & IDS<I>>(this: BaseCreator, _: {
         prototype?: P;
         iterable?: IP;
         ids?: I;
         constructed?: C;
         styles?: S;
-    } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>;
+    } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): ExtendedReturn<BaseCreator, P, I, C, S, IP, Base, CET>;
 }
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
 export interface TagCreator<Base extends object, Super extends (never | TagCreator<any, any>) = never, TypedBase = ReTypedEventHandlers<Base>> {

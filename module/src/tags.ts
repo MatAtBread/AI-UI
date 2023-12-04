@@ -82,14 +82,7 @@ type Untyped<T> = {
   [K in keyof T]: any;
 };
 
-type NoOverlap<O,P> = Untyped<O> extends Untyped<Partial<P>> ? never : O;
-
-// TODO: Not working - it should NOT allow members of O
-type IterablePropertyType<O> = {
-  [excess: string]: string | symbol | number | bigint | boolean | undefined ;
-} /*& {
-  [K in keyof O]: never;
-} */
+type NoOverlap<O,P> = Untyped<O> extends Untyped<Partial<P>> ? {} : O;
 
 /* IterableProperties can't be correctly typed in TS right now, either the declaratiin 
   works for retrieval (the getter), or it works for assignments (the setter), but there's
@@ -119,15 +112,22 @@ type IterableProperties<IP> = {
 
 }
 
+type ExtendedReturn<BaseCreator extends TagCreator<any,any,any>,P,I,C,S,IP,Base,CET extends object> = 
+(keyof IP & keyof Base) extends (never|undefined)
+  ? TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  : {
+    'Clashing iterable and base properties': keyof IP & keyof Base,
+  };
+
 interface ExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
-    IP extends IterablePropertyType<P>,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
+    IP extends { [k: string]: string | symbol | number | bigint | boolean | undefined } = {},
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
     CET extends object = P & Base & IDS<I>
   >(this: BaseCreator, _: (instance: any) => {
@@ -136,25 +136,27 @@ interface ExtendedTag {
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>)
+  : ExtendedReturn<BaseCreator,P,I,C,S,IP,Base,CET>;
 
   // Declarative, with no state instance
   <
     BaseCreator extends TagCreator<any, any>,
     P extends BasedOn<P,Base>,
-    IP extends IterablePropertyType<P>,
     I extends { [id: string]: TagCreator<any, any>; },
     C extends () => (ChildTags | void | Promise<void>),
     S extends string | undefined,
+    IP extends { [k: string]: string | symbol | number | bigint | boolean | undefined } = {},
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
-    CET extends object = P & Base & IDS<I>
+    CET extends object = P & Base & IDS<I>,
   >(this: BaseCreator, _: {
     prototype?: P;
     iterable?: IP;
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): TagCreator<CET, BaseCreator> & StaticMembers<P, Base>
+  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>)
+  : ExtendedReturn<BaseCreator,P,I,C,S,IP,Base,CET>;
 }
 
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
