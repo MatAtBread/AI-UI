@@ -37,8 +37,6 @@ The `declare` object allows you to declare new attributes and methods on your ne
 ## [iterable](./prototype.md) 
 The `iterable` object allows you to *iterable attributes* on your new tag. These are both primitive attributes _and_ async iterators that automatically yield values when they are assigned to, so (for example) the snippet `div("Hello ", this.userName)` will automatically update the DOM when something executes `myElement.userName = "Joe";`. Iterable attributes can primitives or objects, but not functions or symbols, and there some JavaScript caveats around their usage.
 
-We'll give some examples of using `iterable` later.
-
 ## [constructed()](./constructed.md) 
 The `constructed()` method allows you to create children, or modify any children passed by the tag function call, and carry out specific operations related to your new tag depending on the attributes passed when it is created, before it is placed into the DOM.
 
@@ -49,6 +47,8 @@ The `ids` object associates child DOM Element IDs within your tag with specific 
 
 ## [styles](./styles.md) 
 The `styles` string will create specific CSS style rules for your tag. This is especiallu useful when your styles are hierarchical or rqeuire pseudo selectors which can't be easily specified in a normal CSSStyleDeclaration.
+
+# Usage
 
 All of these members are optional, so the following code works, but your new tag isn't that special - it will behave just like the base `div` tag function.
 
@@ -70,13 +70,13 @@ For now, we'll just use the simple, non-functional version of `extended()`.
 
 # Example
 
-In order to explain how these members interact and support each other, we're going to consider a new a example, web page that gets weather data from a remote source and creates charts for the user.
+In order to explain how these members interact and support each other, we're going to consider a new a example, a web page that gets weather data from a remote source and creates charts for the user.
 
 We're going to do this by creating tags that encapsulate the data source and the chart UI, and show how we can statically layout and style the page, whilst ensuring the page remains dynamically updated according to user input.
 
 You can see the source [here](./examples/ts/weather.ts), or try it [here](https://raw.githack.com/MatAtBread/AI-UI/0.9.11/guide/examples/ts/ts-example.html?weather.ts)
 
-in the following sections, we'll go through the code in more detail, explaining how the members of an `extended({...})` definition work together, improving the implementation on the way.
+In the following sections, we'll go through the code in more detail, explaining how the members of an `extended({...})` definition work together, improving the implementation on the way.
 
 ____
 
