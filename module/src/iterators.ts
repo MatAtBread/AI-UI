@@ -245,14 +245,18 @@ function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
         - don't allow objects as iterable properties, which avoids the `deep tree` problem
         - something else
       */
-      return Object.defineProperties(a, pds);
+      if (!(Symbol.asyncIterator in a)) {
+        console.warn('Iterable properties of type "object" will be modified. Spread the object if necessary.');
+        return Object.defineProperties(a, pds);
+      }
+      return a;
     case 'bigint':
     case 'boolean':
     case 'number':
     case 'string':
       return Object.defineProperties(Object.assign(a as any), pds); // Boxes types, including BigInt
   }
-  throw new TypeError('Iterbale properties cannot be '+typeof a);
+  throw new TypeError('Iterable properties cannot be of type "'+typeof a+'"');
 }
 
 /* Merge asyncIterables into a single asyncIterable */

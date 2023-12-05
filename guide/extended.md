@@ -56,17 +56,19 @@ All of these members are optional, so the following code works, but your new tag
 const MySpecialDiv = div.extended({});
 ```
 
-There is an additional `extended(...)` signature which provides a _"private"_ object associated with your element (via an internal closure). You can find more details about why this is useful and how to use it in [Private element data, getters & setters](./instance.md).
+There is an additional `extended(...)` signature which provides a _"private"_ object associated with your element (via an internal closure). You can find more details about why this is useful and how to use it in [Private element data, getters & setters and iterable properties](./instance.md).
 
 ```typescript
-TagFunctionName.extended((privateInstanceData: MyPrivateInstance) => {
-  prototype?: object;
+TagFunctionName.extended((privateInstanceData: MyPrivateInstanceType) => {
+  override?: object;
+  declare?: object;
+  iterable?: object;
   constructed?: ()=>undefined | ChildTags;
   ids?: { [id: string]: TagCreator; };
   styles?: string;
 })
 ```
-For now, we'll just use the simple, non-functional version of `extended()`.
+For now, we'll just use the simple, non-functional version of `extended(...)`.
 
 # Example
 

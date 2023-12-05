@@ -11,10 +11,14 @@ const App = div.extended({
   },
   iterable: {
     num: 100,
-    rounded: false as boolean
+    obj: { foo: 'bar' },
+    rounded: false as boolean,
   },
   override: {
     id: 'mat',
+    onclick() {
+      this.reset();
+    }
   },
   ids:{
     rounded: input
@@ -36,11 +40,11 @@ const App = div.extended({
       }, '-'),
       this.rounded.map!(f => f ? div("ABC") : div("def")),
       div(this.num), 
-      div(this.num.map!(n => JSON.stringify({n}))), 
       div(typeof this.num), // NOT 'number' as it's boxed
       div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
       div(this.num.map!(n => "-ve: "+(-n))), // Dynamic - we map the value
+      div(this.obj.map!(n => JSON.stringify(this.obj))), 
     ]
   }
 });
