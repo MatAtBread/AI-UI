@@ -164,18 +164,20 @@ export function broadcastIterator(stop = () => { }) {
     return b;
 }
 export function defineIterableProperty(o, name, v) {
-    function initIterator() {
+    // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
+    // access the iterator methods to prevent leaks where an iterable is created, but
+    // never referenced, and therefore cannot be consumed and ultimately closed
+    let initIterator = () => {
+        initIterator = () => b;
         const bi = broadcastIterator();
         extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
-        extras.push = { value: bi.push, enumerable: false, writable: false };
-        extras.close = { value: bi.close, enumerable: false, writable: false };
+        push = bi.push;
         const b = bi[Symbol.asyncIterator]();
-        Object.keys(asyncHelperFunctions).map(k => 
-        // @ts-ignore
-        extras[k] = { value: b[k], enumerable: false, writable: false });
+        Object.keys(asyncHelperFunctions).map(k => extras[k] = { value: b[k], enumerable: false, writable: false });
         Object.defineProperties(a, extras);
         return b;
-    }
+    };
+    // Create stubs that lazily create the AsyncExtraIterable interface when invoked
     const lazyAsyncMethod = (method) => function (...args) {
         initIterator();
         return a[method].call(this, ...args);
@@ -186,33 +188,45 @@ export function defineIterableProperty(o, name, v) {
             value: initIterator
         }
     };
-    [...Object.keys(asyncHelperFunctions), 'push', 'close'].map(k => extras[k] = {
+    Object.keys(asyncHelperFunctions).map(k => extras[k] = {
         enumerable: false,
         writable: true,
         value: lazyAsyncMethod(k)
     });
-    let a = Object.defineProperties(box(v), extras);
+    // Lazily initialize `push`
+    let push = (v) => {
+        initIterator(); // Updates `push` to reference the broadvaster
+        return push(v);
+    };
+    let a = box(v, extras);
     Object.defineProperty(o, name, {
         get() { return a; },
         set(v) {
-            a = Object.defineProperties(box(v), extras);
-            a.push(v?.valueOf());
+            a = box(v, extras);
+            push(v?.valueOf());
         },
         enumerable: true
     });
     return o;
 }
-function box(a) {
+function box(a, pds) {
     if (a === null || a === undefined)
-        return Object.create(null, { valueOf: { value() { return a; } } });
+        return Object.create(null, { ...pds, valueOf: { value() { return a; } } });
     switch (typeof a) {
         case 'object':
-            return { ...a };
+            /* TODO: This is problematic as the object might have clashing keys.
+              The alternatives are:
+              - Don't add the pds, then the object remains unmolested, but can't be used with .map, .filter, etc
+              - examine the object and decide whether to insert the prototype (breaks built in objects, works with PoJS)
+              - don't allow objects as iterable properties, which avoids the `deep tree` problem
+              - something else
+            */
+            return Object.defineProperties(a, pds);
         case 'bigint':
         case 'boolean':
         case 'number':
         case 'string':
-            return Object.assign(a); // Boxes types, including BigInt
+            return Object.defineProperties(Object.assign(a), pds); // Boxes types, including BigInt
     }
     throw new TypeError('Iterbale properties cannot be ' + typeof a);
 }
