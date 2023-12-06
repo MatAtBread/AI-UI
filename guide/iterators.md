@@ -153,7 +153,7 @@ await counter3.consume(n => console.log(n));
 
 ## broadcast
 ```typescript
-function broadcast<U, X>(this: AsyncIterable<U>, pipe?: (dest: AsyncIterable<U>) => AsyncIterable<X>): AsyncIterable<X>
+function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U>
 ```
 
 Queues the incoming yielded values so they can be replayed to multiple consumers. The queue for each consumer commences when the consumer first calls the async iterator `next()` function, and the whole broadcast iterator terminates when either the producer or all consumers terminate.
