@@ -67,7 +67,7 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
   },
   when: function (...what) {
     return when(this, ...what)
-  }
+  },
   /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
   set style(s: any) {
     const pd = getProtoPropertyDescriptor(this,'style');
@@ -138,6 +138,14 @@ export const tag = <TagLoader>function <Tags extends string,
     Object.getOwnPropertyDescriptors(elementProtype), // We know it's not nested
   );
 
+  // We do this here and not in elementProtype as there's no syntax
+  // to copy a getter/setter pair from another object
+  Object.defineProperty(tagPrototypes, 'attributes', {
+    ...Object.getOwnPropertyDescriptor(Element.prototype,'attributes'),
+    set(a: object) {
+      assignProps(this, a);
+    }
+  });
   if (prototypes)
     deepDefine(tagPrototypes, prototypes);
 

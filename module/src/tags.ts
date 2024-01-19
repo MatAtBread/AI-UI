@@ -72,6 +72,11 @@ type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
   ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> 
   : T;
 
+type ReadWriteAttributes<E,Base> = Omit<E,'attributes'> & {
+  get attributes(): NamedNodeMap;
+  set attributes(v: Partial<PossiblyAsync<Base>>);
+}
+
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
 type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
@@ -162,7 +167,7 @@ interface ExtendedTag {
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>)
+  } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>)
   : ExtendedReturn<BaseCreator,P,O,D,IP,Base,CET>;
 
   // Declarative, with no state instance
@@ -185,7 +190,7 @@ interface ExtendedTag {
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>)
+  } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>)
   : ExtendedReturn<BaseCreator,P,O,D,IP,Base,CET>;
 }
 

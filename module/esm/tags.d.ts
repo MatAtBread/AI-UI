@@ -30,6 +30,10 @@ type TypedEventHandlers<T> = {
     [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? null | ((this: T, event: E) => R) : GlobalEventHandlers[K];
 };
 type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers) ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> : T;
+type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
+    get attributes(): NamedNodeMap;
+    set attributes(v: Partial<PossiblyAsync<Base>>);
+};
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 type BasedOn<P, Base> = Partial<UntypedEventHandlers> & {
     [K in keyof P]: K extends keyof Base ? Partial<Base[K]> | P[K] : P[K];
@@ -77,7 +81,7 @@ interface ExtendedTag {
         ids?: I;
         constructed?: C;
         styles?: S;
-    } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
+    } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
     <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)
     O extends object, // overrides - same types as Base, or omitted
     D extends object, // declare - any types
@@ -98,7 +102,7 @@ interface ExtendedTag {
         ids?: I;
         constructed?: C;
         styles?: S;
-    } & ThisType<IterableProperties<IP> & AsyncGeneratedObject<CET>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
+    } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
 }
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
 export interface TagCreator<Base extends object, Super extends (never | TagCreator<any, any>) = never, TypedBase = ReTypedEventHandlers<Base>> {

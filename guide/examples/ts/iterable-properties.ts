@@ -28,6 +28,14 @@ const App = div.extended({
     const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast();
     this.num.consume!(n => console.log({n}));
 
+    const s = this.attributes;
+
+    this.attributes = {
+      style: {
+        backgroundColor: this.rounded.map!(i => i ? '#ffe':'#fef')
+      }
+    };
+    
     return [
       h2("Hello World"),
       input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded!.checked }}),
@@ -39,6 +47,7 @@ const App = div.extended({
         style: { borderRadius },
         onclick: () => this.num -= 1
       }, '-'),
+
       this.rounded.map!(f => f ? div("ABC") : div("def")),
       div(this.num), 
       div(typeof this.num), // NOT 'number' as it's boxed

@@ -24,7 +24,7 @@ const elementProtype = {
     },
     when: function (...what) {
         return when(this, ...what);
-    }
+    },
     /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
     set style(s: any) {
       const pd = getProtoPropertyDescriptor(this,'style');
@@ -75,6 +75,14 @@ export const tag = function (_1, _2, _3) {
     /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
       are not evaluated until called */
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
+    // We do this here and not in elementProtype as there's no syntax
+    // to copy a getter/setter pair from another object
+    Object.defineProperty(tagPrototypes, 'attributes', {
+        ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
+        set(a) {
+            assignProps(this, a);
+        }
+    });
     if (prototypes)
         deepDefine(tagPrototypes, prototypes);
     function nodes(...c) {
