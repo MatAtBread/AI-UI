@@ -8,6 +8,8 @@ export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHe
 export declare function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T>;
 export declare function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T>;
 export declare function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T>;
+export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
+export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
     map: <U, R>(this: Partial<AsyncIterable<U>>, ...args: ((o: U) => R | PromiseLike<R>)[]) => AsyncIterable<Awaited<R>> & AsyncExtraIterable<Awaited<R>>;

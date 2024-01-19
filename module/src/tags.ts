@@ -1,6 +1,6 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 
-import { AsyncExtraIterable } from "./iterators";
+import { AsyncExtraIterable, AsyncProvider } from "./iterators";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
@@ -10,8 +10,6 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> // Things that will resolve to any of the above
   | Array<ChildTags> 
   | Iterable<ChildTags>; // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
-
-export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 
 type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent union distribution
   ? X extends AsyncProvider<infer U> 
@@ -109,40 +107,46 @@ type IterableProperties<IP> = {
   [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
 }
 
-type ExcessKeys<A,B> = keyof A extends (keyof A & keyof B)  ? never : Exclude<keyof A, keyof B>;
+type NeverEmpty<O extends object> = {} extends O ? never : O;
+type ExcessKeys<A extends object,B extends object> = NeverEmpty<OmitType<{
+      [K in keyof A]: K extends keyof B 
+        ? B[K] extends A[K] 
+          ? never : B[K]
+        : undefined
+    }, never>>;
 
-type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O, D, IP, Base, CET extends object>
-  = (keyof O & keyof D) extends never
-  ? (keyof IP & keyof O) extends never
-  ? (keyof IP & keyof D) extends never
+type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number];
 
-  ? (keyof IP & keyof Base) extends never
-  ? (keyof D & keyof Base) extends never
-
-  ? ExcessKeys<O, Base> extends never
-  ? TagCreator<CET & IterableProperties<IP>, BaseCreator> & StaticMembers<P & O & D, Base>
-  : { '`override` has excess properties not in the base tag': ExcessKeys<O, Base> }
-
-  : { '`declare` clashes with base properties': (keyof D & keyof Base) }
-  : { '`iterable` clashes with base properties': keyof IP & keyof Base }
-
-  : { '`iterable` clashes with `declare`': keyof IP & keyof D }
-  : { '`iterable` clashes with `override`': keyof IP & keyof O }
-  : { '`override` clashes with `declare`': keyof O & keyof D }
+type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends object, D, IP, Base extends object, CET extends object>
+  = ((keyof O & keyof D) 
+  | (keyof IP & keyof D) 
+  | (keyof IP & keyof O)
+  | (keyof IP & keyof Base) 
+  | (keyof D & keyof Base)) extends never ?
+  ExcessKeys<O, Base> extends never ?
+  TagCreator<CET & IterableProperties<IP>, BaseCreator> & StaticMembers<P & O & D, Base>
+  : { '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, Base> }
+  : OmitType<{ 
+    '`declare` clashes with base properties': keyof D & keyof Base,
+    '`iterable` clashes with base properties': keyof IP & keyof Base,
+    '`iterable` clashes with `override`': keyof IP & keyof O,
+    '`iterable` clashes with `declare`': keyof IP & keyof D,
+    '`override` clashes with `declare`': keyof O & keyof D
+  }, never>
 
 interface ExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
-    P extends BasedOn<P,Base>,
-    O extends BasedOn<O,Base>,
-    D extends object,
-    I extends { [id: string]: TagCreator<any, any>; },
-    C extends () => (ChildTags | void | Promise<void>),
-    S extends string | undefined,
-    IP extends { [k: string]: string | number | bigint | boolean | object | undefined } = {},
-    Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
-    CET extends object = D & O & P & Base & IDS<I>
+    P extends BasedOn<P,Base>,                            // prototype (deprecated, but can be used to extend a single property type in a union)
+    O extends object,                                     // overrides - same types as Base, or omitted
+    D extends object,                                     // declare - any types
+    I extends { [id: string]: TagCreator<any, any>; },    // ids - tagCreators
+    C extends () => (ChildTags | void | Promise<void>),   // constructed()
+    S extends string | undefined,                         // styles (string)
+    IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {}, // iterable - primitives (will be boxed)
+    Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, // Base
+    CET extends object = D & O & P & Base & IDS<I>        // Combined Effective Type of this extended tag
   >(this: BaseCreator, _: (instance: any) => {
     /** @deprecated */ prototype?: P;
     override?: O;
@@ -157,15 +161,15 @@ interface ExtendedTag {
   // Declarative, with no state instance
   <
     BaseCreator extends TagCreator<any, any>,
-    P extends BasedOn<P,Base>,
-    O extends BasedOn<O,Base>,
-    D extends object,
-    I extends { [id: string]: TagCreator<any, any>; },
-    C extends () => (ChildTags | void | Promise<void>),
-    S extends string | undefined,
-    IP extends { [k: string]: string | number | bigint | boolean | object | undefined } = {},
-    Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never,
-    CET extends object = D & P & Base & IDS<I>,
+    P extends BasedOn<P,Base>,                            // prototype (deprecated, but can be used to extend a single property type in a union)
+    O extends object,                                     // overrides - same types as Base, or omitted
+    D extends object,                                     // declare - any types
+    I extends { [id: string]: TagCreator<any, any>; },    // ids - tagCreators
+    C extends () => (ChildTags | void | Promise<void>),   // constructed()
+    S extends string | undefined,                         // styles (string)
+    IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {}, // iterable - primitives (will be boxed)
+    Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, // Base
+    CET extends object = D & O & P & Base & IDS<I>        // Combined Effective Type of this extended tag
   >(this: BaseCreator, _: {
     /** @deprecated */ prototype?: P;
     override?: O;

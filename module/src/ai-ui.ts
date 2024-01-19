@@ -1,15 +1,13 @@
 import { isPromiseLike } from './deferred.js';
-import { defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { AsyncProvider, ChildTags, Instance, Overrides, TagCreator } from './tags'
+import { ChildTags, Instance, Overrides, TagCreator } from './tags'
+import { DEBUG } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export { ChildTags, Instance, TagCreator } from './tags'
 export * as Iterators from './iterators.js';
-
-// @ts-ignore
-const DEBUG = globalThis.DEBUG == '*' || globalThis.DEBUG == true || globalThis.DEBUG?.includes?.('AI-UI') || false;
 
 /* A holder for prototypes specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
@@ -89,12 +87,6 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
 
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";
-
-function asyncIterator<T>(o: AsyncProvider<T>) {
-  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
-  if (isAsyncIterator(o)) return o;
-  throw new Error("Not as async provider");
-}
 
 function isChildTag(x: any): x is ChildTags {
   return typeof x === 'string'
@@ -202,7 +194,7 @@ export const tag = <TagLoader>function <Tags extends string,
             if (!n.length || !n[0].parentNode)
               throw new Error("Element(s) no longer exist in document" + insertionStack);
 
-            t = appender(n[0].parentNode, n[0])(es.value?.valueOf() as ChildTags ?? DomPromiseContainer());
+            t = appender(n[0].parentNode, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
             n.forEach(e => e.parentNode?.removeChild(e));
             ap.next().then(update).catch(error);
           }
@@ -312,6 +304,11 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   }
 
+  function unbox(a: unknown): unknown {
+    const v = a?.valueOf();
+    return Array.isArray(v) ? v.map(unbox) : v;
+  }
+
   function assignProps(base: Element, props: Record<string, any>) {
     // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
     if (!(callStackSymbol in props)) {
@@ -334,7 +331,7 @@ export const tag = <TagLoader>function <Tags extends string,
                   }
 
                   if (!es.done) {
-                    const value = es.value?.valueOf();
+                    const value = unbox(es.value);
                     if (typeof value === 'object' && value !== null) {
                       /*
                       THIS IS JUST A HACK: `style` has to be set member by member, eg:

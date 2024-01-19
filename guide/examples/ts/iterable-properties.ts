@@ -1,24 +1,23 @@
 import { tag } from '../../../module/esm/ai-ui.js';
+import { merge } from '../../../module/esm/iterators.js';
 
 /* Specify what base tags you reference in your UI */
 const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
-
 const App = div.extended({
   declare:{
+    lastNum: 0,
     reset() {
       this.num = 0;
     }
   },
   iterable: {
     num: 100,
-    obj: { foo: 'bar' },
-    rounded: false as boolean,
+    rounded: false as boolean
   },
   override: {
-    id: 'mat',
-    onclick() {
-      this.reset();
-    }
+    /* generates error (key a base key) fnarr: 0, */
+    /* generates error (wrong type for key) align: 0, */
+    dir: ''
   },
   ids:{
     rounded: input
@@ -43,16 +42,20 @@ const App = div.extended({
       div(typeof this.num), // NOT 'number' as it's boxed
       div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
-      div(this.num.map!(n => "-ve: "+(-n))), // Dynamic - we map the value
-      div(this.obj.map!(n => JSON.stringify(this.obj))), 
+      // @ts-ignore
+      div(merge(this.rounded!, this.num).map!(_ => this.num * (this.rounded == true ? 1 : -1))), // Dynamic - we map the value
     ]
   }
 });
 
 /* Add add it to the document so the user can see it! */
-document.body.append(App({
+const app = App({
   style: {
     color: 'blue'
   }
-},
-  'Iterable properies'));
+},'Iterable properies');
+document.body.append(app);
+
+//type WhenIteratedType<S extends WhenParameters> = (Extract<S[number], AsyncIterable<any>> extends AsyncIterable<infer I> ? unknown extends I ? never : I : never) | ExtractEvents<Extract<S[number], string>> | (Extract<S[number], Element> extends never ? never : Event);
+// type X = WhenReturn<["change"]>;
+//const X = app.when('change') ;//.consume(e => console.log(e));

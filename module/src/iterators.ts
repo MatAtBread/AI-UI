@@ -1,7 +1,6 @@
 import { DeferredPromise, deferred } from "./deferred.js";
 
 /* Things to suppliement the JS base AsyncIterable */
-
 export type PushIterator<T> = AsyncExtraIterable<T> & {
   push(value: T): boolean;  // Push a new value to consumers. Returns false if all the consumers have gone
   close(ex?: Error): void;  // Tell the consumer we're done, with an optional error
@@ -17,6 +16,14 @@ export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is As
 }
 export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T> {
   return isAsyncIterable(o) || isAsyncIterator(o);
+}
+
+export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
+
+export function asyncIterator<T>(o: AsyncProvider<T>) {
+  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
+  if (isAsyncIterator(o)) return o;
+  throw new Error("Not as async provider");
 }
 
 /* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
@@ -222,11 +229,37 @@ export function defineIterableProperty<T extends object, N extends string | numb
   }
 
   let a = box(v, extras);  
+  let vi: AsyncIterator<V> | undefined;
   Object.defineProperty(o, name, {
     get(): V { return a },
     set(v: V) {
-      a = box(v, extras);
-      push(v?.valueOf() as V);
+      /*
+      Potential code to allow setting of an iterable property from another iterator
+      ** It doesn't work as it is asynchronously recursive **
+      if (isAsyncIter(v)) {
+        if (vi) {
+          vi.return?.();
+        }
+        vi = asyncIterator(v) as AsyncIterator<V>;
+        const update = () => vi!.next().then(es => {
+          if (es.done) {
+            vi = undefined;
+          } else {
+            a = box(es.value, extras);
+            push(es.value?.valueOf() as V);
+            update();
+          }
+        }).catch(ex => {
+          console.log(ex);
+          //vi!.throw?.(ex);
+          vi = undefined;
+        });
+        update();
+      } else 
+      */{
+        a = box(v, extras);
+        push(v?.valueOf() as V);  
+      }
     },
     enumerable: true
   });
@@ -282,7 +315,8 @@ export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
             results[idx] = result.value;
             return { done: count === 0, value: result.value }
           } else {
-            promises[idx] = it[idx].next().then(result => ({ idx, result }));
+            // `ex` is the underlying async iteration exception
+            promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
             return result;
           }
         }).catch(ex => {

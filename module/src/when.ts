@@ -1,3 +1,4 @@
+import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { deferred } from "./deferred.js";
 import { PushIterator, pushIterator, iterableHelpers, asyncExtras, merge, AsyncExtraIterable } from "./iterators.js";
@@ -173,8 +174,8 @@ async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
   }
 }
 
-/* Syntactic sugar: chainAsync decorates the specified so it can be mapped by a following function, or
-  used directly as an iterable */
+/* Syntactic sugar: chainAsync decorates the specified iterator so it can be mapped by 
+  a following function, or used directly as an iterable */
 function chainAsync<A extends AsyncIterable<X>, X>(src: A): MappableIterable<A> {
   function mappableAsyncIterable(mapper: Parameters<typeof asyncExtras.map>[0]) {
     return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
@@ -242,10 +243,13 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
           : iterators.length === 1
             ? iterators[0]
             : (neverGonnaHappen<WhenIteratedType<S>>());
+          
+        // Now everything is ready, we simply defer all async ops to the underlying
+        // merged asyncIterator
         const events = merged[Symbol.asyncIterator]();
-        ai.next = () => events.next();
-        ai.return = (value: any) => events.return?.(value) ?? Promise.resolve({ done: true as const, value });
-        ai.throw = (...args: any[]) => events.throw?.(args) ?? Promise.reject({ done: true as const, value: args[0] });
+        ai.next = events.next.bind(events); //() => events.next();
+        ai.return = events.return?.bind(events);
+        ai.throw = events.throw?.bind(events);
 
         return { done: false, value: {} };
       }
@@ -290,15 +294,15 @@ function allSelectorsPresent(container: Element, missing: string[]): Promise<voi
   }
 
   const d = deferred<void>();
-  /* debugging help: warn if waiting a long time for a selectors to be ready *
-    const stack = new Error().stack.replace(/^Error/, "Missing selectors after 5 seconds:");
+  /* debugging help: warn if waiting a long time for a selectors to be ready */
+  if (DEBUG) {
+    const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
     const warn = setTimeout(() => {
       console.warn(stack, missing);
     }, 5000);
 
     d.finally(() => clearTimeout(warn))
   }
-  /*** */
 
   new MutationObserver((records, mutation) => {
     for (const record of records) {

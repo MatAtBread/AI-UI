@@ -8,6 +8,13 @@ export function isAsyncIterable(o) {
 export function isAsyncIter(o) {
     return isAsyncIterable(o) || isAsyncIterator(o);
 }
+export function asyncIterator(o) {
+    if (isAsyncIterable(o))
+        return o[Symbol.asyncIterator]();
+    if (isAsyncIterator(o))
+        return o;
+    throw new Error("Not as async provider");
+}
 /* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
   something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
   the same arguments returns a AsyncExtraIterable<X>
@@ -199,11 +206,37 @@ export function defineIterableProperty(o, name, v) {
         return push(v);
     };
     let a = box(v, extras);
+    let vi;
     Object.defineProperty(o, name, {
         get() { return a; },
         set(v) {
-            a = box(v, extras);
-            push(v?.valueOf());
+            /*
+            Potential code to allow setting of an iterable property from another iterator
+            ** It doesn't work as it is asynchronously recursive **
+            if (isAsyncIter(v)) {
+              if (vi) {
+                vi.return?.();
+              }
+              vi = asyncIterator(v) as AsyncIterator<V>;
+              const update = () => vi!.next().then(es => {
+                if (es.done) {
+                  vi = undefined;
+                } else {
+                  a = box(es.value, extras);
+                  push(es.value?.valueOf() as V);
+                  update();
+                }
+              }).catch(ex => {
+                console.log(ex);
+                //vi!.throw?.(ex);
+                vi = undefined;
+              });
+              update();
+            } else
+            */ {
+                a = box(v, extras);
+                push(v?.valueOf());
+            }
         },
         enumerable: true
     });
@@ -252,7 +285,8 @@ export const merge = (...ai) => {
                         return { done: count === 0, value: result.value };
                     }
                     else {
-                        promises[idx] = it[idx].next().then(result => ({ idx, result }));
+                        // `ex` is the underlying async iteration exception
+                        promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
                         return result;
                     }
                 }).catch(ex => {

@@ -1,3 +1,5 @@
+import { DEBUG } from "./debug.js";
+
 // Create a deferred Promise, which can be asynchronously/externally resolved or rejected.
 export type DeferredPromise<T> = Promise<T> & { 
   resolve: (value: T | PromiseLike<T>) => void; 
@@ -13,6 +15,10 @@ export function deferred<T>(): DeferredPromise<T> {
   const promise = new Promise<T>((...r) => [resolve, reject] = r) as DeferredPromise<T>;
   promise.resolve = resolve;
   promise.reject = reject;
+  if (DEBUG) {
+    const initLocation = new Error().stack;
+    promise.catch(ex => console.log("Deferred", ex, initLocation));
+  }
   return promise;
 }
 

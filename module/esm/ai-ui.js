@@ -1,11 +1,10 @@
 import { isPromiseLike } from './deferred.js';
-import { defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable } from './iterators.js';
 import { when } from './when.js';
+import { DEBUG } from './debug.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
-// @ts-ignore
-const DEBUG = globalThis.DEBUG == '*' || globalThis.DEBUG == true || globalThis.DEBUG?.includes?.('AI-UI') || false;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
     "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",
@@ -42,13 +41,6 @@ const elementProtype = {
 };
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";
-function asyncIterator(o) {
-    if (isAsyncIterable(o))
-        return o[Symbol.asyncIterator]();
-    if (isAsyncIterator(o))
-        return o;
-    throw new Error("Not as async provider");
-}
 function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
@@ -132,7 +124,7 @@ export const tag = function (_1, _2, _3) {
                         const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
                         if (!n.length || !n[0].parentNode)
                             throw new Error("Element(s) no longer exist in document" + insertionStack);
-                        t = appender(n[0].parentNode, n[0])(es.value?.valueOf() ?? DomPromiseContainer());
+                        t = appender(n[0].parentNode, n[0])(unbox(es.value) ?? DomPromiseContainer());
                         n.forEach(e => e.parentNode?.removeChild(e));
                         ap.next().then(update).catch(error);
                     }
@@ -245,6 +237,10 @@ export const tag = function (_1, _2, _3) {
             }
         }
     }
+    function unbox(a) {
+        const v = a?.valueOf();
+        return Array.isArray(v) ? v.map(unbox) : v;
+    }
     function assignProps(base, props) {
         // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
         if (!(callStackSymbol in props)) {
@@ -266,7 +262,7 @@ export const tag = function (_1, _2, _3) {
                                         return;
                                     }
                                     if (!es.done) {
-                                        const value = es.value?.valueOf();
+                                        const value = unbox(es.value);
                                         if (typeof value === 'object' && value !== null) {
                                             /*
                                             THIS IS JUST A HACK: `style` has to be set member by member, eg:
