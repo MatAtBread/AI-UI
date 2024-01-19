@@ -26,6 +26,8 @@ const App = div.extended({
   constructed() {
     /* When constructed, this "div" tag contains some other tags: */
     const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast();
+    this.num.consume!(n => console.log({n}));
+
     return [
       h2("Hello World"),
       input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded!.checked }}),

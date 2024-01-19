@@ -35,7 +35,7 @@ function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(f
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
-const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially };
+const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume };
 export const asyncExtras = {
   map: wrapAsyncHelper(map),
   filter: wrapAsyncHelper(filter),
@@ -46,7 +46,7 @@ export const asyncExtras = {
   retain: wrapAsyncHelper(retain),
   broadcast: wrapAsyncHelper(broadcast),
   initially: wrapAsyncHelper(initially),
-  consume
+  consume: consume
 };
 
 class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
@@ -267,8 +267,13 @@ export function defineIterableProperty<T extends object, N extends string | numb
 }
 
 function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
-  if (a===null || a===undefined)
-    return Object.create(null,{ ...pds, valueOf: { value() { return a }}});
+  if (a===null || a===undefined) {
+    return Object.create(null,{ 
+      ...pds, 
+      valueOf: { value() { return a }},
+      toJSON: { value() { return a }}
+    });
+  }
   switch (typeof a) {
     case 'object':
       /* TODO: This is problematic as the object might have clashing keys.
@@ -287,7 +292,11 @@ function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
     case 'boolean':
     case 'number':
     case 'string':
-      return Object.defineProperties(Object.assign(a as any), pds); // Boxes types, including BigInt
+      // Boxes types, including BigInt
+      return Object.defineProperties(Object.assign(a as any), {
+        ...pds,
+        toJSON: { value() { return a.valueOf() }}
+      }); 
   }
   throw new TypeError('Iterable properties cannot be of type "'+typeof a+'"');
 }
@@ -557,9 +566,9 @@ function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
   }
 }
 
-async function consume<U>(this: AsyncIterable<U>, f?: (u: U) => void | PromiseLike<void>): Promise<void> {
+async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void> {
   let last: unknown = undefined;
-  for await (const u of this)
+  for await (const u of this as AsyncIterable<U>)
     last = f?.(u);
   await last;
 }

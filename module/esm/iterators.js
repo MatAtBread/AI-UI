@@ -22,7 +22,7 @@ export function asyncIterator(o) {
 function wrapAsyncHelper(fn) {
     return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
 }
-const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially };
+const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume };
 export const asyncExtras = {
     map: wrapAsyncHelper(map),
     filter: wrapAsyncHelper(filter),
@@ -33,7 +33,7 @@ export const asyncExtras = {
     retain: wrapAsyncHelper(retain),
     broadcast: wrapAsyncHelper(broadcast),
     initially: wrapAsyncHelper(initially),
-    consume
+    consume: consume
 };
 class QueueIteratableIterator {
     constructor(stop = () => { }) {
@@ -243,8 +243,13 @@ export function defineIterableProperty(o, name, v) {
     return o;
 }
 function box(a, pds) {
-    if (a === null || a === undefined)
-        return Object.create(null, { ...pds, valueOf: { value() { return a; } } });
+    if (a === null || a === undefined) {
+        return Object.create(null, {
+            ...pds,
+            valueOf: { value() { return a; } },
+            toJSON: { value() { return a; } }
+        });
+    }
     switch (typeof a) {
         case 'object':
             /* TODO: This is problematic as the object might have clashing keys.
@@ -263,7 +268,11 @@ function box(a, pds) {
         case 'boolean':
         case 'number':
         case 'string':
-            return Object.defineProperties(Object.assign(a), pds); // Boxes types, including BigInt
+            // Boxes types, including BigInt
+            return Object.defineProperties(Object.assign(a), {
+                ...pds,
+                toJSON: { value() { return a.valueOf(); } }
+            });
     }
     throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
 }

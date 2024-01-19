@@ -22,6 +22,9 @@ const elementProtype = {
     set ids(v) {
         throw new Error('Cannot set ids on ' + this.valueOf());
     },
+    when: function (...what) {
+        return when(this, ...what);
+    }
     /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
     set style(s: any) {
       const pd = getProtoPropertyDescriptor(this,'style');
@@ -35,9 +38,6 @@ const elementProtype = {
       const pd = getProtoPropertyDescriptor(this,'style');
       return pd?.get.call(this);
     },*/
-    when: function (...what) {
-        return when(this, ...what);
-    }
 };
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";

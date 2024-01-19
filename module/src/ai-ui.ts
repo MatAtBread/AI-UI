@@ -65,7 +65,9 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
   set ids(v: any) {
     throw new Error('Cannot set ids on ' + this.valueOf());
   },
-
+  when: function (...what) {
+    return when(this, ...what)
+  }
   /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
   set style(s: any) {
     const pd = getProtoPropertyDescriptor(this,'style');
@@ -79,10 +81,6 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
     const pd = getProtoPropertyDescriptor(this,'style');
     return pd?.get.call(this);
   },*/
-
-  when: function (...what) {
-    return when(this, ...what)
-  }
 };
 
 const poStyleElt = document.createElement("STYLE");
@@ -139,6 +137,7 @@ export const tag = <TagLoader>function <Tags extends string,
     null,
     Object.getOwnPropertyDescriptors(elementProtype), // We know it's not nested
   );
+
   if (prototypes)
     deepDefine(tagPrototypes, prototypes);
 

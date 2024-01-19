@@ -44,7 +44,7 @@ type ExcessKeys<A extends object, B extends object> = NeverEmpty<OmitType<{
 type OmitType<T, V> = [{
     [K in keyof T as T[K] extends V ? never : K]: T[K];
 }][number];
-type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends object, D, IP, Base extends object, CET extends object> = ((keyof O & keyof D) | (keyof IP & keyof D) | (keyof IP & keyof O) | (keyof IP & keyof Base) | (keyof D & keyof Base)) extends never ? ExcessKeys<O, Base> extends never ? TagCreator<CET & IterableProperties<IP>, BaseCreator> & StaticMembers<P & O & D, Base> : {
+type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends object, D, IP, Base extends object, CET extends object> = ((keyof O & keyof D) | (keyof IP & keyof D) | (keyof IP & keyof O) | (keyof IP & keyof Base) | (keyof D & keyof Base) | (keyof D & keyof P) | (keyof O & keyof P) | (keyof IP & keyof P)) extends never ? ExcessKeys<O, Base> extends never ? TagCreator<CET & IterableProperties<IP>, BaseCreator> & StaticMembers<P & O & D, Base> : {
     '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, Base>;
 } : OmitType<{
     '`declare` clashes with base properties': keyof D & keyof Base;
@@ -52,6 +52,9 @@ type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends 
     '`iterable` clashes with `override`': keyof IP & keyof O;
     '`iterable` clashes with `declare`': keyof IP & keyof D;
     '`override` clashes with `declare`': keyof O & keyof D;
+    '`prototype` (deprecated) clashes with `declare`': keyof D & keyof P;
+    '`prototype` (deprecated) clashes with `override`': keyof O & keyof P;
+    '`prototype` (deprecated) clashes with `iterable`': keyof IP & keyof P;
 }, never>;
 interface ExtendedTag {
     <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)

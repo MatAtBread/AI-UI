@@ -101,7 +101,7 @@ type IterableProperties<IP> = {
       Div(this.prop) ; // the value
       this.prop.map!(....)  // the iterator (not the trailing '!' to assert non-null value)
 
-    This relies on a hack to `wrapAsyncHelper` in iterators.ts when *acceots* a Partial<AsyncIterator> 
+    This relies on a hack to `wrapAsyncHelper` in iterators.ts when *accepts* a Partial<AsyncIterator> 
     but casts it to a AsyncIterator before use.
   */
   [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
@@ -122,16 +122,23 @@ type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends 
   | (keyof IP & keyof D) 
   | (keyof IP & keyof O)
   | (keyof IP & keyof Base) 
-  | (keyof D & keyof Base)) extends never ?
+  | (keyof D & keyof Base)
+  | (keyof D & keyof P)
+  | (keyof O & keyof P)
+  | (keyof IP & keyof P)
+  ) extends never ?
   ExcessKeys<O, Base> extends never ?
   TagCreator<CET & IterableProperties<IP>, BaseCreator> & StaticMembers<P & O & D, Base>
   : { '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, Base> }
-  : OmitType<{ 
+  : OmitType<{
     '`declare` clashes with base properties': keyof D & keyof Base,
     '`iterable` clashes with base properties': keyof IP & keyof Base,
     '`iterable` clashes with `override`': keyof IP & keyof O,
     '`iterable` clashes with `declare`': keyof IP & keyof D,
-    '`override` clashes with `declare`': keyof O & keyof D
+    '`override` clashes with `declare`': keyof O & keyof D,
+    '`prototype` (deprecated) clashes with `declare`': keyof D & keyof P,
+    '`prototype` (deprecated) clashes with `override`': keyof O & keyof P,
+    '`prototype` (deprecated) clashes with `iterable`': keyof IP & keyof P
   }, never>
 
 interface ExtendedTag {
