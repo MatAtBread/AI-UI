@@ -160,7 +160,7 @@ interface ExtendedTag {
     S extends string | undefined,                         // styles (string)
     IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {}, // iterable - primitives (will be boxed)
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, // Base
-    CET extends object = D & O & P & Base & IDS<I>        // Combined Effective Type of this extended tag
+    CET extends object = D & O & MergeBaseTypes<P, Base> & IDS<I> // Combined Effective Type of this extended tag
   >(this: BaseCreator, _: (instance: any) => {
     /** @deprecated */ prototype?: P;
     override?: O;
@@ -169,7 +169,7 @@ interface ExtendedTag {
     ids?: I;
     constructed?: C;
     styles?: S;
-  } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>)
+  } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, Base>>>)
   : ExtendedReturn<BaseCreator,P,O,D,IP,Base,CET>;
 
   // Declarative, with no state instance
@@ -183,7 +183,7 @@ interface ExtendedTag {
     S extends string | undefined,                         // styles (string)
     IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {}, // iterable - primitives (will be boxed)
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, // Base
-    CET extends object = D & O & MergeBaseTypes<P, Base> & IDS<I>        // Combined Effective Type of this extended tag
+    CET extends object = D & O & MergeBaseTypes<P, Base> & IDS<I> // Combined Effective Type of this extended tag
   >(this: BaseCreator, _: {
     /** @deprecated */ prototype?: P;
     override?: O;
