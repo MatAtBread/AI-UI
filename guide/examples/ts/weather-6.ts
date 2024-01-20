@@ -40,11 +40,10 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 }
 
 /* 
-  Define a "Chart" so it is like an image, but with additional attributes called `label`,
-  `xData` and `yData`. 
+  Define a "Chart" so it is like an image, but with additional attributes called `label` and `data`.
 
-  When these are all set, draw a chart for the data within the image.
-  Use opacity to indicate we're loading
+  When `data` is set, draw a chart for the data within the image.
+  Use opacity to indicate we're loading.
 */
 
 const Chart = img.extended({
