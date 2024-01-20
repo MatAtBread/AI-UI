@@ -67,20 +67,7 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
   },
   when: function (...what) {
     return when(this, ...what)
-  },
-  /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
-  set style(s: any) {
-    const pd = getProtoPropertyDescriptor(this,'style');
-    if (typeof s === 'object') {
-      deepAssign(pd?.get.call(this),s);
-    } else {
-      pd?.set.call(this,s);
-    }
-  },
-  get style() {
-    const pd = getProtoPropertyDescriptor(this,'style');
-    return pd?.get.call(this);
-  },*/
+  }
 };
 
 const poStyleElt = document.createElement("STYLE");
@@ -117,13 +104,13 @@ export const tag = <TagLoader>function <Tags extends string,
 ): Record<string, TagCreator<P & Element>> {
   type NamespacedElementBase = T1 extends string ? T1 extends '' ? HTMLElement : Element : HTMLElement;
 
-  /* Work out which parameter is which. There are 4 variations:
+  /* Work out which parameter is which. There are 6 variations:
     tag()                                       []
     tag(prototypes)                             [object]
     tag(tags[])                                 [string[]]
     tag(tags[], prototypes)                     [string[], object]
     tag(namespace | null, tags[])               [string | null, string[]]
-    tag(namespace | null, tags[],prototypes)    [string | null, string[], object]
+    tag(namespace | null, tags[], prototypes)    [string | null, string[], object]
   */
   const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
     ? [_1, _2 as Tags[], _3 as P]
@@ -131,7 +118,7 @@ export const tag = <TagLoader>function <Tags extends string,
       ? [null, _1 as Tags[], _2 as P] 
       : [null, standandTags, _1 as P];
 
-  /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
+  /* Note: we use property defintion (and not object spread) so getters (like `ids`)
     are not evaluated until called */
   const tagPrototypes = Object.create(
     null,
@@ -146,6 +133,7 @@ export const tag = <TagLoader>function <Tags extends string,
       assignProps(this, a);
     }
   });
+
   if (prototypes)
     deepDefine(tagPrototypes, prototypes);
 
@@ -398,7 +386,6 @@ export const tag = <TagLoader>function <Tags extends string,
                        assign(d[k], value);
                     }
                   }
-
                 } else {
                   if (s[k] !== undefined)
                     d[k] = s[k];

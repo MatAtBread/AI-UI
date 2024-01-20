@@ -3,11 +3,10 @@
   "bugs": {
     "url": "https://github.com/MatAtBread/AI-UI/issues"
   },
-  "dependencies": {},
   "description": "A tiny, genuinely functional, UI framework for building dynamic HTML pages",
   "devDependencies": {
     "ts-loader": "^9.5.0",
-    "typescript": "^5.3.2",
+    "typescript": "^5.3.3",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
   },

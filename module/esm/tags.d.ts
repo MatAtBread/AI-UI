@@ -32,8 +32,8 @@ type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
     set attributes(v: Partial<PossiblyAsync<Base>>);
 };
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
-type MergeBaseTypes<P, Base> = {
-    [K in keyof P]: K extends keyof Base ? Partial<Base[K]> | P[K] : P[K];
+type MergeBaseTypes<T, U> = {
+    [K in keyof U | keyof T]: K extends (keyof T & keyof U) ? U[K] | T[K] : K extends keyof T ? T[K] : K extends keyof U ? U[K] : never;
 };
 type IterableProperties<IP> = {
     [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
@@ -58,7 +58,7 @@ type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends 
     '`prototype` (deprecated) clashes with `iterable`': keyof IP & keyof P;
 }, never>;
 interface ExtendedTag {
-    <BaseCreator extends TagCreator<any, any>, P extends MergeBaseTypes<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)
+    <BaseCreator extends TagCreator<any, any>, P extends object, // prototype (deprecated, but can be used to extend a single property type in a union)
     O extends object, // overrides - same types as Base, or omitted
     D extends object, // declare - any types
     I extends {
@@ -79,7 +79,7 @@ interface ExtendedTag {
         constructed?: C;
         styles?: S;
     } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
-    <BaseCreator extends TagCreator<any, any>, P extends MergeBaseTypes<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)
+    <BaseCreator extends TagCreator<any, any>, P extends object, // prototype (deprecated, but can be used to extend a single property type in a union)
     O extends object, // overrides - same types as Base, or omitted
     D extends object, // declare - any types
     I extends {
@@ -91,7 +91,7 @@ interface ExtendedTag {
         [k: string]: string | number | bigint | boolean | /* object | */ undefined;
     } = {}, // iterable - primitives (will be boxed)
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, // Base
-    CET extends object = D & O & P & Base & IDS<I>>(this: BaseCreator, _: {
+    CET extends object = D & O & MergeBaseTypes<P, Base> & IDS<I>>(this: BaseCreator, _: {
         /** @deprecated */ prototype?: P;
         override?: O;
         declare?: D;
@@ -99,7 +99,7 @@ interface ExtendedTag {
         ids?: I;
         constructed?: C;
         styles?: S;
-    } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
+    } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, Base>>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
 }
 type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
 export interface TagCreator<Base extends object, Super extends (never | TagCreator<any, any>) = never, TypedBase = ReTypedEventHandlers<Base>> {

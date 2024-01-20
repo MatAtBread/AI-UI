@@ -24,20 +24,7 @@ const elementProtype = {
     },
     when: function (...what) {
         return when(this, ...what);
-    },
-    /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
-    set style(s: any) {
-      const pd = getProtoPropertyDescriptor(this,'style');
-      if (typeof s === 'object') {
-        deepAssign(pd?.get.call(this),s);
-      } else {
-        pd?.set.call(this,s);
-      }
-    },
-    get style() {
-      const pd = getProtoPropertyDescriptor(this,'style');
-      return pd?.get.call(this);
-    },*/
+    }
 };
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";
@@ -59,20 +46,20 @@ function isChildTag(x) {
 /* tag */
 const callStackSymbol = Symbol('callStack');
 export const tag = function (_1, _2, _3) {
-    /* Work out which parameter is which. There are 4 variations:
+    /* Work out which parameter is which. There are 6 variations:
       tag()                                       []
       tag(prototypes)                             [object]
       tag(tags[])                                 [string[]]
       tag(tags[], prototypes)                     [string[], object]
       tag(namespace | null, tags[])               [string | null, string[]]
-      tag(namespace | null, tags[],prototypes)    [string | null, string[], object]
+      tag(namespace | null, tags[], prototypes)    [string | null, string[], object]
     */
     const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
-    /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
+    /* Note: we use property defintion (and not object spread) so getters (like `ids`)
       are not evaluated until called */
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
     // We do this here and not in elementProtype as there's no syntax
