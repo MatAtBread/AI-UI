@@ -35,7 +35,6 @@ function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(f
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
-const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume };
 export const asyncExtras = {
   map: wrapAsyncHelper(map),
   filter: wrapAsyncHelper(filter),
@@ -46,7 +45,10 @@ export const asyncExtras = {
   retain: wrapAsyncHelper(retain),
   broadcast: wrapAsyncHelper(broadcast),
   initially: wrapAsyncHelper(initially),
-  consume: consume
+  consume: consume,
+  merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A) {
+    return merge(this, ...m);
+  }
 };
 
 class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
@@ -304,11 +306,11 @@ function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
 /* Merge asyncIterables into a single asyncIterable */
 
 /* TS hack to expose the return AsyncGenerator a generator of the union of the merged types */
-type CollapseIterableType<T> = T[] extends AsyncIterable<infer U>[] ? U : never;
+type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 
-export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
-  const it = ai.map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
+export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
+  const it = (ai as AsyncIterable<any>[]).map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
   const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
   const results: CollapseIterableType<A[number]>[] = [];
   const forever = new Promise<any>(() => { });
@@ -572,3 +574,5 @@ async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | 
     last = f?.(u);
   await last;
 }
+
+const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };

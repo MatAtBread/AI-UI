@@ -22,7 +22,6 @@ export function asyncIterator(o) {
 function wrapAsyncHelper(fn) {
     return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
 }
-const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume };
 export const asyncExtras = {
     map: wrapAsyncHelper(map),
     filter: wrapAsyncHelper(filter),
@@ -33,7 +32,10 @@ export const asyncExtras = {
     retain: wrapAsyncHelper(retain),
     broadcast: wrapAsyncHelper(broadcast),
     initially: wrapAsyncHelper(initially),
-    consume: consume
+    consume: consume,
+    merge(...m) {
+        return merge(this, ...m);
+    }
 };
 class QueueIteratableIterator {
     constructor(stop = () => { }) {
@@ -538,3 +540,4 @@ async function consume(f) {
         last = f?.(u);
     await last;
 }
+const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };

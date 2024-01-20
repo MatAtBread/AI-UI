@@ -23,9 +23,6 @@ export type Overrides = {
     styles?: string;
     constructed?: () => (ChildTags | void | Promise<void>);
 };
-type UntypedEventHandlers = {
-    [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? null | ((event: E) => R) : GlobalEventHandlers[K];
-};
 type TypedEventHandlers<T> = {
     [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? null | ((this: T, event: E) => R) : GlobalEventHandlers[K];
 };
@@ -35,7 +32,7 @@ type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
     set attributes(v: Partial<PossiblyAsync<Base>>);
 };
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
-type BasedOn<P, Base> = Partial<UntypedEventHandlers> & {
+type MergeBaseTypes<P, Base> = {
     [K in keyof P]: K extends keyof Base ? Partial<Base[K]> | P[K] : P[K];
 };
 type IterableProperties<IP> = {
@@ -43,7 +40,7 @@ type IterableProperties<IP> = {
 };
 type NeverEmpty<O extends object> = {} extends O ? never : O;
 type ExcessKeys<A extends object, B extends object> = NeverEmpty<OmitType<{
-    [K in keyof A]: K extends keyof B ? B[K] extends A[K] ? never : B[K] : undefined;
+    [K in keyof A]: K extends keyof B ? A[K] extends Partial<B[K]> ? never : B[K] : undefined;
 }, never>>;
 type OmitType<T, V> = [{
     [K in keyof T as T[K] extends V ? never : K]: T[K];
@@ -61,7 +58,7 @@ type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends 
     '`prototype` (deprecated) clashes with `iterable`': keyof IP & keyof P;
 }, never>;
 interface ExtendedTag {
-    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)
+    <BaseCreator extends TagCreator<any, any>, P extends MergeBaseTypes<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)
     O extends object, // overrides - same types as Base, or omitted
     D extends object, // declare - any types
     I extends {
@@ -82,7 +79,7 @@ interface ExtendedTag {
         constructed?: C;
         styles?: S;
     } & ThisType<ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & P & Base>>): ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
-    <BaseCreator extends TagCreator<any, any>, P extends BasedOn<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)
+    <BaseCreator extends TagCreator<any, any>, P extends MergeBaseTypes<P, Base>, // prototype (deprecated, but can be used to extend a single property type in a union)
     O extends object, // overrides - same types as Base, or omitted
     D extends object, // declare - any types
     I extends {

@@ -3,9 +3,9 @@ import { merge } from '../../../module/esm/iterators.js';
 
 /* Specify what base tags you reference in your UI */
 const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
+
 const App = div.extended({
   declare:{
-    lastNum: 0,
     reset() {
       this.num = 0;
     }
@@ -15,8 +15,6 @@ const App = div.extended({
     rounded: false as boolean
   },
   override: {
-    /* generates error (key a base key) fnarr: 0, */
-    /* generates error (wrong type for key) align: 0, */
     dir: ''
   },
   ids:{
@@ -27,8 +25,6 @@ const App = div.extended({
     /* When constructed, this "div" tag contains some other tags: */
     const borderRadius = this.rounded.map!(f => f ? '1em': '').broadcast();
     this.num.consume!(n => console.log({n}));
-
-    const s = this.attributes;
 
     this.attributes = {
       style: {
@@ -53,8 +49,7 @@ const App = div.extended({
       div(typeof this.num), // NOT 'number' as it's boxed
       div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
-      // @ts-ignore
-      div(merge(this.rounded!, this.num).map!(_ => this.num * (this.rounded == true ? 1 : -1))), // Dynamic - we map the value
+      div(merge(this.rounded, this.num).map!(_ => this.num * (this.rounded == true ? 1 : -1))), // Dynamic - we map the value
     ]
   }
 });

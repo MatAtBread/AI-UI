@@ -29,15 +29,16 @@ export declare const asyncExtras: {
     broadcast: <U_7>(this: Partial<AsyncIterable<U_7>>) => AsyncIterable<U_7> & AsyncExtraIterable<U_7>;
     initially: <U_8, I = U_8>(this: Partial<AsyncIterable<U_8>>, initValue: I) => AsyncIterable<U_8 | I> & AsyncExtraIterable<U_8 | I>;
     consume: typeof consume;
+    merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T>>, ...A][number]>>;
 };
 export declare function pushIterator<T>(stop?: () => void, bufferWhenNoConsumers?: boolean): PushIterator<T>;
 export declare function broadcastIterator<T>(stop?: () => void): BroadcastIterator<T>;
 export declare function defineIterableProperty<T extends object, N extends string | number | symbol, V>(o: T, name: N, v: V): T & {
     [n in N]: V & BroadcastIterator<V>;
 };
-type CollapseIterableType<T> = T[] extends AsyncIterable<infer U>[] ? U : never;
+type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
-export declare const merge: <A extends AsyncIterable<any>[]>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
+export declare const merge: <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
 export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never);
 export declare function generatorHelpers<G extends (...args: A) => AsyncGenerator<G1, G2, G3>, A extends any[], G1, G2, G3>(g: G): (...args: A) => AsyncGenerator<G1, G2, G3> & AsyncExtraIterable<G1>;
 declare function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void>;

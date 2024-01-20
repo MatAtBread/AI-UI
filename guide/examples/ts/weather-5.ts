@@ -133,13 +133,12 @@ const Location = input.extended((inst:{ geo?: GeoInfo }) => ({
     },
   },
   prototype: {
-    // Overrides for existing attributes
     placeholder: 'Enter a town...',
     style: {
       display: 'block',
       backgroundColor: ''
     },
-    onkeydown(e) {
+    onkeydown() {
       this.style.backgroundColor = '';
     }
   }

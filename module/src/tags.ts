@@ -79,7 +79,7 @@ type ReadWriteAttributes<E,Base> = Omit<E,'attributes'> & {
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
-type BasedOn<P,Base> = Partial<UntypedEventHandlers> & {
+type MergeBaseTypes<P,Base> = {
   [K in keyof P]: K extends keyof Base 
       ? Partial<Base[K]> | P[K]
       : P[K];
@@ -115,7 +115,7 @@ type IterableProperties<IP> = {
 type NeverEmpty<O extends object> = {} extends O ? never : O;
 type ExcessKeys<A extends object,B extends object> = NeverEmpty<OmitType<{
       [K in keyof A]: K extends keyof B 
-        ? B[K] extends A[K] 
+        ? A[K] extends Partial<B[K]>
           ? never : B[K]
         : undefined
     }, never>>;
@@ -150,7 +150,7 @@ interface ExtendedTag {
   // Functional, with a private Instance
   <
     BaseCreator extends TagCreator<any, any>,
-    P extends BasedOn<P,Base>,                            // prototype (deprecated, but can be used to extend a single property type in a union)
+    P extends MergeBaseTypes<P,Base>,                     // prototype (deprecated, but can be used to extend a single property type in a union)
     O extends object,                                     // overrides - same types as Base, or omitted
     D extends object,                                     // declare - any types
     I extends { [id: string]: TagCreator<any, any>; },    // ids - tagCreators
@@ -173,7 +173,7 @@ interface ExtendedTag {
   // Declarative, with no state instance
   <
     BaseCreator extends TagCreator<any, any>,
-    P extends BasedOn<P,Base>,                            // prototype (deprecated, but can be used to extend a single property type in a union)
+    P extends MergeBaseTypes<P,Base>,                     // prototype (deprecated, but can be used to extend a single property type in a union)
     O extends object,                                     // overrides - same types as Base, or omitted
     D extends object,                                     // declare - any types
     I extends { [id: string]: TagCreator<any, any>; },    // ids - tagCreators
