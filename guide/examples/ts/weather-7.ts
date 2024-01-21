@@ -109,25 +109,28 @@ const WeatherForecast = Chart.extended({
 const Location = input.extended({
   declare: {
     geo() {
-      return this.when('change').map(_ => {
-        this.disabled = true;
-        return getGeoInfo(this.value).then(g => {
+      return this.when('change').map(async _ => {
+        try {
+          this.disabled = true;
+          const g = await getGeoInfo(this.value);
           const lastGeo = g?.results?.[0];
-          this.style.backgroundColor = lastGeo ? '' : '#fdd';
           return lastGeo;
-        }).finally(() => this.disabled = false);
+        } finally {
+          this.disabled = false;
+        }
       })
     }
   },
-  override: {
-    placeholder: 'Enter a town...',
-    style: {
-      display: 'block',
-      backgroundColor: ''
-    },
-    onkeydown() {
+  constructed() {
+    this.attributes = {
+      placeholder: 'Enter a town...',
+      style: {
+        display: 'block',
+        backgroundColor: this.geo().map(g => g ? '' : '#fdd')
+      }
+    };
+    this.onkeydown = () =>
       this.style.backgroundColor = '';
-    }
   }
 });
 

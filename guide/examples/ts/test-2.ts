@@ -1,7 +1,7 @@
 import { tag } from '../../../module/esm/ai-ui.js';
 
 /* Specify what base tags you reference in your UI */
-const { div } = tag(['div']);
+const { div, select } = tag(['div','select']);
 
 const X = div.extended({
   prototype: {
@@ -11,5 +11,13 @@ const X = div.extended({
 });
 
 let {dir,xxx} = X();
-dir = true;
-xxx = [];
+//dir = true;
+//xxx = [];
+
+const v = select.extended({
+  declare:{
+    get valueAsNumber() {
+      return Number(this.value)
+    }
+  }
+})().valueAsNumber;
