@@ -8,7 +8,7 @@ Using AI-UI in your web apps
 * [Help with async iterators](./iterators.md)
 * [Extended: Create new tags](./extended.md)
 * [Extended 1: Composition with `constructed()`](./constructed.md) _coming soon_
-* [Extended 2: Adding methods & attributes with `prototype`](./prototype.md) _coming soon_
+* [Extended 2: Adding methods & attributes with `declare`, `override` & `iterable`](./prototype.md) _coming soon_
 * [Extended 3: Type-safe elements using `ids`](./ids.md) _coming soon_
 * [Extended 4: Defining element `styles`](./styles.md) _coming soon_
 * [Extended 5: Private element data, getters & setters](./instance.md) _coming soon_

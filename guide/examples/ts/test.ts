@@ -39,7 +39,7 @@ const Lazy = h2.extended((instance:{ myAttr: number }) => ({
     },
     myMethod(n: number) { instance.myAttr = n },
   },
-  prototype:{
+  override:{
     className: 'Lazy',
     onclick() { this.thing = String(Number(this.thing)-1) },
     style:{
@@ -54,7 +54,7 @@ const Lazy = h2.extended((instance:{ myAttr: number }) => ({
 }));
 
 const Lazier = Lazy.extended({
-  prototype:{
+  override:{
     className: `Lazier Lazy`,
     style:{
       borderRight: '2px solid black'
@@ -71,7 +71,7 @@ const Lazier = Lazy.extended({
 });
 
 const Laziest = Lazier.extended({
-  prototype:{
+  override:{
     className: `Laziest ${Lazier.className}`,
     onclick() { this.thing = String(Number(this.thing)+1) },
     style:{
@@ -107,7 +107,7 @@ const App = div.extended({
     text: input,
     lazy: Laziest
   },
-  prototype:{
+  override:{
     className: 'App'
   },
   constructed(){
@@ -178,7 +178,7 @@ const Block = div.extended({
     height: 20px;
     background-color: red;
   }`,
-  prototype:{
+  override:{
     className:'RedBlock',
     style: {
       backgroundColor: 'magenta'

@@ -48,7 +48,7 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 */
 
 const Chart = img.extended({
-  prototype: {
+  override: {
     // Overrides for existing attributes
     style: {
       transition: 'opacity 0.5s',
@@ -132,7 +132,7 @@ const Location = input.extended((inst:{ geo?: GeoInfo }) => ({
       }
     },
   },
-  prototype: {
+  override: {
     placeholder: 'Enter a town...',
     style: {
       display: 'block',

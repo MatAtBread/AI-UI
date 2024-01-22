@@ -116,7 +116,7 @@ const Location = input.extended({
       }
     }
   },
-  prototype: {
+  override: {
     placeholder: 'Enter a town...',
     style: {
       display: 'block',

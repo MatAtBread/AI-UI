@@ -85,7 +85,7 @@ const Location = input.extended({
   declare: {
     geo: null as null | GeoInfo,
   },
-  prototype:{
+  override:{
     placeholder: 'Enter a town...',
     style: {
       display: 'block',
