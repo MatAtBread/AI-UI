@@ -196,7 +196,7 @@ interface ExtendedTag {
   : ExtendedReturn<BaseCreator,P,O,D,IP,Base,CET>;
 }
 
-type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
+export type TagCreatorArgs<A> = [] | ChildTags[] | [A] | [A, ...ChildTags[]];
 export interface TagCreator<Base extends object, 
   Super extends (never | TagCreator<any,any>) = never,
   TypedBase = ReTypedEventHandlers<Base>
