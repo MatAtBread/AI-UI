@@ -261,7 +261,8 @@ export const tag = <TagLoader>function <Tags extends string,
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  console.warn("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                  if (DEBUG)
+                    console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -365,7 +366,8 @@ export const tag = <TagLoader>function <Tags extends string,
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value)) {
                   if (value instanceof Node) {
-                    console.warn("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                    if (DEBUG)
+                      console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                     d[k] = value;
                   } else {
                     // Note - if we're copying to ourself (or an array of different length), 

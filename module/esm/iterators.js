@@ -51,6 +51,9 @@ class QueueIteratableIterator {
             return Promise.resolve({ done: false, value: this._items.shift() });
         }
         const value = deferred();
+        // We install a catch handler as the promise might be legitimately reject before anything waits for it,
+        // and this suppresses the uncaught exception warning.
+        value.catch(ex => { });
         this._pending.push(value);
         return value;
     }
@@ -322,7 +325,9 @@ export const merge = (...ai) => {
                     it[i].throw?.(ex); // Terminate the sources with the appropriate cause
                 }
             }
-            return Promise.reject(ex);
+            // Because we've passed the exception on to all the sources, we're now done
+            // previously: return Promise.reject(ex);
+            return Promise.resolve({ done: true, value: ex });
         }
     };
     return iterableHelpers(merged);
