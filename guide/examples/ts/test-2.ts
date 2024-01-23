@@ -1,7 +1,8 @@
 import { TagCreator, tag } from '../../../module/esm/ai-ui.js';
+import { TagCreatorArgs } from '../../../module/esm/tags.js';
 
 /* Specify what base tags you reference in your UI */
-const { div, select } = tag(['div','select']);
+const { div, select, option } = tag(['div','select','option']);
 
 const X = div.extended({
   prototype: {
@@ -11,9 +12,10 @@ const X = div.extended({
 });
 
 let {dir,xxx} = X();
-dir = true;
-xxx = [];
+//dir = true;
+//xxx = [];
 
+/*
 const GenericSelect = <G = never>() => select.extended({
   override:{} as {
     selectedOptions: HTMLCollectionOf<HTMLOptionElement & { originalData: G }>
@@ -33,3 +35,15 @@ const NumberSelect = (GenericSelect<{ info?: number }>()).extended({
 });
 
 const g2 = NumberSelect()
+*/
+
+const GenericSelect = <G = never>(...a: TagCreatorArgs<ReturnType<typeof select>>) => select.extended({
+  override:{} as {
+    selectedOptions: HTMLCollectionOf<HTMLOptionElement & { originalData: G }>
+  }
+})(...a);
+
+const g = GenericSelect<number>(option("Matt"));
+const go = g.selectedOptions[0];
+
+

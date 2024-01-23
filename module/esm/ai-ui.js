@@ -378,21 +378,24 @@ export const tag = function (_1, _2, _3) {
             deepDefine(e, tagDefinition.prototype);
             deepDefine(e, tagDefinition.override);
             deepDefine(e, tagDefinition.declare);
-            const iterableKeys = tagDefinition.iterable && Object.keys(tagDefinition.iterable);
-            iterableKeys?.forEach(k => {
+            tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
                 defineIterableProperty(e, k, tagDefinition.iterable[k]);
             });
             if (combinedAttrs[callStackSymbol] === newCallStack) {
                 if (!noAttrs)
                     assignProps(e, attrs);
-                while (newCallStack.length) {
-                    const base = newCallStack.shift();
+                for (const base of newCallStack) {
                     const children = base?.constructed?.call(e);
                     if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
                         appender(e)(children);
                 }
-                // @ts-ignore
-                iterableKeys?.forEach(k => e[k] = e[k].valueOf());
+                // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
+                // so the full hierarchy gets to consume the initial state
+                for (const base of newCallStack) {
+                    base.iterable && Object.keys(base.iterable).forEach(
+                    // @ts-ignore
+                    k => e[k] = e[k].valueOf());
+                }
             }
             return e;
         };
