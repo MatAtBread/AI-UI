@@ -1,5 +1,5 @@
 import { TagCreator, tag } from '../../../module/esm/ai-ui.js';
-import { TagCreatorArgs } from '../../../module/esm/tags.js';
+import { PossiblyAsync, TagCreatorArgs } from '../../../module/esm/tags.js';
 
 /* Specify what base tags you reference in your UI */
 const { div, select, option } = tag(['div','select','option']);
@@ -37,13 +37,20 @@ const NumberSelect = (GenericSelect<{ info?: number }>()).extended({
 const g2 = NumberSelect()
 */
 
-const GenericSelect = <G = never>(...a: TagCreatorArgs<ReturnType<typeof select>>) => select.extended({
-  override:{} as {
-    selectedOptions: HTMLCollectionOf<HTMLOptionElement & { originalData: G }>
+const GenericSelect = <G = never>(...a: TagCreatorArgs<PossiblyAsync<ReturnType<typeof select>> & ThisType<ReturnType<typeof select>>>) => select.extended({
+  override:{
+    selectedOptions: undefined as unknown as HTMLCollectionOf<HTMLOptionElement & { originalData: G }>
   }
-})(...a);
+})(...a as any[]);
 
-const g = GenericSelect<number>(option("Matt"));
-const go = g.selectedOptions[0];
+const g = GenericSelect<number>({ style: { color: 'blue' } },option("Matt"));
+const go = g.selectedOptions[0].originalData;
+g.id
 
+const NumberSelect = GenericSelect<number>;
+
+const ns = NumberSelect({ style: { color: 'blue' } },'abc');
+
+const nn = ns.selectedOptions[0].originalData
+ns.id
 

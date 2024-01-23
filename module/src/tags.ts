@@ -11,7 +11,7 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   | Array<ChildTags> 
   | Iterable<ChildTags>; // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
 
-type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent union distribution
+export type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent union distribution
   ? X extends AsyncProvider<infer U> 
     ? PossiblyAsync<U> 
     : X extends Function 

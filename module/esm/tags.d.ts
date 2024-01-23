@@ -1,6 +1,6 @@
 import { AsyncExtraIterable, AsyncProvider } from "./iterators";
 export type ChildTags = Node | number | string | boolean | undefined | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
-type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncProvider<X> : AsyncProvider<Partial<X>> | {
+export type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncProvider<X> : AsyncProvider<Partial<X>> | {
     [K in keyof X]?: PossiblyAsync<X[K]>;
 } : X | AsyncProvider<X> | undefined;
 export type Instance<T extends {} = Record<string, unknown>> = T;
