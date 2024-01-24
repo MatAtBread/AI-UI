@@ -41,5 +41,5 @@
     "prepublishOnly": "npm run build"
   },
   "types": "./esm/*.d.ts",
-  "version": "0.10.4"
+  "version": "0.10.4-generics"
 }
