@@ -91,8 +91,8 @@ for await (const x of counter3.map(num => num * num)) {
 Note that `map` can accept multiple mappers, in which case each is invoked in turn and yielded to the next consumer:
 
 ```javascript
-for await (const x of counter3.map(num => num, num => num * num)) {
-  console.log(x); // Integers 0,0,1,1,2,4,3,9,4,16,5,25...9,81
+for await (const x of counter3.map(num => Math.round(num/2)).unique()) {
+  console.log(x); // Integers 0,1,2,3,4
 }
 ```
 
@@ -107,7 +107,21 @@ Filter the results of an async iterable. Only those vales returning `true` from 
 for await (const x of counter3.filter(num => num % 2 === 0)) {
   console.log(x); // Integers 0,2,4,6,8
 }
+
 ```
+## unique
+```typescript
+function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U>
+```
+
+Filter the results of an async iterable to remove duplicate values. The optional specifed function can be used to test for equality. By default, the test is the JavaScript loose equality operator "==".
+
+```javascript
+for await (const x of counter3.filter(num => num % 2 === 0)) {
+  console.log(x); // Integers 0,2,4,6,8
+}
+```
+
 
 ## initially
 ```typescript

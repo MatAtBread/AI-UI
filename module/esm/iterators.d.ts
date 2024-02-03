@@ -14,20 +14,21 @@ type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
     map: <U, R>(this: Partial<AsyncIterable<U>>, ...args: ((o: U) => R | PromiseLike<R>)[]) => AsyncIterable<Awaited<R>> & AsyncExtraIterable<Awaited<R>>;
     filter: <U_1>(this: Partial<AsyncIterable<U_1>>, fn: (o: U_1) => boolean | PromiseLike<boolean>) => AsyncIterable<U_1> & AsyncExtraIterable<U_1>;
-    throttle: <U_2>(this: Partial<AsyncIterable<U_2>>, milliseconds: number) => AsyncIterable<U_2> & AsyncExtraIterable<U_2>;
-    debounce: <U_3>(this: Partial<AsyncIterable<U_3>>, milliseconds: number) => AsyncIterable<U_3> & AsyncExtraIterable<U_3>;
-    waitFor: <U_4>(this: Partial<AsyncIterable<U_4>>, cb: (done: (value: void | PromiseLike<void>) => void) => void) => AsyncIterable<U_4> & AsyncExtraIterable<U_4>;
-    count: <U_5 extends {}, K extends string>(this: Partial<AsyncIterable<U_5>>, field: K) => AsyncGenerator<Awaited<U_5> & {
+    unique: <U_2>(this: Partial<AsyncIterable<U_2>>, fn?: ((next: U_2, prev: U_2) => boolean | PromiseLike<boolean>) | undefined) => AsyncIterable<U_2> & AsyncExtraIterable<U_2>;
+    throttle: <U_3>(this: Partial<AsyncIterable<U_3>>, milliseconds: number) => AsyncIterable<U_3> & AsyncExtraIterable<U_3>;
+    debounce: <U_4>(this: Partial<AsyncIterable<U_4>>, milliseconds: number) => AsyncIterable<U_4> & AsyncExtraIterable<U_4>;
+    waitFor: <U_5>(this: Partial<AsyncIterable<U_5>>, cb: (done: (value: void | PromiseLike<void>) => void) => void) => AsyncIterable<U_5> & AsyncExtraIterable<U_5>;
+    count: <U_6 extends {}, K extends string>(this: Partial<AsyncIterable<U_6>>, field: K) => AsyncGenerator<Awaited<U_6> & {
         [x: string]: number;
-    }, void, unknown> & AsyncExtraIterable<Awaited<U_5> & {
+    }, void, unknown> & AsyncExtraIterable<Awaited<U_6> & {
         [x: string]: number;
     }>;
-    retain: <U_6 extends {}>(this: Partial<AsyncIterable<U_6>>) => AsyncIterableIterator<U_6> & {
-        value: U_6;
+    retain: <U_7 extends {}>(this: Partial<AsyncIterable<U_7>>) => AsyncIterableIterator<U_7> & {
+        value: U_7;
         done: boolean;
-    } & AsyncExtraIterable<U_6>;
-    broadcast: <U_7>(this: Partial<AsyncIterable<U_7>>) => AsyncIterable<U_7> & AsyncExtraIterable<U_7>;
-    initially: <U_8, I = U_8>(this: Partial<AsyncIterable<U_8>>, initValue: I) => AsyncIterable<U_8 | I> & AsyncExtraIterable<U_8 | I>;
+    } & AsyncExtraIterable<U_7>;
+    broadcast: <U_8>(this: Partial<AsyncIterable<U_8>>) => AsyncIterable<U_8> & AsyncExtraIterable<U_8>;
+    initially: <U_9, I = U_9>(this: Partial<AsyncIterable<U_9>>, initValue: I) => AsyncIterable<U_9 | I> & AsyncExtraIterable<U_9 | I>;
     consume: typeof consume;
     merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T>>, ...A][number]>>;
 };

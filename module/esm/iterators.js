@@ -25,6 +25,7 @@ function wrapAsyncHelper(fn) {
 export const asyncExtras = {
     map: wrapAsyncHelper(map),
     filter: wrapAsyncHelper(filter),
+    unique: wrapAsyncHelper(unique),
     throttle: wrapAsyncHelper(throttle),
     debounce: wrapAsyncHelper(debounce),
     waitFor: wrapAsyncHelper(waitFor),
@@ -395,6 +396,29 @@ async function* filter(fn) {
         ai.return?.();
     }
 }
+const noUniqueValue = Symbol('noUniqueValue');
+async function* unique(fn) {
+    const ai = this[Symbol.asyncIterator]();
+    let prev = noUniqueValue;
+    try {
+        while (true) {
+            const p = await ai.next();
+            if (p.done) {
+                return ai.return?.(p.value);
+            }
+            if (fn && prev !== noUniqueValue ? await fn(p.value, prev) : p.value != prev) {
+                yield p.value;
+            }
+            prev = p.value;
+        }
+    }
+    catch (ex) {
+        ai.throw?.(ex);
+    }
+    finally {
+        ai.return?.();
+    }
+}
 async function* initially(initValue) {
     yield initValue;
     for await (const u of this)
@@ -545,4 +569,4 @@ async function consume(f) {
         last = f?.(u);
     await last;
 }
-const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };
+const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };

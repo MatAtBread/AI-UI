@@ -38,6 +38,7 @@ type AsyncIterableHelpers = typeof asyncExtras;
 export const asyncExtras = {
   map: wrapAsyncHelper(map),
   filter: wrapAsyncHelper(filter),
+  unique: wrapAsyncHelper(unique),
   throttle: wrapAsyncHelper(throttle),
   debounce: wrapAsyncHelper(debounce),
   waitFor: wrapAsyncHelper(waitFor),
@@ -429,6 +430,28 @@ async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | Promis
   }
 }
 
+const noUniqueValue = Symbol('noUniqueValue');
+async function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U> {
+  const ai = this[Symbol.asyncIterator]();
+  let prev: U | typeof noUniqueValue = noUniqueValue;
+  try {
+    while (true) {
+      const p = await ai.next();
+      if (p.done) {
+        return ai.return?.(p.value);
+      }
+      if (fn && prev !== noUniqueValue ? await fn(p.value, prev) : p.value != prev) {
+        yield p.value;
+      }
+      prev = p.value;
+    }
+  } catch (ex) {
+    ai.throw?.(ex);
+  } finally {
+    ai.return?.();
+  }
+}
+
 async function *initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I> {
   yield initValue;
   for await (const u of this)
@@ -580,4 +603,4 @@ async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | 
   await last;
 }
 
-const asyncHelperFunctions = { map, filter, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };
+const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };

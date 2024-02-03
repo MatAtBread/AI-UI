@@ -39,8 +39,10 @@ type IterableProperties<IP> = {
     [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
 };
 type NeverEmpty<O extends object> = {} extends O ? never : O;
+interface _Not_Declared_ {
+}
 type ExcessKeys<A extends object, B extends object> = NeverEmpty<OmitType<{
-    [K in keyof A]: K extends keyof B ? A[K] extends Partial<B[K]> ? never : B[K] : undefined;
+    [K in keyof A]: K extends keyof B ? A[K] extends Partial<B[K]> ? never : B[K] : _Not_Declared_;
 }, never>>;
 type OmitType<T, V> = [{
     [K in keyof T as T[K] extends V ? never : K]: T[K];
@@ -64,7 +66,7 @@ interface ExtendedTag {
     I extends {
         [id: string]: TagCreator<any, any>;
     }, // ids - tagCreators
-    C extends () => (ChildTags | void | Promise<void>), // constructed()
+    C extends () => (ChildTags | void | Promise<void | ChildTags>), // constructed()
     S extends string | undefined, // styles (string)
     IP extends {
         [k: string]: string | number | bigint | boolean | /* object | */ undefined;
@@ -85,7 +87,7 @@ interface ExtendedTag {
     I extends {
         [id: string]: TagCreator<any, any>;
     }, // ids - tagCreators
-    C extends () => (ChildTags | void | Promise<void>), // constructed()
+    C extends () => (ChildTags | void | Promise<void | ChildTags>), // constructed()
     S extends string | undefined, // styles (string)
     IP extends {
         [k: string]: string | number | bigint | boolean | /* object | */ undefined;
