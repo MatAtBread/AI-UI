@@ -1,4 +1,5 @@
-import { tag } from '../../../module/esm/ai-ui.js';
+//import { tag } from '../../../module/esm/ai-ui.js';
+import { tag } from '../../../module/src/ai-ui';
 
 /* Specify what base tags you reference in your UI */
 const { div, select, option } = tag(['div','select','option']);
@@ -17,11 +18,16 @@ const A = div.extended({
 
 const B = A.extended({
   override: {
-    things: [{ n: 123 }]
+    thing: { n: 2, x: false },
+    things: [{ n: 123, d: true }]//, { n: 1 }, { s: '', n: 2 }]
   }
 });
 
-document.body.append(B({
-  thing: {n: 3},
-  things:[{ n: 1 }, { s: '', n: 2 }]
-}));
+B().things;
+B().thing;
+
+type ZZ =  {
+  n: number;
+}[] & Thing[];
+
+const z = B().things[0];

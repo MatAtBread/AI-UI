@@ -79,9 +79,21 @@ type ReadWriteAttributes<E,Base> = Omit<E,'attributes'> & {
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
+type Extends<A,B> = 
+  A extends any[] 
+  ? B extends any[] 
+    ? Extends<A[number], B[number]>[]
+    : never
+  : B extends any[]
+    ? never
+    : A extends B ? B
+    : B extends A ? A 
+    : never;
+
+
 type MergeBaseTypes<T,U> = {
   [K in keyof U | keyof T]
-      : K extends (keyof T & keyof U) ? U[K] | T[K]
+      : K extends (keyof T & keyof U) ? Extends<T[K],U[K]> // U[K] | T[K]
       : K extends keyof T ? T[K]
       : K extends keyof U ? U[K]
       : never;
@@ -161,7 +173,7 @@ interface ExtendedTag {
     S extends string | undefined,                         // styles (string)
     IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {}, // iterable - primitives (will be boxed)
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, // Base
-    CET extends object = D & O & MergeBaseTypes<P, Base> & IDS<I> // Combined Effective Type of this extended tag
+    CET extends object = D & MergeBaseTypes<P & O, Base> & IDS<I> // Combined Effective Type of this extended tag
   >(this: BaseCreator, _: (instance: any) => {
     /** @deprecated */ prototype?: P;
     override?: O;
@@ -184,7 +196,7 @@ interface ExtendedTag {
     S extends string | undefined,                         // styles (string)
     IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {}, // iterable - primitives (will be boxed)
     Base extends object = BaseCreator extends TagCreator<infer B, any> ? B : never, // Base
-    CET extends object = D & O & MergeBaseTypes<P, Base> & IDS<I> // Combined Effective Type of this extended tag
+    CET extends object = D & MergeBaseTypes<P & O, Base> & IDS<I> // Combined Effective Type of this extended tag
   >(this: BaseCreator, _: {
     /** @deprecated */ prototype?: P;
     override?: O;
