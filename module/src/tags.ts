@@ -85,7 +85,7 @@ type Flatten<O> = [{
   [K in keyof O]: O[K]
 }][number];
 
-type PrettyFlatten<Src extends Others, Others> = Flatten<Omit<Src, keyof Others>> & Pick<Src, keyof Others>;
+type PrettyFlatten<Src extends Others, Others = HTMLElement> = Flatten<Omit<Src, keyof Others>> & Pick<Src, keyof Others>;
 
 type Extends<A, B> =
   A extends any[]
@@ -223,7 +223,7 @@ interface ExtendedTag {
     // Base inferred from this<baseTagCreator>.extended
     Base extends RootObj = BaseCreator extends TagCreator<infer B, any> ? B : never,
     // Combined Effective Type of this extended tag
-    CET extends RootObj = Flatten<D & O & IDS<I>> & MergeBaseTypes<P & O, Base>,
+    CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P & O, Base>,
     // Combined ThisType
     CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, Base>>
   >(this: BaseCreator, _: ExtensionDefinition<CTT, P, O, D, IP, I, C, S> | ((instance: any) => ExtensionDefinition<CTT, P, O, D, IP, I, C, S>))

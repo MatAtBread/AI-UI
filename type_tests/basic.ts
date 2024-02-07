@@ -132,7 +132,11 @@ Over.super === Base;
 const Combi = Decl.extended({
   declare:{
     more: ''
+  },
+  override:{
+    x: '' // ERROR = Decl.x is a boolean
   }
 });
 
-Combi()
+const cmb = Combi()
+cmb.x
