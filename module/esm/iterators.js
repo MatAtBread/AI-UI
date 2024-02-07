@@ -266,7 +266,7 @@ function box(a, pds) {
               - something else
             */
             if (!(Symbol.asyncIterator in a)) {
-                console.warn('Iterable properties of type "object" will be modified. Spread the object if necessary.');
+                console.warn('Iterable properties of type "object" will be modified. Spread the object if necessary.', a);
                 return Object.defineProperties(a, pds);
             }
             return a;

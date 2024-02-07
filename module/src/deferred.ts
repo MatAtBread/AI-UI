@@ -1,9 +1,9 @@
 import { DEBUG } from "./debug.js";
 
 // Create a deferred Promise, which can be asynchronously/externally resolved or rejected.
-export type DeferredPromise<T> = Promise<T> & { 
-  resolve: (value: T | PromiseLike<T>) => void; 
-  reject: (value: any) => void; 
+export type DeferredPromise<T> = Promise<T> & {
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (value: any) => void;
 }
 
 // Used to suppress TS error about use before initialisation

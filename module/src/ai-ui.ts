@@ -15,8 +15,8 @@ type OtherMembers = { };
 
 /* Members applied to EVERY tag created, even base tags */
 interface PoElementMethods {
-  get ids(): Record<string, Element | undefined>;
-  when<S extends WhenParameters>(...what: S): WhenReturn<S>;
+  get ids(): {}
+  when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
 }
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
@@ -26,7 +26,7 @@ interface TagLoader {
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
 
   /*
-   Signatures for the tag loader. All params are optional in any combination, 
+   Signatures for the tag loader. All params are optional in any combination,
    but must be in order:
       tag(
           ?nameSpace?: string,  // absent nameSpace implies HTML
@@ -110,12 +110,12 @@ export const tag = <TagLoader>function <Tags extends string,
     tag(tags[])                                 [string[]]
     tag(tags[], prototypes)                     [string[], object]
     tag(namespace | null, tags[])               [string | null, string[]]
-    tag(namespace | null, tags[], prototypes)    [string | null, string[], object]
+    tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
   */
   const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
     ? [_1, _2 as Tags[], _3 as P]
     : Array.isArray(_1)
-      ? [null, _1 as Tags[], _2 as P] 
+      ? [null, _1 as Tags[], _2 as P]
       : [null, standandTags, _1 as P];
 
   /* Note: we use property defintion (and not object spread) so getters (like `ids`)
@@ -266,8 +266,8 @@ export const tag = <TagLoader>function <Tags extends string,
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
-                    // Note - if we're copying to an array of different length 
-                    // we're decoupling common object references, so we need a clean object to 
+                    // Note - if we're copying to an array of different length
+                    // we're decoupling common object references, so we need a clean object to
                     // assign into
                     if (Array.isArray(d[k]) && d[k].length !== value.length) {
                       if (value.constructor === Object || value.constructor === Array) {
@@ -360,8 +360,8 @@ export const tag = <TagLoader>function <Tags extends string,
                   appender(base)(DyamicElementError({error: errorValue}));
                 }
                 ap.next().then(update).catch(error);
-              } 
-              
+              }
+
               if (!isAsyncIter<unknown>(value)) {
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value)) {
@@ -370,8 +370,8 @@ export const tag = <TagLoader>function <Tags extends string,
                       console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                     d[k] = value;
                   } else {
-                    // Note - if we're copying to ourself (or an array of different length), 
-                    // we're decoupling common object references, so we need a clean object to 
+                    // Note - if we're copying to ourself (or an array of different length),
+                    // we're decoupling common object references, so we need a clean object to
                     // assign into
                     if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
                       if (value.constructor === Object || value.constructor === Array) {
@@ -407,9 +407,9 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   }
 
-  /* 
+  /*
   Extend a component class with create a new component class factory:
-      const NewDiv = Div.extended({ overrides }) 
+      const NewDiv = Div.extended({ overrides })
           ...or...
       const NewDic = Div.extended((instance:{ arbitrary-type }) => ({ overrides }))
          ...later...
@@ -425,7 +425,7 @@ export const tag = <TagLoader>function <Tags extends string,
     let staticExtensions: Overrides = overrides(staticInstance);
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
-      poStyleElt.appendChild(document.createTextNode(staticExtensions.styles));
+      poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
       if (!document.head.contains(poStyleElt)) {
         document.head.appendChild(poStyleElt);
       }
@@ -501,14 +501,14 @@ export const tag = <TagLoader>function <Tags extends string,
 
     // Attempt to make up a meaningfu;l name for this extended tag
     const creatorName = fullProto
-      && 'className' in fullProto 
-      && typeof fullProto.className === 'string' 
+      && 'className' in fullProto
+      && typeof fullProto.className === 'string'
       ? fullProto.className
       : '?';
     const callSite = DEBUG ? ' @'+(new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?') : '';
 
-    Object.defineProperty(extendTag, "name", { 
-      value: "<ai-" + creatorName.replace(/\s+/g,'-') + callSite+">" 
+    Object.defineProperty(extendTag, "name", {
+      value: "<ai-" + creatorName.replace(/\s+/g,'-') + callSite+">"
     });
 
     return extendTag;
@@ -550,7 +550,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
         // Create element
         const e = nameSpace
-          ? doc.createElementNS(nameSpace, k.toLowerCase())
+          ? doc.createElementNS(nameSpace as string, k.toLowerCase())
           : doc.createElement(k);
         e.constructor = tagCreator;
 
@@ -595,7 +595,7 @@ const DomPromiseContainer = AsyncDOMContainer.extended({
     className: 'promise'
   },
   constructed() {
-    return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG 
+    return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG
       ? new Error("Constructed").stack?.replace(/^Error: /, '')
       : undefined);
   }
@@ -613,11 +613,11 @@ const DyamicElementError = AsyncDOMContainer.extended({
     error: undefined as any
   },
   constructed(){
-    return (typeof this.error === 'object') 
-      ? this.error instanceof Error 
-        ? this.error.message 
-        : JSON.stringify(this.error) 
-      : String(this.error); 
+    return (typeof this.error === 'object')
+      ? this.error instanceof Error
+        ? this.error.message
+        : JSON.stringify(this.error)
+      : String(this.error);
   }
 });
 

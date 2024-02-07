@@ -5,8 +5,8 @@ export { ChildTags, Instance, TagCreator } from './tags';
 export * as Iterators from './iterators.js';
 type OtherMembers = {};
 interface PoElementMethods {
-    get ids(): Record<string, Element | undefined>;
-    when<S extends WhenParameters>(...what: S): WhenReturn<S>;
+    get ids(): {};
+    when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
 }
 interface TagLoader {
     /** @deprecated - Legacy function similar to Element.append/before/after */

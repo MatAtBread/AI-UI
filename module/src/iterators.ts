@@ -66,8 +66,8 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   next() {
     if (this._items!.length) {
       return Promise.resolve({ done: false, value: this._items!.shift()! });
-    } 
-    
+    }
+
     const value = deferred<IteratorYieldResult<T>>();
     // We install a catch handler as the promise might be legitimately reject before anything waits for it,
     // and this suppresses the uncaught exception warning.
@@ -190,17 +190,17 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   return b;
 }
 
-export function defineIterableProperty<T extends object, N extends string | number | symbol, V>(o: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
+export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(o: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
-  let initIterator = () => { 
+  let initIterator = () => {
     initIterator = ()=>b;
     const bi = broadcastIterator<V>();
     extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
     push = bi.push;
     const b = bi[Symbol.asyncIterator]();
-    Object.keys(asyncHelperFunctions).map(k => 
+    Object.keys(asyncHelperFunctions).map(k =>
       extras[k] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
     )
     Object.defineProperties(a, extras)
@@ -220,9 +220,9 @@ export function defineIterableProperty<T extends object, N extends string | numb
     }
   };
 
-  Object.keys(asyncHelperFunctions).map(k => 
-    extras[k as keyof typeof extras] = { 
-      enumerable: false, 
+  Object.keys(asyncHelperFunctions).map(k =>
+    extras[k as keyof typeof extras] = {
+      enumerable: false,
       writable: true,
       value: lazyAsyncMethod(k)
     }
@@ -234,7 +234,7 @@ export function defineIterableProperty<T extends object, N extends string | numb
     return push(v);
   }
 
-  let a = box(v, extras);  
+  let a = box(v, extras);
   let vi: AsyncIterator<V> | undefined;
   Object.defineProperty(o, name, {
     get(): V { return a },
@@ -261,10 +261,10 @@ export function defineIterableProperty<T extends object, N extends string | numb
           vi = undefined;
         });
         update();
-      } else 
+      } else
       */{
         a = box(v, extras);
-        push(v?.valueOf() as V);  
+        push(v?.valueOf() as V);
       }
     },
     enumerable: true
@@ -274,8 +274,8 @@ export function defineIterableProperty<T extends object, N extends string | numb
 
 function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
   if (a===null || a===undefined) {
-    return Object.create(null,{ 
-      ...pds, 
+    return Object.create(null,{
+      ...pds,
       valueOf: { value() { return a }},
       toJSON: { value() { return a }}
     });
@@ -290,7 +290,7 @@ function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
         - something else
       */
       if (!(Symbol.asyncIterator in a)) {
-        console.warn('Iterable properties of type "object" will be modified. Spread the object if necessary.');
+        console.warn('Iterable properties of type "object" will be modified. Spread the object if necessary.',a);
         return Object.defineProperties(a, pds);
       }
       return a;
@@ -302,7 +302,7 @@ function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
       return Object.defineProperties(Object.assign(a as any), {
         ...pds,
         toJSON: { value() { return a.valueOf() }}
-      }); 
+      });
   }
   throw new TypeError('Iterable properties cannot be of type "'+typeof a+'"');
 }
@@ -322,7 +322,7 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
   const merged: AsyncIterableIterator<A[number]> = {
     [Symbol.asyncIterator]() { return this },
     next() {
-      return count 
+      return count
         ? Promise.race(promises).then(({ idx, result }) => {
           if (result.done) {
             count--;
@@ -365,13 +365,13 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
 }
 
 
-/* 
+/*
   Extensions to the AsyncIterable:
   calling `bind(ai)` adds "standard" methods to the specified AsyncIterable
 */
 
 function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
-  return isAsyncIterable(i) 
+  return isAsyncIterable(i)
     && Object.keys(asyncExtras)
     .every(k => (k in i) && (i as any)[k] === asyncExtras[k as keyof AsyncIterableHelpers]);
 }
@@ -487,7 +487,7 @@ const forever = new Promise<any>(() => { });
 async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   let timer: Promise<{ debounced: number, value: U }> = forever;
-  let last = -1;
+  let last:any = -1;
   try {
     while (true) {
       const p = await Promise.race([ai.next(), timer]);

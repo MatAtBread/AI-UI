@@ -38,8 +38,9 @@
     "build-web": "webpack && webpack --config webpack.cjs.js",
     "build-web-dev": "webpack --config webpack.dev.js && webpack --config webpack.cjs-dev.js",
     "clean": "rm -rf dist/* esm/*",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "tsc --noEmit --target es2020  --moduleResolution nodenext --module nodenext  --lib DOM,DOM.Iterable,es2020 ../type_tests/*.ts"
   },
   "types": "./esm/*.d.ts",
-  "version": "0.10.4-p1"
+  "version": "0.10.5"
 }

@@ -74,13 +74,8 @@ function whenEvent(container, what) {
     return push;
 }
 async function* neverGonnaHappen() {
-    try {
-        await new Promise(() => { });
-        yield undefined; // Never should be executed
-    }
-    catch (ex) {
-        console.warn('neverGonnaHappen', ex);
-    }
+    await new Promise(() => { });
+    yield undefined; // Never should be executed
 }
 /* Syntactic sugar: chainAsync decorates the specified iterator so it can be mapped by
   a following function, or used directly as an iterable */

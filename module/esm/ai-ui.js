@@ -52,7 +52,7 @@ export const tag = function (_1, _2, _3) {
       tag(tags[])                                 [string[]]
       tag(tags[], prototypes)                     [string[], object]
       tag(namespace | null, tags[])               [string | null, string[]]
-      tag(namespace | null, tags[], prototypes)    [string | null, string[], object]
+      tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
     */
     const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
@@ -195,8 +195,8 @@ export const tag = function (_1, _2, _3) {
                                 }
                                 else {
                                     if (d[k] !== value) {
-                                        // Note - if we're copying to an array of different length 
-                                        // we're decoupling common object references, so we need a clean object to 
+                                        // Note - if we're copying to an array of different length
+                                        // we're decoupling common object references, so we need a clean object to
                                         // assign into
                                         if (Array.isArray(d[k]) && d[k].length !== value.length) {
                                             if (value.constructor === Object || value.constructor === Array) {
@@ -302,8 +302,8 @@ export const tag = function (_1, _2, _3) {
                                         d[k] = value;
                                     }
                                     else {
-                                        // Note - if we're copying to ourself (or an array of different length), 
-                                        // we're decoupling common object references, so we need a clean object to 
+                                        // Note - if we're copying to ourself (or an array of different length),
+                                        // we're decoupling common object references, so we need a clean object to
                                         // assign into
                                         if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
                                             if (value.constructor === Object || value.constructor === Array) {
@@ -358,7 +358,7 @@ export const tag = function (_1, _2, _3) {
         let staticExtensions = overrides(staticInstance);
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
-            poStyleElt.appendChild(document.createTextNode(staticExtensions.styles));
+            poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
             if (!document.head.contains(poStyleElt)) {
                 document.head.appendChild(poStyleElt);
             }

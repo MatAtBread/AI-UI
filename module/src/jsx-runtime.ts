@@ -3,11 +3,11 @@ import { ChildTags, TagCreator, tag } from "./ai-ui.js"
 /* Support for React.createElement */
 const tagCreators: { [k in keyof HTMLElementTagNameMap]?: TagCreator<HTMLElementTagNameMap[k]> } = {};
 
-export const PoJSX = <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T,...children: ChildTags[]) => 
-tagName === PoJSX 
+export const PoJSX = <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T,...children: ChildTags[]) =>
+tagName === PoJSX
     ? children
-    : (typeof tagName === 'string' 
-      ? (tagName in tagCreators ? tagCreators : Object.assign(tagCreators,tag([tagName])))[tagName] 
+    : (typeof tagName === 'string'
+      ? (tagName in tagCreators ? tagCreators : Object.assign(tagCreators,tag([tagName])))[tagName]
       : tagName)! (attrs,...children);
 
 /* Support for React 17's _jsx(tag,attrs) */
@@ -17,8 +17,8 @@ function sterilise<T extends { children?: any}>(attrs:T): Omit<T,'children'> {
    return childless;
 }
 
-export const jsx = <T extends { children?: any}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T) => 
-  tagName === jsx 
+export const jsx = <T extends { children?: any}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T) =>
+  tagName === jsx
     ? attrs.children
     : (typeof tagName === 'string' ? tag([tagName])[tagName] : tagName)(sterilise(attrs), attrs.children)
 
