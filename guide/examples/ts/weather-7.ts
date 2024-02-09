@@ -39,7 +39,7 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
     .then(obj => obj.daily)
 }
 
-/* 
+/*
   Define a "Chart" so it is like an image, but with additional attributes called `label` and `data`.
 
   When `data` is set, draw a chart for the data within the image.
@@ -81,7 +81,7 @@ const WeatherForecast = Chart.extended({
     set geo(g: GeoInfo | undefined) {
       this.style.opacity = '0.2';
       if (g) {
-        /* Note: we can't use `await` here as setters can't be generators or otherwise 
+        /* Note: we can't use `await` here as setters can't be generators or otherwise
           interrupt the execution of their caller, so we fall back to .then() */
         getWeatherForecast(g).then(forecast => {
           this.label = g.name + ', ' + g.country;

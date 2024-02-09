@@ -82,7 +82,7 @@ class QueueIteratableIterator {
                 this._pending.shift().reject(value);
             this._items = this._pending = null;
         }
-        return Promise.resolve(value);
+        return Promise.reject(value);
     }
     push(value) {
         if (!this._pending) {
@@ -370,10 +370,7 @@ async function* map(...mapper) {
         }
     }
     catch (ex) {
-        ai.throw?.(ex);
-    }
-    finally {
-        ai.return?.();
+        return ai.throw ? ai.throw(ex) : ai.return?.();
     }
 }
 async function* filter(fn) {
@@ -390,10 +387,7 @@ async function* filter(fn) {
         }
     }
     catch (ex) {
-        ai.throw?.(ex);
-    }
-    finally {
-        ai.return?.();
+        return ai.throw ? ai.throw(ex) : ai.return?.();
     }
 }
 const noUniqueValue = Symbol('noUniqueValue');
@@ -413,10 +407,7 @@ async function* unique(fn) {
         }
     }
     catch (ex) {
-        ai.throw?.(ex);
-    }
-    finally {
-        ai.return?.();
+        return ai.throw ? ai.throw(ex) : ai.return?.();
     }
 }
 async function* initially(initValue) {
@@ -441,10 +432,7 @@ async function* throttle(milliseconds) {
         }
     }
     catch (ex) {
-        ai.throw?.(ex);
-    }
-    finally {
-        ai.return?.();
+        return ai.throw ? ai.throw(ex) : ai.return?.();
     }
 }
 const forever = new Promise(() => { });
@@ -474,10 +462,7 @@ async function* debounce(milliseconds) {
         }
     }
     catch (ex) {
-        ai.throw?.(ex);
-    }
-    finally {
-        ai.return?.();
+        return ai.throw ? ai.throw(ex) : ai.return?.();
     }
 }
 async function* waitFor(cb) {
@@ -493,10 +478,7 @@ async function* waitFor(cb) {
         }
     }
     catch (ex) {
-        ai.throw?.(ex);
-    }
-    finally {
-        ai.return?.();
+        return ai.throw ? ai.throw(ex) : ai.return?.();
     }
 }
 async function* count(field) {
@@ -510,12 +492,10 @@ async function* count(field) {
             };
             yield counted;
         }
+        ai.return?.();
     }
     catch (ex) {
-        ai.throw?.(ex);
-    }
-    finally {
-        ai.return?.();
+        return ai.throw ? ai.throw(ex) : ai.return?.();
     }
 }
 function retain() {

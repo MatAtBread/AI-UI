@@ -95,7 +95,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
         this._pending.shift()!.reject(value);
       this._items = this._pending = null;
     }
-    return Promise.resolve(value);
+    return Promise.reject(value);
   }
 
   push(value: T) {
@@ -405,9 +405,7 @@ async function* map<U, R>(this: AsyncIterable<U>, ...mapper: ((o: U) => R | Prom
         yield m(p.value);
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -424,9 +422,7 @@ async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | Promis
       }
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -446,9 +442,7 @@ async function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boo
       prev = p.value;
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -475,9 +469,7 @@ async function* throttle<U>(this: AsyncIterable<U>, milliseconds: number): Async
       }
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -507,9 +499,7 @@ async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): Async
       }
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -525,9 +515,7 @@ async function* waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | Pro
       yield p.value;
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -542,10 +530,9 @@ async function* count<U extends {}, K extends string>(this: AsyncIterable<U>, fi
       }
       yield counted;
     }
-  } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
     ai.return?.();
+  } catch (ex) {
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 

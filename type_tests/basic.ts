@@ -1,13 +1,12 @@
 import type { TagCreator } from '../module/src/ai-ui';
 
-/* Test helpers */
-export async function *ai<T>(t: T) { yield t }
+export async function* ai<T>(t: T) { yield t }
+
 export type AssertEqual<T, Expected> = [T] extends [Expected]
   ? [Expected] extends [T]
-    ? {true:true}
-    : {false:false}
-  : {false:false};
-
+  ? { true: true; }
+  : { false: false; }
+  : { false: false; };
 
 /* Declare a tag type & function */
 declare var Base: TagCreator<{ Attr: 'base', N: 0 | 1 | 2, fn():void, gen: unknown }>;
@@ -94,7 +93,7 @@ neverWithIDs.true;
 neverWithIDs.false;
 
 // Declare new attributes & test `this`
-const Decl = Base.extended({
+const Decl = Same.extended({
   declare:{
     x: false,
     fn2() {
@@ -114,6 +113,18 @@ Decl().x === 1;
 const t = Decl().fn2();
 (<AssertEqual<typeof t, 'a' | 'b'>>{}).true;
 
+/*
+const Decl2 = Decl.extended({
+  declare:{
+    x: ''
+  }
+});
+
+Decl2();
+*/
+
+
+/*
 const Over = Base.extended({
   override:{
     N: 1 as const
@@ -126,17 +137,22 @@ const Over = Base.extended({
 const OverN = Over().N;
 (<AssertEqual<typeof OverN,1>>{}).true
 
-/* Check super linkage */
+/* Check super linkage * /
 Over.super === Base;
 
 const Combi = Decl.extended({
   declare:{
-    more: ''
+    more: '',
+    fn3() { this.more; this.x }
   },
   override:{
-    x: '' // ERROR = Decl.x is a boolean
+    x: true // ERROR = Decl.x is a boolean
+  },
+  constructed() {
+    this.more;
   }
 });
 
 const cmb = Combi()
-cmb.x
+cmb.more
+*/

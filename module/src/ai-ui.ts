@@ -605,19 +605,23 @@ const DyamicElementError = AsyncDOMContainer.extended({
   ai-ui-container.error {
     display: block;
     color: #b33;
+    white-space: pre;
   }`,
   override: {
     className: 'error'
   },
   declare: {
-    error: undefined as any
+    error: undefined as unknown as Error | IteratorResult<Error,Error>
   },
   constructed(){
-    return (typeof this.error === 'object')
-      ? this.error instanceof Error
-        ? this.error.message
-        : JSON.stringify(this.error)
-      : String(this.error);
+    if (!this.error)
+      return "Error";
+
+    if (this.error instanceof Error)
+      return this.error.stack;
+    if ('value' in this.error && this.error.value instanceof Error)
+      return this.error.value.stack;
+    return this.error.toString();
   }
 });
 

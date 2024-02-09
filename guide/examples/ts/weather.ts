@@ -39,9 +39,9 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
     .then(obj => obj.daily)
 }
 
-/* 
+/*
   Define a "Chart" so it is like an image, but with additional attributes called `label`,
-  `xData` and `yData`. 
+  `xData` and `yData`.
 
   When these are all set, draw a chart for the data within the image.
   Use opacity to indicate we're loading
@@ -106,8 +106,8 @@ const App = div.extended({
   time.
 
   Note, the `ids` member will appear in the transpiled .js file, but in fact are unused at
-  run-time, the declarations merely serve to inform Typescript which ids are which 
-  types 
+  run-time, the declarations merely serve to inform Typescript which ids are which
+  types
   */
   ids:{
     weather: Chart,
@@ -115,8 +115,8 @@ const App = div.extended({
   },
   async constructed() {
     /* When we're constructed, create a Location element and a Chart element.
-      We also keep a reference to tha thing we're creating as we're using it in 
-      am event handler. This is the common way to do this in DOM code, but is better 
+      We also keep a reference to tha thing we're creating as we're using it in
+      am event handler. This is the common way to do this in DOM code, but is better
       handled using `when`.
     */
 
@@ -128,24 +128,24 @@ const App = div.extended({
             fires), however AI-UI provides the `when` mechanism to make this much
             simpler and cleaner way, avoiding things like requiring the `app` closure
             which is needed as `this` is hidden by the event handler definition.
-            
-            However, being just normal DOM elements, we choose to do it the "obvious" way 
+
+            However, being just normal DOM elements, we choose to do it the "obvious" way
             in order introduce new concepts in the appropriate places.
-            
+
             See https://github.com/MatAtBread/AI-UI/blob/main/guide/when.md
           */
           try {
             /* Here we use the `ids` member directly, and VSCode knows that the
             child of the app called `location` is a Location.
 
-            Note that although the type of the child is known, the element might not actually 
-            exist in the DOM, so we use the non-null assertion operator (!) as we know (as 
+            Note that although the type of the child is known, the element might not actually
+            exist in the DOM, so we use the non-null assertion operator (!) as we know (as
             opposed to testing at run-time) it exists in the case.
             */
             const geo = await getGeoInfo(this.ids.location!.value);
             const forecast = await getWeatherForecast(geo.results[0]);
 
-            
+
             /* Similarly, `weather` is a Chart */
 
             this.ids.weather!.label = geo.results[0].name + ', ' + geo.results[0].country;

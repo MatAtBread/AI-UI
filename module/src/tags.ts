@@ -36,16 +36,6 @@ type IDS<I> = {
   }
 }
 
-export type Overrides = {
-  /** @deprecated */ prototype?: object; // Defaults for exitsting properties
-  override?: object;
-  iterable?: object;  // New 'hot' properties
-  declare?: object;   // New properties
-  ids?: { [id: string]: TagCreator<any, any>; };  // Descendant element types
-  styles?: string;
-  constructed?: () => (ChildTags | void | Promise<void>);
-};
-
 // Like GlobalEventHandlers, but with `this` removed
 // Commented section was fixed add/removeEventListener, but causes issues elsewmhere
 type UntypedEventHandlers = {
@@ -81,11 +71,14 @@ type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
-type Flatten<O> = [{
+export type Flatten<O> = [{
   [K in keyof O]: O[K]
 }][number];
 
-type PrettyFlatten<Src extends Others, Others = HTMLElement> = Flatten<Omit<Src, keyof Others>> & Pick<Src, keyof Others>;
+type FlattenOthers<Src, Others = HTMLElement> =
+  Src extends Partial<Others>
+  ? Flatten<Omit<Src, keyof Partial<Others>>> & Pick<Src, keyof Partial<Others>>
+  : Flatten<Src>
 
 type Extends<A, B> =
   A extends any[]
@@ -136,10 +129,12 @@ type IterableProperties<IP> = {
 
 type NeverEmpty<O extends RootObj> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
+type PickType<T, V> = [{ [K in keyof T as T[K] extends V ? K : never]: T[K] }][number]
+
 // For informative purposes - unused in practice
 interface _Not_Declared_ { }
 interface _Not_Array_ { }
-type ExcessKeys<A extends RootObj, B extends RootObj> =
+type ExcessKeys<A, B> =
   A extends any[]
   ? B extends any[]
   ? ExcessKeys<A[number], B[number]>
@@ -148,7 +143,7 @@ type ExcessKeys<A extends RootObj, B extends RootObj> =
   ? _Not_Array_
   : NeverEmpty<OmitType<{
     [K in keyof A]: K extends keyof B
-    ? A[K] extends Partial<B[K]>
+    ? A[K] extends (B[K] extends Function ? B[K] : DeepPartial<B[K]>)
     ? never : B[K]
     : _Not_Declared_
   }, never>>
@@ -157,22 +152,22 @@ type OverlappingKeys<A,B> = B extends never ? never
   : A extends never ? never
   : keyof A & keyof B;
 
-type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends object, D, IP, Base extends object, CET extends object>
+type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP, CET extends object>
   = (OverlappingKeys<O,D>
     | OverlappingKeys<IP,D>
     | OverlappingKeys<IP,O>
-    | OverlappingKeys<IP,Base>
-    | OverlappingKeys<D,Base>
+    | OverlappingKeys<IP,TagCreatorAttributes<BaseCreator>>
+    | OverlappingKeys<D,TagCreatorAttributes<BaseCreator>>
     | OverlappingKeys<D,P>
     | OverlappingKeys<O,P>
     | OverlappingKeys<IP,P>
-  ) extends never ?
-  ExcessKeys<O, Base> extends never ?
-  TagCreator<CET & IterableProperties<IP>, BaseCreator> & StaticMembers<P & O & D, Base>
-  : { '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, Base> }
+  ) extends never
+  ? ExcessKeys<O, TagCreatorAttributes<BaseCreator>> extends never
+    ? never
+    : { '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, TagCreatorAttributes<BaseCreator>> }
   : OmitType<{
-    '`declare` clashes with base properties': OverlappingKeys<D,Base>,
-    '`iterable` clashes with base properties': OverlappingKeys<IP,Base>,
+    '`declare` clashes with base properties': OverlappingKeys<D,TagCreatorAttributes<BaseCreator>>,
+    '`iterable` clashes with base properties': OverlappingKeys<IP,TagCreatorAttributes<BaseCreator>>,
     '`iterable` clashes with `override`': OverlappingKeys<IP,O>,
     '`iterable` clashes with `declare`': OverlappingKeys<IP,D>,
     '`override` clashes with `declare`': OverlappingKeys<O,D>,
@@ -181,18 +176,26 @@ type ExtendedReturn<BaseCreator extends TagCreator<any, any, any>, P, O extends 
     '`prototype` (deprecated) clashes with `iterable`': OverlappingKeys<IP,P>
   }, never>
 
-type ExtensionDefinition<// Combined Effective Type of this extended tag
-  CTT, // styles (string)
-  P extends RootObj, // prototype (deprecated, but can be used to extend a single property type in a union)
-  O extends RootObj, // overrides - same types as Base, or omitted
-  D extends RootObj, // ids - tagCreators
+type ExtensionDefinition<
+  // prototype (deprecated, but can be used to extend a single property type in a union)
+  P extends RootObj,
+  // overrides - same types as Base, or omitted
+  O extends RootObj,
+  // declare - any types
+  D extends RootObj,
+  // Iterable properties
   IP extends {
     [k: string]: string | number | bigint | boolean | /* object | */ undefined;
-  }, // declare - any types
+  },
+  // ids - tagCreators
   I extends {
     [idExt: string]: TagCreator<any, any>;
-  }, C extends () => (ChildTags | void | Promise<void | ChildTags>), // constructed()
-  S extends string | undefined> = ThisType<CTT> & {
+  },
+  // constructed()
+  C extends () => (ChildTags | void | Promise<void | ChildTags>),
+  // styles (string)
+  S extends string | undefined
+  > = {
     /** @deprecated */ prototype?: P;
     override?: O;
     declare?: D;
@@ -201,6 +204,16 @@ type ExtensionDefinition<// Combined Effective Type of this extended tag
     constructed?: C;
     styles?: S;
   };
+
+  // The base, generic extension definition, used by ai-ui
+  export type Overrides = ExtensionDefinition<
+    object,object,object,
+    { [k: string]: string | number | bigint | boolean | /* object | */ undefined },
+    { [id: string]: TagCreator<any, any>; },
+    () => (ChildTags | void | Promise<void | ChildTags>),
+    string>;
+
+  export type TagCreatorAttributes<T extends TagCreator<any,any>> = T extends TagCreator<infer B,any> ? B:never;
 
 interface ExtendedTag {
   <
@@ -220,34 +233,40 @@ interface ExtendedTag {
     I extends { [idExt: string]: TagCreator<any, any> } = {},
     // iterable properties - primitives (will be boxed)
     IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {},
-    // Base inferred from this<baseTagCreator>.extended
-    Base extends RootObj = BaseCreator extends TagCreator<infer B, any> ? B : never,
     // Combined Effective Type of this extended tag
-    CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P & O, Base>,
+    CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>,
     // Combined ThisType
-    CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, Base>>
-  >(this: BaseCreator, _: ExtensionDefinition<CTT, P, O, D, IP, I, C, S> | ((instance: any) => ExtensionDefinition<CTT, P, O, D, IP, I, C, S>))
-    : ExtendedReturn<BaseCreator, P, O, D, IP, Base, CET>;
+    CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>
+  >(this: BaseCreator, _:
+    ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>
+    | ((instance: any) => ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)
+  ) : CheckPropertyClashes<BaseCreator, P, O, D, IP, CET> extends never
+      ? TagCreator<
+      FlattenOthers<CET & IterableProperties<IP>>,
+      BaseCreator,
+      // Static members attached to the tag creator
+      PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
+    >
+      : CheckPropertyClashes<BaseCreator, P, O, D, IP, CET>
 }
 
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
-export interface TagCreator<Base extends RootObj,
-  Super extends (never | TagCreator<any, any>) = never,
-  TypedBase = ReTypedEventHandlers<Base>
-> {
-  /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
-    The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
-  */
-  (...args: TagCreatorArgs<PossiblyAsync<TypedBase> & ThisType<TypedBase>>): TypedBase //& { constructor: TagCreator<Base,Super,TypedBase> }
+/* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
+  The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
+*/
+type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
 
+/* A TagCreator is TagCreatorFunction decorated with some extra methods */
+export type TagCreator<Base extends RootObj,
+  Super extends (never | TagCreator<any, any>) = never,
+  Statics = {}
+> = TagCreatorFunction<Base> & {
   /* It can also be extended */
-  extended: ExtendedTag;
+  extended: ExtendedTag
   /* It is based on a "super" TagCreator */
   super: Super
   /* It has a function that exposes the differences between the tags it creates and its super */
   overrides?: (<A extends Instance>(a: A) => Overrides); /* null for base tags */
-
   /* It has a name (set to a class or definition location), which is helpful when debugging */
   readonly name: string;
-};
-
+} & Statics;
