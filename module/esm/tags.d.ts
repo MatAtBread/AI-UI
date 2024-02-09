@@ -41,6 +41,9 @@ type NeverEmpty<O extends RootObj> = {} extends O ? never : O;
 type OmitType<T, V> = [{
     [K in keyof T as T[K] extends V ? never : K]: T[K];
 }][number];
+type PickType<T, V> = [{
+    [K in keyof T as T[K] extends V ? K : never]: T[K];
+}][number];
 interface _Not_Declared_ {
 }
 interface _Not_Array_ {
@@ -49,7 +52,7 @@ type ExcessKeys<A, B> = A extends any[] ? B extends any[] ? ExcessKeys<A[number]
     [K in keyof A]: K extends keyof B ? A[K] extends (B[K] extends Function ? B[K] : DeepPartial<B[K]>) ? never : B[K] : _Not_Declared_;
 }, never>>;
 type OverlappingKeys<A, B> = B extends never ? never : A extends never ? never : keyof A & keyof B;
-type ExtendedReturn<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP, CET extends object> = (OverlappingKeys<O, D> | OverlappingKeys<IP, D> | OverlappingKeys<IP, O> | OverlappingKeys<IP, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, P> | OverlappingKeys<O, P> | OverlappingKeys<IP, P>) extends never ? ExcessKeys<O, TagCreatorAttributes<BaseCreator>> extends never ? TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator> : {
+type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP, CET extends object> = (OverlappingKeys<O, D> | OverlappingKeys<IP, D> | OverlappingKeys<IP, O> | OverlappingKeys<IP, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, P> | OverlappingKeys<O, P> | OverlappingKeys<IP, P>) extends never ? ExcessKeys<O, TagCreatorAttributes<BaseCreator>> extends never ? never : {
     '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, TagCreatorAttributes<BaseCreator>>;
 } : OmitType<{
     '`declare` clashes with base properties': OverlappingKeys<D, TagCreatorAttributes<BaseCreator>>;
@@ -85,14 +88,14 @@ interface ExtendedTag {
         [idExt: string]: TagCreator<any, any>;
     } = {}, IP extends {
         [k: string]: string | number | bigint | boolean | /* object | */ undefined;
-    } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>) | ((instance: any) => ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)): ExtendedReturn<BaseCreator, P, O, D, IP, CET>;
+    } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>) | ((instance: any) => ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)): CheckPropertyClashes<BaseCreator, P, O, D, IP, CET> extends never ? TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>> : CheckPropertyClashes<BaseCreator, P, O, D, IP, CET>;
 }
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
-export type TagCreator<Base extends RootObj, Super extends (never | TagCreator<any, any>) = never> = {
-    (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>): ReTypedEventHandlers<Base>;
+type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+export type TagCreator<Base extends RootObj, Super extends (never | TagCreator<any, any>) = never, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;
     super: Super;
     overrides?: (<A extends Instance>(a: A) => Overrides);
     readonly name: string;
-};
+} & Statics;
 export {};
