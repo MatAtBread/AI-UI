@@ -152,7 +152,7 @@ type OverlappingKeys<A,B> = B extends never ? never
   : A extends never ? never
   : keyof A & keyof B;
 
-type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP, CET extends object>
+type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP>
   = (OverlappingKeys<O,D>
     | OverlappingKeys<IP,D>
     | OverlappingKeys<IP,O>
@@ -217,6 +217,38 @@ type ExtensionDefinition<
 
 interface ExtendedTag {
   <
+      // `this` in this.extended(...)
+      BaseCreator extends TagCreator<any, any>,
+      // constructed()
+      C extends () => (ChildTags | void | Promise<void | ChildTags>),
+      // styles (string)
+      S extends string | undefined,
+      // prototype (deprecated, but can be used to extend a single property type in a union)
+      P extends RootObj = {},
+      // overrides - same types as Base, or omitted
+      O extends RootObj = {},
+      // declare - any types
+      D extends RootObj = {},
+      // ids - tagCreators
+      I extends { [idExt: string]: TagCreator<any, any> } = {},
+      // iterable properties - primitives (will be boxed)
+      IP extends { [k: string]: string | number | bigint | boolean | /* object | */ undefined } = {},
+      // Combined Effective Type of this extended tag
+      CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>,
+      // Combined ThisType
+      CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>
+    >(this: BaseCreator, _:
+      ((instance: any) => (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>))
+    ) : CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never
+        ? TagCreator<
+        FlattenOthers<CET & IterableProperties<IP>>,
+        BaseCreator,
+        // Static members attached to the tag creator
+        PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
+      >
+        : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
+
+  <
     // `this` in this.extended(...)
     BaseCreator extends TagCreator<any, any>,
     // constructed()
@@ -237,17 +269,15 @@ interface ExtendedTag {
     CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>,
     // Combined ThisType
     CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>
-  >(this: BaseCreator, _:
-    ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>
-    | ((instance: any) => ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)
-  ) : CheckPropertyClashes<BaseCreator, P, O, D, IP, CET> extends never
+  >(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)
+  : CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never
       ? TagCreator<
       FlattenOthers<CET & IterableProperties<IP>>,
       BaseCreator,
       // Static members attached to the tag creator
       PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
     >
-      : CheckPropertyClashes<BaseCreator, P, O, D, IP, CET>
+      : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
 }
 
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];

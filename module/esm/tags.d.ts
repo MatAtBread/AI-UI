@@ -52,7 +52,7 @@ type ExcessKeys<A, B> = A extends any[] ? B extends any[] ? ExcessKeys<A[number]
     [K in keyof A]: K extends keyof B ? A[K] extends (B[K] extends Function ? B[K] : DeepPartial<B[K]>) ? never : B[K] : _Not_Declared_;
 }, never>>;
 type OverlappingKeys<A, B> = B extends never ? never : A extends never ? never : keyof A & keyof B;
-type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP, CET extends object> = (OverlappingKeys<O, D> | OverlappingKeys<IP, D> | OverlappingKeys<IP, O> | OverlappingKeys<IP, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, P> | OverlappingKeys<O, P> | OverlappingKeys<IP, P>) extends never ? ExcessKeys<O, TagCreatorAttributes<BaseCreator>> extends never ? never : {
+type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP> = (OverlappingKeys<O, D> | OverlappingKeys<IP, D> | OverlappingKeys<IP, O> | OverlappingKeys<IP, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, P> | OverlappingKeys<O, P> | OverlappingKeys<IP, P>) extends never ? ExcessKeys<O, TagCreatorAttributes<BaseCreator>> extends never ? never : {
     '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, TagCreatorAttributes<BaseCreator>>;
 } : OmitType<{
     '`declare` clashes with base properties': OverlappingKeys<D, TagCreatorAttributes<BaseCreator>>;
@@ -88,7 +88,12 @@ interface ExtendedTag {
         [idExt: string]: TagCreator<any, any>;
     } = {}, IP extends {
         [k: string]: string | number | bigint | boolean | /* object | */ undefined;
-    } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>) | ((instance: any) => ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)): CheckPropertyClashes<BaseCreator, P, O, D, IP, CET> extends never ? TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>> : CheckPropertyClashes<BaseCreator, P, O, D, IP, CET>;
+    } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ((instance: any) => (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>))): CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never ? TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>> : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
+    <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void | ChildTags>), S extends string | undefined, P extends RootObj = {}, O extends RootObj = {}, D extends RootObj = {}, I extends {
+        [idExt: string]: TagCreator<any, any>;
+    } = {}, IP extends {
+        [k: string]: string | number | bigint | boolean | /* object | */ undefined;
+    } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>): CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never ? TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>> : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
 }
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
 type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
