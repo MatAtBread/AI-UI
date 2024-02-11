@@ -311,7 +311,18 @@ export const tag = <TagLoader>function <Tags extends string,
       (function assign(d: any, s: any): void {
         if (s === null || s === undefined || typeof s !== 'object')
           return;
-        for (const [k, srcDesc] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
+        // static props before getters/setters
+        const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
+        sourceEntries.sort((a,b) => {
+          const desc = Object.getOwnPropertyDescriptor(d,a[0]);
+          if (desc) {
+            if ('value' in desc) return -1;
+            if ('set' in desc) return 1;
+            if ('get' in desc) return 0.5;
+          }
+          return 0;
+        });
+        for (const [k, srcDesc] of sourceEntries) {
           try {
             if ('value' in srcDesc) {
               const value = srcDesc.value;
