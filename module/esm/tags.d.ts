@@ -37,6 +37,9 @@ type MergeBaseTypes<T, Base> = {
 type IterableProperties<IP> = {
     [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
 };
+type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & {
+    length?: never;
+};
 type NeverEmpty<O extends RootObj> = {} extends O ? never : O;
 type OmitType<T, V> = [{
     [K in keyof T as T[K] extends V ? never : K]: T[K];
@@ -65,7 +68,7 @@ type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends
     '`prototype` (deprecated) clashes with `iterable`': OverlappingKeys<IP, P>;
 }, never>;
 type ExtensionDefinition<P extends RootObj, O extends RootObj, D extends RootObj, IP extends {
-    [k: string]: string | number | bigint | boolean | /* object | */ undefined;
+    [k: string]: IterablePropertyValue;
 }, I extends {
     [idExt: string]: TagCreator<any, any>;
 }, C extends () => (ChildTags | void | Promise<void | ChildTags>), S extends string | undefined> = {
@@ -78,7 +81,7 @@ type ExtensionDefinition<P extends RootObj, O extends RootObj, D extends RootObj
     styles?: S;
 };
 export type Overrides = ExtensionDefinition<object, object, object, {
-    [k: string]: string | number | bigint | boolean | /* object | */ undefined;
+    [k: string]: IterablePropertyValue;
 }, {
     [id: string]: TagCreator<any, any>;
 }, () => (ChildTags | void | Promise<void | ChildTags>), string>;
@@ -87,12 +90,12 @@ interface ExtendedTag {
     <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void | ChildTags>), S extends string | undefined, P extends RootObj = {}, O extends RootObj = {}, D extends RootObj = {}, I extends {
         [idExt: string]: TagCreator<any, any>;
     } = {}, IP extends {
-        [k: string]: string | number | bigint | boolean | /* object | */ undefined;
+        [k: string]: IterablePropertyValue;
     } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ((instance: any) => (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>))): CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never ? TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>> : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
     <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void | ChildTags>), S extends string | undefined, P extends RootObj = {}, O extends RootObj = {}, D extends RootObj = {}, I extends {
         [idExt: string]: TagCreator<any, any>;
     } = {}, IP extends {
-        [k: string]: string | number | bigint | boolean | /* object | */ undefined;
+        [k: string]: IterablePropertyValue;
     } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>): CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never ? TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>> : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
 }
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];

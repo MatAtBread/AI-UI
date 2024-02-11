@@ -1,3 +1,4 @@
+import { DEBUG } from "./debug.js";
 import { DeferredPromise, deferred } from "./deferred.js";
 
 /* Things to suppliement the JS base AsyncIterable */
@@ -190,18 +191,18 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   return b;
 }
 
-export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(o: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
+export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
   let initIterator = () => {
-    initIterator = ()=>b;
+    initIterator = ()=> b;
     const bi = broadcastIterator<V>();
     extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
     push = bi.push;
     const b = bi[Symbol.asyncIterator]();
     Object.keys(asyncHelperFunctions).map(k =>
-      extras[k] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
+      extras[k as keyof typeof extras] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
     )
     Object.defineProperties(a, extras)
     return b;
@@ -213,12 +214,12 @@ export function defineIterableProperty<T extends {}, N extends string | number |
     return a[method].call(this,...args);
   }
 
-  const extras: Record<string | symbol, PropertyDescriptor> = {
+  const extras: Record<keyof typeof asyncHelperFunctions | typeof Symbol.asyncIterator, PropertyDescriptor> = {
     [Symbol.asyncIterator]: {
       enumerable: false, writable: true,
       value: initIterator
     }
-  };
+  } as Record<keyof typeof asyncHelperFunctions | typeof Symbol.asyncIterator, PropertyDescriptor>;
 
   Object.keys(asyncHelperFunctions).map(k =>
     extras[k as keyof typeof extras] = {
@@ -230,49 +231,24 @@ export function defineIterableProperty<T extends {}, N extends string | number |
 
   // Lazily initialize `push`
   let push: BroadcastIterator<V>['push'] = (v:V) => {
-    initIterator(); // Updates `push` to reference the broadvaster
+    initIterator(); // Updates `push` to reference the broadcaster
     return push(v);
   }
 
   let a = box(v, extras);
-  let vi: AsyncIterator<V> | undefined;
-  Object.defineProperty(o, name, {
+
+  Object.defineProperty(obj, name, {
     get(): V { return a },
     set(v: V) {
-      /*
-      Potential code to allow setting of an iterable property from another iterator
-      ** It doesn't work as it is asynchronously recursive **
-      if (isAsyncIter(v)) {
-        if (vi) {
-          vi.return?.();
-        }
-        vi = asyncIterator(v) as AsyncIterator<V>;
-        const update = () => vi!.next().then(es => {
-          if (es.done) {
-            vi = undefined;
-          } else {
-            a = box(es.value, extras);
-            push(es.value?.valueOf() as V);
-            update();
-          }
-        }).catch(ex => {
-          console.log(ex);
-          //vi!.throw?.(ex);
-          vi = undefined;
-        });
-        update();
-      } else
-      */{
-        a = box(v, extras);
-        push(v?.valueOf() as V);
-      }
+      a = box(v, extras);
+      push(v?.valueOf() as V);
     },
     enumerable: true
   });
-  return o as any;
+  return obj as any;
 }
 
-function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
+function box(a: unknown, pds: Record<string | symbol, PropertyDescriptor>) {
   if (a===null || a===undefined) {
     return Object.create(null,{
       ...pds,
@@ -290,8 +266,9 @@ function box(a: any, pds: Record<string | symbol, PropertyDescriptor>) {
         - something else
       */
       if (!(Symbol.asyncIterator in a)) {
-        console.warn('Iterable properties of type "object" will be modified. Spread the object if necessary.',a);
-        return Object.defineProperties(a, pds);
+        if (DEBUG)
+          console.warn('Iterable properties of type "object" will be spread to prevent re-initialisation.',a);
+        return Object.defineProperties({...a}, pds);
       }
       return a;
     case 'bigint':

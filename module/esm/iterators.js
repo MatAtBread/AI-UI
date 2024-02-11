@@ -1,3 +1,4 @@
+import { DEBUG } from "./debug.js";
 import { deferred } from "./deferred.js";
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
@@ -176,7 +177,7 @@ export function broadcastIterator(stop = () => { }) {
     });
     return b;
 }
-export function defineIterableProperty(o, name, v) {
+export function defineIterableProperty(obj, name, v) {
     // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
     // access the iterator methods to prevent leaks where an iterable is created, but
     // never referenced, and therefore cannot be consumed and ultimately closed
@@ -208,45 +209,19 @@ export function defineIterableProperty(o, name, v) {
     });
     // Lazily initialize `push`
     let push = (v) => {
-        initIterator(); // Updates `push` to reference the broadvaster
+        initIterator(); // Updates `push` to reference the broadcaster
         return push(v);
     };
     let a = box(v, extras);
-    let vi;
-    Object.defineProperty(o, name, {
+    Object.defineProperty(obj, name, {
         get() { return a; },
         set(v) {
-            /*
-            Potential code to allow setting of an iterable property from another iterator
-            ** It doesn't work as it is asynchronously recursive **
-            if (isAsyncIter(v)) {
-              if (vi) {
-                vi.return?.();
-              }
-              vi = asyncIterator(v) as AsyncIterator<V>;
-              const update = () => vi!.next().then(es => {
-                if (es.done) {
-                  vi = undefined;
-                } else {
-                  a = box(es.value, extras);
-                  push(es.value?.valueOf() as V);
-                  update();
-                }
-              }).catch(ex => {
-                console.log(ex);
-                //vi!.throw?.(ex);
-                vi = undefined;
-              });
-              update();
-            } else
-            */ {
-                a = box(v, extras);
-                push(v?.valueOf());
-            }
+            a = box(v, extras);
+            push(v?.valueOf());
         },
         enumerable: true
     });
-    return o;
+    return obj;
 }
 function box(a, pds) {
     if (a === null || a === undefined) {
@@ -266,8 +241,9 @@ function box(a, pds) {
               - something else
             */
             if (!(Symbol.asyncIterator in a)) {
-                console.warn('Iterable properties of type "object" will be modified. Spread the object if necessary.', a);
-                return Object.defineProperties(a, pds);
+                if (DEBUG)
+                    console.warn('Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
+                return Object.defineProperties({ ...a }, pds);
             }
             return a;
         case 'bigint':
