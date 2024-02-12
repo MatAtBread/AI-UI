@@ -67,7 +67,7 @@ class QueueIteratableIterator {
             }
             catch (ex) { }
             while (this._pending.length)
-                this._pending.shift().reject(value);
+                this._pending.shift().resolve(value);
             this._items = this._pending = null;
         }
         return Promise.resolve(value);
@@ -273,7 +273,9 @@ export const merge = (...ai) => {
                         count--;
                         promises[idx] = forever;
                         results[idx] = result.value;
-                        return { done: count === 0, value: result.value };
+                        // We don't yield intermediate return values, we just keep them in results
+                        // return { done: count === 0, value: result.value }
+                        return this.next();
                     }
                     else {
                         // `ex` is the underlying async iteration exception
@@ -285,26 +287,26 @@ export const merge = (...ai) => {
                 })
                 : Promise.reject({ done: true, value: new Error("Iterator merge complete") });
         },
-        return() {
+        async return() {
             const ex = new Error("Merge terminated");
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    it[i].return?.({ done: true, value: ex }); // Terminate the sources with the appropriate cause
+                    results[i] = await it[i].return?.({ done: true, value: ex }).then(v => v.value, ex => ex);
                 }
             }
-            return Promise.resolve({ done: true, value: ex });
+            return { done: true, value: results };
         },
-        throw(ex) {
+        async throw(ex) {
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    it[i].throw?.(ex); // Terminate the sources with the appropriate cause
+                    results[i] = await it[i].throw?.(ex).then(v => v.value, ex => ex);
                 }
             }
             // Because we've passed the exception on to all the sources, we're now done
             // previously: return Promise.reject(ex);
-            return Promise.resolve({ done: true, value: ex });
+            return { done: true, value: results };
         }
     };
     return iterableHelpers(merged);
@@ -328,7 +330,6 @@ export function iterableHelpers(ai) {
 export function generatorHelpers(g) {
     // @ts-ignore: TS type madness
     return function (...args) {
-        // @ts-ignore: TS type madness
         return iterableHelpers(g(...args));
     };
 }

@@ -100,7 +100,7 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
         if (!document.body.contains(container)) {
           const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
           observations.delete(o);
-          push[Symbol.asyncIterator]().throw?.(new Error(msg));
+          push[Symbol.asyncIterator]().return?.(new Error(msg));
         } else {
           if (ev.target instanceof Node) {
             if (selector) {

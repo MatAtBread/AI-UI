@@ -54,7 +54,7 @@ export const asyncExtras = {
 };
 
 class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
-  private _pending = [] as DeferredPromise<IteratorYieldResult<T>>[] | null;
+  private _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
   private _items = [] as T[] | null;
 
   constructor(private readonly stop = () => { }) {
@@ -69,7 +69,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
       return Promise.resolve({ done: false, value: this._items!.shift()! });
     }
 
-    const value = deferred<IteratorYieldResult<T>>();
+    const value = deferred<IteratorResult<T>>();
     // We install a catch handler as the promise might be legitimately reject before anything waits for it,
     // and this suppresses the uncaught exception warning.
     value.catch(ex => {});
@@ -82,7 +82,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
     if (this._pending) {
       try { this.stop() } catch (ex) { }
       while(this._pending.length)
-        this._pending.shift()!.reject(value);
+        this._pending.shift()!.resolve(value);
         this._items = this._pending = null;
       }
     return Promise.resolve(value);
@@ -305,7 +305,9 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
             count--;
             promises[idx] = forever;
             results[idx] = result.value;
-            return { done: count === 0, value: result.value }
+            // We don't yield intermediate return values, we just keep them in results
+            // return { done: count === 0, value: result.value }
+            return this.next();
           } else {
             // `ex` is the underlying async iteration exception
             promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
@@ -316,26 +318,26 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
         })
       : Promise.reject({ done: true as const, value: new Error("Iterator merge complete") });
     },
-    return() {
+    async return() {
       const ex = new Error("Merge terminated");
       for (let i = 0; i < it.length; i++) {
         if (promises[i] !== forever) {
           promises[i] = forever;
-          it[i].return?.({ done: true, value: ex }); // Terminate the sources with the appropriate cause
+          results[i] = await it[i].return?.({ done: true, value: ex }).then(v => v.value, ex => ex);
         }
       }
-      return Promise.resolve({ done: true, value: ex });
+      return { done: true, value: results };
     },
-    throw(ex: any) {
+    async throw(ex: any) {
       for (let i = 0; i < it.length; i++) {
         if (promises[i] !== forever) {
           promises[i] = forever;
-          it[i].throw?.(ex); // Terminate the sources with the appropriate cause
+          results[i] = await it[i].throw?.(ex).then(v => v.value, ex => ex);
         }
       }
       // Because we've passed the exception on to all the sources, we're now done
-              // previously: return Promise.reject(ex);
-      return Promise.resolve({ done: true, value: ex });
+      // previously: return Promise.reject(ex);
+      return { done: true, value: results };
     }
   };
   return iterableHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
@@ -354,17 +356,17 @@ function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
 }
 
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
-export function iterableHelpers<A extends AsyncIterable<any>>(ai: A) {
+export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never) {
   if (!isExtraIterable(ai)) {
     Object.assign(ai, asyncExtras);
   }
   return ai as A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never)
 }
 
-export function generatorHelpers<G extends (...args: A)=>AsyncGenerator<G1,G2,G3>, A extends any[], G1,G2,G3>(g:G): (...args: A)=>AsyncGenerator<G1,G2,G3> & AsyncExtraIterable<G1>{
+export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G)
+  : (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never) {
   // @ts-ignore: TS type madness
   return function(...args:A) {
-    // @ts-ignore: TS type madness
     return iterableHelpers(g(...args))
   }
 }

@@ -117,8 +117,11 @@ export const tag = function (_1, _2, _3) {
                 const update = (es) => {
                     if (!es.done) {
                         const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
-                        if (!n.length || !n[0].parentNode)
-                            throw new Error("Element(s) no longer exist in document" + insertionStack);
+                        if (!n.length || !n[0].parentNode) {
+                            // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                            error(new Error("Element(s) no longer exist in document" + insertionStack));
+                            return;
+                        }
                         t = appender(n[0].parentNode, n[0])(unbox(es.value) ?? DomPromiseContainer());
                         n.forEach(e => e.parentNode?.removeChild(e));
                         ap.next().then(update).catch(error);

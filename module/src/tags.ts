@@ -154,7 +154,7 @@ type OverlappingKeys<A,B> = B extends never ? never
   : A extends never ? never
   : keyof A & keyof B;
 
-type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP>
+type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP, Result = never>
   = (OverlappingKeys<O,D>
     | OverlappingKeys<IP,D>
     | OverlappingKeys<IP,O>
@@ -165,7 +165,7 @@ type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends
     | OverlappingKeys<IP,P>
   ) extends never
   ? ExcessKeys<O, TagCreatorAttributes<BaseCreator>> extends never
-    ? never
+    ? Result
     : { '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, TagCreatorAttributes<BaseCreator>> }
   : OmitType<{
     '`declare` clashes with base properties': OverlappingKeys<D,TagCreatorAttributes<BaseCreator>>,
@@ -241,14 +241,15 @@ interface ExtendedTag {
       CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>
     >(this: BaseCreator, _:
       ((instance: any) => (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>))
-    ) : CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never
-        ? TagCreator<
+    )
+    : CheckPropertyClashes<BaseCreator, P, O, D, IP,
+      TagCreator<
         FlattenOthers<CET & IterableProperties<IP>>,
         BaseCreator,
         // Static members attached to the tag creator
         PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
       >
-        : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
+    >;
 
   <
     // `this` in this.extended(...)
@@ -272,14 +273,15 @@ interface ExtendedTag {
     // Combined ThisType
     CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>
   >(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)
-  : CheckPropertyClashes<BaseCreator, P, O, D, IP> extends never
-      ? TagCreator<
-      FlattenOthers<CET & IterableProperties<IP>>,
-      BaseCreator,
-      // Static members attached to the tag creator
-      PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
+  :
+  CheckPropertyClashes<BaseCreator, P, O, D, IP,
+      TagCreator<
+        FlattenOthers<CET & IterableProperties<IP>>,
+        BaseCreator,
+        // Static members attached to the tag creator
+        PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
     >
-      : CheckPropertyClashes<BaseCreator, P, O, D, IP>;
+  >;
 }
 
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
