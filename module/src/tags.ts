@@ -127,7 +127,8 @@ type IterableProperties<IP> = {
   [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
 }
 
-type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { length?: never }; // Basically anything, _except_ an array
+type X = Array<X>
+type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never }; // Basically anything, _except_ an array
 
 type NeverEmpty<O extends RootObj> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
