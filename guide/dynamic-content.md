@@ -37,13 +37,14 @@ async function *clock() {
 
 ...and replace "Dunno" with the time:
 
-```javascript
+```diff
   const App = div.extended({
     constructed() {
       /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
-        div(clock())
+-       div("Dunno")
++       div(clock())
       ]
     }
   });
@@ -92,7 +93,8 @@ In additon to async generators, you can pass Promises (basically a generator tha
 Let's update the App to display a new Chuck Morris joke every few seconds. First, we'll get just one from the web
 
 ```javascript
-  /* A function that uses `fetch` to get a Chuck Noris joke. You could write this without async/await easily */
+  /* A function that uses `fetch` to get a Chuck Noris joke. You could write this without async/await 
+    easily using native Promises */
   async function chuckJoke() {
     const response = await fetch('https://api.chucknorris.io/jokes/random');
     const fromJson = await response.json();
@@ -102,13 +104,14 @@ Let's update the App to display a new Chuck Morris joke every few seconds. First
 ```
 ...and update our dynamic div's content:
 
-```javascript
+```diff
   const App = div.extended({
     constructed() {
       /* When constructed, this "div" tag contains some other tags: */
       return [
         h2("Hello World"),
-        div(chuckJoke())
+-       div("This time is now: ",clock())
++       div(chuckJoke())
       ]
     }
   });

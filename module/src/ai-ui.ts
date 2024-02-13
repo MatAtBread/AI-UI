@@ -1,14 +1,13 @@
 import { isPromiseLike } from './deferred.js';
-import { isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { AsyncProvider, ChildTags, Instance, Overrides, TagCreator } from './tags'
+import { ChildTags, Instance, Overrides, TagCreator } from './tags'
+import { DEBUG } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
-export { ChildTags, Instance } from './tags'
+export { ChildTags, Instance, TagCreator } from './tags'
 export * as Iterators from './iterators.js';
-
-const DEBUG = false;
 
 /* A holder for prototypes specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
@@ -16,8 +15,8 @@ type OtherMembers = { };
 
 /* Members applied to EVERY tag created, even base tags */
 interface PoElementMethods {
-  get ids(): Record<string, Element | undefined>;
-  when<S extends WhenParameters>(...what: S): WhenReturn<S>;
+  get ids(): {}
+  when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
 }
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
@@ -27,7 +26,7 @@ interface TagLoader {
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
 
   /*
-   Signatures for the tag loader. All params are optional in any combination, 
+   Signatures for the tag loader. All params are optional in any combination,
    but must be in order:
       tag(
           ?nameSpace?: string,  // absent nameSpace implies HTML
@@ -40,8 +39,10 @@ interface TagLoader {
         tags(['div','button'], { myThing() {} })
         tags('http://namespace',['Foreign'], { isForeign: true })
   */
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes?: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> };
   <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> };
   <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>;
 }
@@ -64,21 +65,6 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
   set ids(v: any) {
     throw new Error('Cannot set ids on ' + this.valueOf());
   },
-
-  /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
-  set style(s: any) {
-    const pd = getProtoPropertyDescriptor(this,'style');
-    if (typeof s === 'object') {
-      deepAssign(pd?.get.call(this),s);
-    } else {
-      pd?.set.call(this,s);
-    }
-  },
-  get style() {
-    const pd = getProtoPropertyDescriptor(this,'style');
-    return pd?.get.call(this);
-  },*/
-
   when: function (...what) {
     return when(this, ...what)
   }
@@ -86,12 +72,6 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
 
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";
-
-function asyncIterator<T>(o: AsyncProvider<T>) {
-  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
-  if (isAsyncIterator(o)) return o;
-  throw new Error("Not as async provider");
-}
 
 function isChildTag(x: any): x is ChildTags {
   return typeof x === 'string'
@@ -124,26 +104,36 @@ export const tag = <TagLoader>function <Tags extends string,
 ): Record<string, TagCreator<P & Element>> {
   type NamespacedElementBase = T1 extends string ? T1 extends '' ? HTMLElement : Element : HTMLElement;
 
-  /* Work out which parameter is which. There are 4 variations:
+  /* Work out which parameter is which. There are 6 variations:
     tag()                                       []
     tag(prototypes)                             [object]
     tag(tags[])                                 [string[]]
     tag(tags[], prototypes)                     [string[], object]
     tag(namespace | null, tags[])               [string | null, string[]]
-    tag(namespace | null, tags[],prototypes)    [string | null, string[], object]
+    tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
   */
   const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
     ? [_1, _2 as Tags[], _3 as P]
     : Array.isArray(_1)
-      ? [null, _1 as Tags[], _2 as P] 
+      ? [null, _1 as Tags[], _2 as P]
       : [null, standandTags, _1 as P];
 
-  /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
+  /* Note: we use property defintion (and not object spread) so getters (like `ids`)
     are not evaluated until called */
   const tagPrototypes = Object.create(
     null,
     Object.getOwnPropertyDescriptors(elementProtype), // We know it's not nested
   );
+
+  // We do this here and not in elementProtype as there's no syntax
+  // to copy a getter/setter pair from another object
+  Object.defineProperty(tagPrototypes, 'attributes', {
+    ...Object.getOwnPropertyDescriptor(Element.prototype,'attributes'),
+    set(a: object) {
+      assignProps(this, a);
+    }
+  });
+
   if (prototypes)
     deepDefine(tagPrototypes, prototypes);
 
@@ -165,7 +155,7 @@ export const tag = <TagLoader>function <Tags extends string,
           g = n;
         }, x => {
           console.warn(x);
-          appender(g[0])(DyamicElementError(x.toString()));
+          appender(g[0])(DyamicElementError({error: x}));
         });
         return;
       }
@@ -186,7 +176,7 @@ export const tag = <TagLoader>function <Tags extends string,
           ap.return?.(errorValue);
           const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
           if (n[0].parentNode) {
-            t = appender(n[0].parentNode, n[0])(DyamicElementError(errorValue.toString()));
+            t = appender(n[0].parentNode, n[0])(DyamicElementError({error: errorValue}));
             n.forEach(e => e.parentNode?.removeChild(e));
           }
           else
@@ -196,10 +186,13 @@ export const tag = <TagLoader>function <Tags extends string,
         const update = (es: IteratorResult<ChildTags>) => {
           if (!es.done) {
             const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
-            if (!n.length || !n[0].parentNode)
-              throw new Error("Element(s) no longer exist in document" + insertionStack);
+            if (!n.length || !n[0].parentNode) {
+              // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+              error(new Error("Element(s) no longer exist in document" + insertionStack));
+              return;
+            }
 
-            t = appender(n[0].parentNode, n[0])(es.value ?? DomPromiseContainer());
+            t = appender(n[0].parentNode, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
             n.forEach(e => e.parentNode?.removeChild(e));
             ap.next().then(update).catch(error);
           }
@@ -271,12 +264,13 @@ export const tag = <TagLoader>function <Tags extends string,
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  console.warn("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                  if (DEBUG)
+                    console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
-                    // Note - if we're copying to an array of different length 
-                    // we're decoupling common object references, so we need a clean object to 
+                    // Note - if we're copying to an array of different length
+                    // we're decoupling common object references, so we need a clean object to
                     // assign into
                     if (Array.isArray(d[k]) && d[k].length !== value.length) {
                       if (value.constructor === Object || value.constructor === Array) {
@@ -309,13 +303,29 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   }
 
+  function unbox(a: unknown): unknown {
+    const v = a?.valueOf();
+    return Array.isArray(v) ? v.map(unbox) : v;
+  }
+
   function assignProps(base: Element, props: Record<string, any>) {
     // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
     if (!(callStackSymbol in props)) {
       (function assign(d: any, s: any): void {
         if (s === null || s === undefined || typeof s !== 'object')
           return;
-        for (const [k, srcDesc] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
+        // static props before getters/setters
+        const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
+        sourceEntries.sort((a,b) => {
+          const desc = Object.getOwnPropertyDescriptor(d,a[0]);
+          if (desc) {
+            if ('value' in desc) return -1;
+            if ('set' in desc) return 1;
+            if ('get' in desc) return 0.5;
+          }
+          return 0;
+        });
+        for (const [k, srcDesc] of sourceEntries) {
           try {
             if ('value' in srcDesc) {
               const value = srcDesc.value;
@@ -331,7 +341,8 @@ export const tag = <TagLoader>function <Tags extends string,
                   }
 
                   if (!es.done) {
-                    if (typeof es.value === 'object' && es.value !== null) {
+                    const value = unbox(es.value);
+                    if (typeof value === 'object' && value !== null) {
                       /*
                       THIS IS JUST A HACK: `style` has to be set member by member, eg:
                         e.style.color = 'blue'        --- works
@@ -346,13 +357,13 @@ export const tag = <TagLoader>function <Tags extends string,
                       */
                       const destDesc = Object.getOwnPropertyDescriptor(d, k);
                       if (k === 'style' || !destDesc?.set)
-                        assign(d[k], es.value);
+                        assign(d[k], value);
                       else
-                        d[k] = es.value;
+                        d[k] = value;
                     } else {
                       // Src is not an object (or is null) - just assign it, unless it's undefined
-                      if (es.value !== undefined)
-                        d[k] = es.value;
+                      if (value !== undefined)
+                        d[k] = value;
                     }
                     ap.next().then(update).catch(error);
                   }
@@ -360,20 +371,21 @@ export const tag = <TagLoader>function <Tags extends string,
                 const error = (errorValue: any) => {
                   ap.return?.(errorValue);
                   console.warn("Dynamic attribute error", errorValue, k, d, base);
-                  appender(base)(DyamicElementError(errorValue.toString()));
+                  appender(base)(DyamicElementError({error: errorValue}));
                 }
                 ap.next().then(update).catch(error);
-              } 
-              
+              }
+
               if (!isAsyncIter<unknown>(value)) {
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value)) {
                   if (value instanceof Node) {
-                    console.warn("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                    if (DEBUG)
+                      console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                     d[k] = value;
                   } else {
-                    // Note - if we're copying to ourself (or an array of different length), 
-                    // we're decoupling common object references, so we need a clean object to 
+                    // Note - if we're copying to ourself (or an array of different length),
+                    // we're decoupling common object references, so we need a clean object to
                     // assign into
                     if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
                       if (value.constructor === Object || value.constructor === Array) {
@@ -390,7 +402,6 @@ export const tag = <TagLoader>function <Tags extends string,
                        assign(d[k], value);
                     }
                   }
-
                 } else {
                   if (s[k] !== undefined)
                     d[k] = s[k];
@@ -410,9 +421,9 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   }
 
-  /* 
+  /*
   Extend a component class with create a new component class factory:
-      const NewDiv = Div.extended({ overrides }) 
+      const NewDiv = Div.extended({ overrides })
           ...or...
       const NewDic = Div.extended((instance:{ arbitrary-type }) => ({ overrides }))
          ...later...
@@ -428,7 +439,7 @@ export const tag = <TagLoader>function <Tags extends string,
     let staticExtensions: Overrides = overrides(staticInstance);
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
-      poStyleElt.appendChild(document.createTextNode(staticExtensions.styles));
+      poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
       if (!document.head.contains(poStyleElt)) {
         document.head.appendChild(poStyleElt);
       }
@@ -451,13 +462,25 @@ export const tag = <TagLoader>function <Tags extends string,
       const tagDefinition = overrides(ped);
       combinedAttrs[callStackSymbol].push(tagDefinition);
       deepDefine(e, tagDefinition.prototype);
+      deepDefine(e, tagDefinition.override);
+      deepDefine(e, tagDefinition.declare);
+      tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
+        defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
+      });
       if (combinedAttrs[callStackSymbol] === newCallStack) {
         if (!noAttrs)
           assignProps(e, attrs);
-        while (newCallStack.length) {
-          const children = newCallStack.shift()?.constructed?.call(e);
+        for (const base of newCallStack) {
+          const children = base?.constructed?.call(e);
           if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
             appender(e)(children);
+        }
+        // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
+        // so the full hierarchy gets to consume the initial state
+        for (const base of newCallStack) {
+          base.iterable && Object.keys(base.iterable).forEach(
+            // @ts-ignore
+            k => e[k] = e[k].valueOf());
         }
       }
       return e;
@@ -468,7 +491,7 @@ export const tag = <TagLoader>function <Tags extends string,
       overrides,
       extended,
       valueOf: () => {
-        const keys = Object.keys(staticExtensions.prototype || {});
+        const keys = [...Object.keys(staticExtensions.declare || {})/*, ...Object.keys(staticExtensions.prototype || {})*/];
         return `${extendTag.name}: {${keys.join(', ')}}\n \u21AA ${this.valueOf()}`
       }
     });
@@ -478,24 +501,28 @@ export const tag = <TagLoader>function <Tags extends string,
       if (creator?.super)
         walkProto(creator.super);
 
-      const proto = creator.overrides?.(staticInstance)?.prototype;
+      const proto = creator.overrides?.(staticInstance);
       if (proto) {
-        deepDefine(fullProto, proto);
+        deepDefine(fullProto, proto?.prototype);
+        deepDefine(fullProto, proto?.override);
+        deepDefine(fullProto, proto?.declare);
       }
     })(this);
     deepDefine(fullProto, staticExtensions.prototype);
+    deepDefine(fullProto, staticExtensions.override);
+    deepDefine(fullProto, staticExtensions.declare);
     Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
 
     // Attempt to make up a meaningfu;l name for this extended tag
-    const creatorName = staticExtensions.prototype
-      && 'className' in staticExtensions.prototype 
-      && typeof staticExtensions.prototype.className === 'string' 
-      ? staticExtensions.prototype.className
+    const creatorName = fullProto
+      && 'className' in fullProto
+      && typeof fullProto.className === 'string'
+      ? fullProto.className
       : '?';
-    const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
+    const callSite = DEBUG ? ' @'+(new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?') : '';
 
-    Object.defineProperty(extendTag, "name", { 
-      value: "<ai-"+creatorName+" @"+callSite+">" 
+    Object.defineProperty(extendTag, "name", {
+      value: "<ai-" + creatorName.replace(/\s+/g,'-') + callSite+">"
     });
 
     return extendTag;
@@ -537,7 +564,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
         // Create element
         const e = nameSpace
-          ? doc.createElementNS(nameSpace, k.toLowerCase())
+          ? doc.createElementNS(nameSpace as string, k.toLowerCase())
           : doc.createElement(k);
         e.constructor = tagCreator;
 
@@ -578,11 +605,11 @@ const DomPromiseContainer = AsyncDOMContainer.extended({
   ai-ui-container.promise:after {
     content: "⋯";
   }`,
-  prototype: {
+  override: {
     className: 'promise'
   },
   constructed() {
-    return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG 
+    return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG
       ? new Error("Constructed").stack?.replace(/^Error: /, '')
       : undefined);
   }
@@ -592,9 +619,23 @@ const DyamicElementError = AsyncDOMContainer.extended({
   ai-ui-container.error {
     display: block;
     color: #b33;
+    white-space: pre;
   }`,
-  prototype: {
+  override: {
     className: 'error'
+  },
+  declare: {
+    error: undefined as unknown as Error | IteratorResult<Error,Error>
+  },
+  constructed(){
+    if (!this.error)
+      return "Error";
+
+    if (this.error instanceof Error)
+      return this.error.stack;
+    if ('value' in this.error && this.error.value instanceof Error)
+      return this.error.value.stack;
+    return this.error.toString();
   }
 });
 

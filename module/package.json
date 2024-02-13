@@ -3,11 +3,10 @@
   "bugs": {
     "url": "https://github.com/MatAtBread/AI-UI/issues"
   },
-  "dependencies": {},
   "description": "A tiny, genuinely functional, UI framework for building dynamic HTML pages",
   "devDependencies": {
     "ts-loader": "^9.5.0",
-    "typescript": "^5.2.2",
+    "typescript": "^5.3.3",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
   },
@@ -39,8 +38,9 @@
     "build-web": "webpack && webpack --config webpack.cjs.js",
     "build-web-dev": "webpack --config webpack.dev.js && webpack --config webpack.cjs-dev.js",
     "clean": "rm -rf dist/* esm/*",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "tsc -p ../type_tests/tsconfig.json"
   },
   "types": "./esm/*.d.ts",
-  "version": "0.9.11"
+  "version": "0.10.6-p1"
 }

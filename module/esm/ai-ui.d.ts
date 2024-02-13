@@ -1,21 +1,27 @@
 import { WhenParameters, WhenReturn } from './when.js';
 import { ChildTags, TagCreator } from './tags';
 export { when } from './when.js';
-export { ChildTags, Instance } from './tags';
+export { ChildTags, Instance, TagCreator } from './tags';
 export * as Iterators from './iterators.js';
 type OtherMembers = {};
 interface PoElementMethods {
-    get ids(): Record<string, Element | undefined>;
-    when<S extends WhenParameters>(...what: S): WhenReturn<S>;
+    get ids(): {};
+    when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
 }
 interface TagLoader {
     /** @deprecated - Legacy function similar to Element.append/before/after */
     appender(container: Node, before?: Node): (c: ChildTags) => (Node | ((Element & PoElementMethods)))[];
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];
-    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes?: P): {
+    <Tags extends keyof HTMLElementTagNameMap>(): {
+        [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]>;
+    };
+    <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): {
+        [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]>;
+    };
+    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes: P): {
         [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]>;
     };
-    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes?: P): {
+    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes: P): {
         [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]>;
     };
     <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): {

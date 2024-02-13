@@ -1,6 +1,6 @@
 import { tag } from '../../../module/esm/ai-ui.js'
 
-const { h2, div, button, span } = tag();
+const { h2, div, button } = tag();
 
 /* These "base" tag functions create standard HTML elements. The call signature is:
     

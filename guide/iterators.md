@@ -6,7 +6,7 @@ Later, we'll make a lot of use of async iterators created by AI-UI from standard
 
 First, some clarity on terminology.
 * An **async iterator** is an object that resolves multiple times in the future. It has optional methods that allow the _consumer_ of these values to terminate the thing that is _generating_ them. Unlike Observables which "push" values to a subscriber, an **async iterator** is a "pull" mechanism - nothing is generated until there is a consumer for the values, and both the _consumer_ and _generator_ of the values can terminate the iteration.
-* An **async iterable** is an object that can be iterated over asynchronously. 
+* An **async iterable** is an object that can be iterated over asynchronously, via its `[Symbol.asyncIterator]` method.
 * An **async generator** is a function that returns an **async iterable** when it is invoked, using the `yield` and `await` Javascript keywords.
 
 At present, none of these types have standardised prototypes, as they are not Javascript classes, but simply objects that have a standard set of interfaces, as indicated by the presence of a various well-known Symbols on objects and corresponding methods. You can find out more about the details [here](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_async_iterator_and_async_iterable_protocols). There are proposals to expose some of the prototypes so that they can be expanded in the future, for example the [TC39 proposal](https://github.com/tc39/proposal-async-iterator-helpers).
@@ -77,7 +77,7 @@ for await (const x of counter3 /* or counter1, or counter2 */) {
 
 ## map
 ```typescript
-function map<U, R>(this: AsyncIterable<U>, mapper: (o: U) => R | PromiseLike<R>): AsyncIterable<Awaited<R>>
+function map<U, R>(this: AsyncIterable<U>, ...mapper: ((o: U) => R | PromiseLike<R>)[]): AsyncIterable<Awaited<R>>
 ```
 
 Maps the results of an async iterable. The mapper function can itself be asynchronous.
@@ -87,6 +87,15 @@ for await (const x of counter3.map(num => num * num)) {
   console.log(x); // Integers 0,1,4...81
 }
 ```
+
+Note that `map` can accept multiple mappers, in which case each is invoked in turn and yielded to the next consumer:
+
+```javascript
+for await (const x of counter3.map(num => Math.round(num/2)).unique()) {
+  console.log(x); // Integers 0,1,2,3,4
+}
+```
+
 
 ## filter
 ```typescript
@@ -98,7 +107,21 @@ Filter the results of an async iterable. Only those vales returning `true` from 
 for await (const x of counter3.filter(num => num % 2 === 0)) {
   console.log(x); // Integers 0,2,4,6,8
 }
+
 ```
+## unique
+```typescript
+function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U>
+```
+
+Filter the results of an async iterable to remove duplicate values. The optional specifed function can be used to test for equality. By default, the test is the JavaScript loose equality operator "==".
+
+```javascript
+for await (const x of counter3.filter(num => num % 2 === 0)) {
+  console.log(x); // Integers 0,2,4,6,8
+}
+```
+
 
 ## initially
 ```typescript
@@ -144,7 +167,7 @@ await counter3.consume(n => console.log(n));
 
 ## broadcast
 ```typescript
-function broadcast<U, X>(this: AsyncIterable<U>, pipe?: (dest: AsyncIterable<U>) => AsyncIterable<X>): AsyncIterable<X>
+function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U>
 ```
 
 Queues the incoming yielded values so they can be replayed to multiple consumers. The queue for each consumer commences when the consumer first calls the async iterator `next()` function, and the whole broadcast iterator terminates when either the producer or all consumers terminate.

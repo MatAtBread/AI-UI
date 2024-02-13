@@ -11,19 +11,22 @@
 <head></head>
 
 <body>Loading Typescript...</body>
-<script src="https://unpkg.com/typescript@5.2.2/lib/typescript.js"></script>
+<script src="https://unpkg.com/typescript@5.3.3/lib/typescript.js"></script>
 <script>
   window.exports = {};
+  window.DEBUG = 'AI-UI';
 
-  const tsFile = window.location.hash.slice(1);
-  if (!tsFile)
-    document.body.append('No .ts file specified in the URL #');
-  else
+  const tsFile = window.location.search.slice(1);
+  if (!tsFile) {
+    document.body.textContent = 'No .ts file specified';
+  } else {
+    document.body.textContent = 'Loading '+tsFile;
     fetch(tsFile)
     .then(resp => resp.status === 200
       ? resp.text()
       : (() => { throw new Error(`HTTP status ${resp.status}: ${resp.statusText}\n${tsFile}`) })())
     .then(tsCode => {
+      document.body.textContent = 'Transpiling '+tsFile;
       const jsCode = window.ts.transpile(tsCode, {
         "skipLibCheck": true,
         "lib": [ "lib.es2020.d.ts" ],
@@ -39,6 +42,7 @@
       //console.log("Transpiled",tsFile,"\n",jsCode);
     })
     .catch(error => alert(error.message));
+  }
 </script>
 
 </html>

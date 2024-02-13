@@ -1,3 +1,4 @@
+import { DEBUG } from "./debug.js";
 // Used to suppress TS error about use before initialisation
 const nothing = (v) => { };
 export function deferred() {
@@ -6,6 +7,10 @@ export function deferred() {
     const promise = new Promise((...r) => [resolve, reject] = r);
     promise.resolve = resolve;
     promise.reject = reject;
+    if (DEBUG) {
+        const initLocation = new Error().stack;
+        promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? console.log("Deferred", ex, initLocation) : undefined);
+    }
     return promise;
 }
 export function isPromiseLike(x) {

@@ -1,7 +1,7 @@
+import { DEBUG } from "./debug.js";
 import { DeferredPromise, deferred } from "./deferred.js";
 
 /* Things to suppliement the JS base AsyncIterable */
-
 export type PushIterator<T> = AsyncExtraIterable<T> & {
   push(value: T): boolean;  // Push a new value to consumers. Returns false if all the consumers have gone
   close(ex?: Error): void;  // Tell the consumer we're done, with an optional error
@@ -19,18 +19,27 @@ export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterat
   return isAsyncIterable(o) || isAsyncIterator(o);
 }
 
+export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
+
+export function asyncIterator<T>(o: AsyncProvider<T>) {
+  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
+  if (isAsyncIterator(o)) return o;
+  throw new Error("Not as async provider");
+}
+
 /* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
   something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
   the same arguments returns a AsyncExtraIterable<X>
 */
 function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(fn: (this: AsyncIterable<T>, ...args: Args) => X) {
-  return function(this: AsyncIterable<T>, ...args:Args) { return iterableHelpers(fn.call(this, ...args)) }
+  return function(this: Partial<AsyncIterable<T>>, ...args:Args) { return iterableHelpers(fn.call(this as AsyncIterable<T>, ...args)) }
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
 export const asyncExtras = {
   map: wrapAsyncHelper(map),
   filter: wrapAsyncHelper(filter),
+  unique: wrapAsyncHelper(unique),
   throttle: wrapAsyncHelper(throttle),
   debounce: wrapAsyncHelper(debounce),
   waitFor: wrapAsyncHelper(waitFor),
@@ -38,11 +47,14 @@ export const asyncExtras = {
   retain: wrapAsyncHelper(retain),
   broadcast: wrapAsyncHelper(broadcast),
   initially: wrapAsyncHelper(initially),
-  consume
+  consume: consume,
+  merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A) {
+    return merge(this, ...m);
+  }
 };
 
 class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
-  private _pending = [] as DeferredPromise<IteratorYieldResult<T>>[] | null;
+  private _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
   private _items = [] as T[] | null;
 
   constructor(private readonly stop = () => { }) {
@@ -55,9 +67,12 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
   next() {
     if (this._items!.length) {
       return Promise.resolve({ done: false, value: this._items!.shift()! });
-    } 
-    
-    const value = deferred<IteratorYieldResult<T>>();
+    }
+
+    const value = deferred<IteratorResult<T>>();
+    // We install a catch handler as the promise might be legitimately reject before anything waits for it,
+    // and this suppresses the uncaught exception warning.
+    value.catch(ex => {});
     this._pending!.push(value);
     return value;
   }
@@ -67,7 +82,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
     if (this._pending) {
       try { this.stop() } catch (ex) { }
       while(this._pending.length)
-        this._pending.shift()!.reject(value);
+        this._pending.shift()!.resolve(value);
         this._items = this._pending = null;
       }
     return Promise.resolve(value);
@@ -81,7 +96,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
         this._pending.shift()!.reject(value);
       this._items = this._pending = null;
     }
-    return Promise.resolve(value);
+    return Promise.reject(value);
   }
 
   push(value: T) {
@@ -143,7 +158,7 @@ export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false)
 export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   let ai = new Set<QueueIteratableIterator<T>>();
 
-  return <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
+  const b = <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
     [Symbol.asyncIterator](): AsyncIterableIterator<T> {
       const added = new QueueIteratableIterator<T>(() => {
         ai.delete(added);
@@ -173,16 +188,110 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
       (ai as any) = null;
     }
   });
+  return b;
+}
+
+export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
+  // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
+  // access the iterator methods to prevent leaks where an iterable is created, but
+  // never referenced, and therefore cannot be consumed and ultimately closed
+  let initIterator = () => {
+    initIterator = ()=> b;
+    const bi = broadcastIterator<V>();
+    extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
+    push = bi.push;
+    const b = bi[Symbol.asyncIterator]();
+    Object.keys(asyncHelperFunctions).map(k =>
+      extras[k as keyof typeof extras] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
+    )
+    Object.defineProperties(a, extras)
+    return b;
+  }
+
+  // Create stubs that lazily create the AsyncExtraIterable interface when invoked
+  const lazyAsyncMethod = (method: string) => function (this: unknown, ...args:any[]) {
+    initIterator();
+    return a[method].call(this,...args);
+  }
+
+  const extras: Record<keyof typeof asyncHelperFunctions | typeof Symbol.asyncIterator, PropertyDescriptor> = {
+    [Symbol.asyncIterator]: {
+      enumerable: false, writable: true,
+      value: initIterator
+    }
+  } as Record<keyof typeof asyncHelperFunctions | typeof Symbol.asyncIterator, PropertyDescriptor>;
+
+  Object.keys(asyncHelperFunctions).map(k =>
+    extras[k as keyof typeof extras] = {
+      enumerable: false,
+      writable: true,
+      value: lazyAsyncMethod(k)
+    }
+  )
+
+  // Lazily initialize `push`
+  let push: BroadcastIterator<V>['push'] = (v:V) => {
+    initIterator(); // Updates `push` to reference the broadcaster
+    return push(v);
+  }
+
+  let a = box(v, extras);
+
+  Object.defineProperty(obj, name, {
+    get(): V { return a },
+    set(v: V) {
+      a = box(v, extras);
+      push(v?.valueOf() as V);
+    },
+    enumerable: true
+  });
+  return obj as any;
+}
+
+function box(a: unknown, pds: Record<string | symbol, PropertyDescriptor>) {
+  if (a===null || a===undefined) {
+    return Object.create(null,{
+      ...pds,
+      valueOf: { value() { return a }},
+      toJSON: { value() { return a }}
+    });
+  }
+  switch (typeof a) {
+    case 'object':
+      /* TODO: This is problematic as the object might have clashing keys.
+        The alternatives are:
+        - Don't add the pds, then the object remains unmolested, but can't be used with .map, .filter, etc
+        - examine the object and decide whether to insert the prototype (breaks built in objects, works with PoJS)
+        - don't allow objects as iterable properties, which avoids the `deep tree` problem
+        - something else
+      */
+      if (!(Symbol.asyncIterator in a)) {
+        if (DEBUG)
+          console.warn('Iterable properties of type "object" will be spread to prevent re-initialisation.',a);
+        return Object.defineProperties({...a}, pds);
+      }
+      return a;
+    case 'bigint':
+    case 'boolean':
+    case 'number':
+    case 'string':
+      // Boxes types, including BigInt
+      return Object.defineProperties(Object.assign(a as any), {
+        ...pds,
+        toJSON: { value() { return a.valueOf() }}
+      });
+  }
+  throw new TypeError('Iterable properties cannot be of type "'+typeof a+'"');
 }
 
 /* Merge asyncIterables into a single asyncIterable */
 
 /* TS hack to expose the return AsyncGenerator a generator of the union of the merged types */
-type CollapseIterableType<T> = T[] extends AsyncIterable<infer U>[] ? U : never;
+type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 
-export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
-  const it = ai.map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
+export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
+  const it = (ai as AsyncIterable<any>[]).map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
   const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
   const results: CollapseIterableType<A[number]>[] = [];
   const forever = new Promise<any>(() => { });
@@ -190,15 +299,18 @@ export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
   const merged: AsyncIterableIterator<A[number]> = {
     [Symbol.asyncIterator]() { return this },
     next() {
-      return count 
+      return count
         ? Promise.race(promises).then(({ idx, result }) => {
           if (result.done) {
             count--;
             promises[idx] = forever;
             results[idx] = result.value;
-            return { done: count === 0, value: result.value }
+            // We don't yield intermediate return values, we just keep them in results
+            // return { done: count === 0, value: result.value }
+            return this.next();
           } else {
-            promises[idx] = it[idx].next().then(result => ({ idx, result }));
+            // `ex` is the underlying async iteration exception
+            promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
             return result;
           }
         }).catch(ex => {
@@ -206,72 +318,73 @@ export const merge = <A extends AsyncIterable<any>[]>(...ai: A) => {
         })
       : Promise.reject({ done: true as const, value: new Error("Iterator merge complete") });
     },
-    return() {
+    async return() {
       const ex = new Error("Merge terminated");
       for (let i = 0; i < it.length; i++) {
         if (promises[i] !== forever) {
           promises[i] = forever;
-          it[i].return?.({ done: true, value: ex }); // Terminate the sources with the appropriate cause
+          results[i] = await it[i].return?.({ done: true, value: ex }).then(v => v.value, ex => ex);
         }
       }
-      return Promise.resolve({ done: true, value: ex });
+      return { done: true, value: results };
     },
-    throw(ex: any) {
+    async throw(ex: any) {
       for (let i = 0; i < it.length; i++) {
         if (promises[i] !== forever) {
           promises[i] = forever;
-          it[i].throw?.(ex); // Terminate the sources with the appropriate cause
+          results[i] = await it[i].throw?.(ex).then(v => v.value, ex => ex);
         }
       }
-      return Promise.reject(ex);
+      // Because we've passed the exception on to all the sources, we're now done
+      // previously: return Promise.reject(ex);
+      return { done: true, value: results };
     }
   };
   return iterableHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
 }
 
 
-/* 
+/*
   Extensions to the AsyncIterable:
   calling `bind(ai)` adds "standard" methods to the specified AsyncIterable
 */
 
 function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
-  return isAsyncIterable(i) 
+  return isAsyncIterable(i)
     && Object.keys(asyncExtras)
     .every(k => (k in i) && (i as any)[k] === asyncExtras[k as keyof AsyncIterableHelpers]);
 }
 
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
-export function iterableHelpers<A extends AsyncIterable<any>>(ai: A) {
+export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never) {
   if (!isExtraIterable(ai)) {
     Object.assign(ai, asyncExtras);
   }
   return ai as A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never)
 }
 
-export function generatorHelpers<G extends (...args: A)=>AsyncGenerator<G1,G2,G3>, A extends any[], G1,G2,G3>(g:G): (...args: A)=>AsyncGenerator<G1,G2,G3> & AsyncExtraIterable<G1>{
+export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G)
+  : (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never) {
   // @ts-ignore: TS type madness
   return function(...args:A) {
-    // @ts-ignore: TS type madness
     return iterableHelpers(g(...args))
   }
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
-async function* map<U, R>(this: AsyncIterable<U>, mapper: (o: U) => R | PromiseLike<R>): AsyncIterable<Awaited<R>> {
+async function* map<U, R>(this: AsyncIterable<U>, ...mapper: ((o: U) => R | PromiseLike<R>)[]): AsyncIterable<Awaited<R>> {
   const ai = this[Symbol.asyncIterator]();
   try {
     while (true) {
       const p = await ai.next();
       if (p.done) {
-        return ai.return?.(mapper(p.value));
+        return ai.return?.(p.value);
       }
-      yield mapper(p.value);
+      for (const m of mapper)
+        yield m(p.value);
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -288,9 +401,27 @@ async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | Promis
       }
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
+  }
+}
+
+const noUniqueValue = Symbol('noUniqueValue');
+async function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U> {
+  const ai = this[Symbol.asyncIterator]();
+  let prev: U | typeof noUniqueValue = noUniqueValue;
+  try {
+    while (true) {
+      const p = await ai.next();
+      if (p.done) {
+        return ai.return?.(p.value);
+      }
+      if (fn && prev !== noUniqueValue ? await fn(p.value, prev) : p.value != prev) {
+        yield p.value;
+      }
+      prev = p.value;
+    }
+  } catch (ex) {
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -317,9 +448,7 @@ async function* throttle<U>(this: AsyncIterable<U>, milliseconds: number): Async
       }
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -329,7 +458,7 @@ const forever = new Promise<any>(() => { });
 async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   let timer: Promise<{ debounced: number, value: U }> = forever;
-  let last = -1;
+  let last:any = -1;
   try {
     while (true) {
       const p = await Promise.race([ai.next(), timer]);
@@ -349,9 +478,7 @@ async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): Async
       }
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -367,9 +494,7 @@ async function* waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | Pro
       yield p.value;
     }
   } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
-    ai.return?.();
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -384,10 +509,9 @@ async function* count<U extends {}, K extends string>(this: AsyncIterable<U>, fi
       }
       yield counted;
     }
-  } catch (ex) {
-    ai.throw?.(ex);
-  } finally {
     ai.return?.();
+  } catch (ex) {
+    return ai.throw ? ai.throw(ex) : ai.return?.();
   }
 }
 
@@ -416,7 +540,7 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
   }
 }
 
-function broadcast<U, X>(this: AsyncIterable<U>, pipe: ((dest: AsyncIterable<U>) => AsyncIterable<X>) = (x => x as unknown as AsyncIterable<X>)): AsyncIterable<X> {
+function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   const b = broadcastIterator<U>(() => ai.return?.());
   (function update() {
@@ -433,15 +557,16 @@ function broadcast<U, X>(this: AsyncIterable<U>, pipe: ((dest: AsyncIterable<U>)
 
   return {
     [Symbol.asyncIterator]() {
-      const dest = pipe(b);
-      return dest[Symbol.asyncIterator]();
+      return b[Symbol.asyncIterator]();
     }
   }
 }
 
-async function consume<U>(this: AsyncIterable<U>, f?: (u: U) => void | PromiseLike<void>): Promise<void> {
+async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void> {
   let last: unknown = undefined;
-  for await (const u of this)
+  for await (const u of this as AsyncIterable<U>)
     last = f?.(u);
   await last;
 }
+
+const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };

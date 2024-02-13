@@ -1,10 +1,10 @@
 import { isPromiseLike } from './deferred.js';
-import { isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable } from './iterators.js';
 import { when } from './when.js';
+import { DEBUG } from './debug.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
-const DEBUG = false;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
     "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",
@@ -22,32 +22,12 @@ const elementProtype = {
     set ids(v) {
         throw new Error('Cannot set ids on ' + this.valueOf());
     },
-    /* EXPERIMENTAL: Allow a partial style object to be assigned to `style`
-    set style(s: any) {
-      const pd = getProtoPropertyDescriptor(this,'style');
-      if (typeof s === 'object') {
-        deepAssign(pd?.get.call(this),s);
-      } else {
-        pd?.set.call(this,s);
-      }
-    },
-    get style() {
-      const pd = getProtoPropertyDescriptor(this,'style');
-      return pd?.get.call(this);
-    },*/
     when: function (...what) {
         return when(this, ...what);
     }
 };
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles";
-function asyncIterator(o) {
-    if (isAsyncIterable(o))
-        return o[Symbol.asyncIterator]();
-    if (isAsyncIterator(o))
-        return o;
-    throw new Error("Not as async provider");
-}
 function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
@@ -66,22 +46,30 @@ function isChildTag(x) {
 /* tag */
 const callStackSymbol = Symbol('callStack');
 export const tag = function (_1, _2, _3) {
-    /* Work out which parameter is which. There are 4 variations:
+    /* Work out which parameter is which. There are 6 variations:
       tag()                                       []
       tag(prototypes)                             [object]
       tag(tags[])                                 [string[]]
       tag(tags[], prototypes)                     [string[], object]
       tag(namespace | null, tags[])               [string | null, string[]]
-      tag(namespace | null, tags[],prototypes)    [string | null, string[], object]
+      tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
     */
     const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
-    /* Note: we use deepAssign (and not object spread) so getters (like `ids`)
+    /* Note: we use property defintion (and not object spread) so getters (like `ids`)
       are not evaluated until called */
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
+    // We do this here and not in elementProtype as there's no syntax
+    // to copy a getter/setter pair from another object
+    Object.defineProperty(tagPrototypes, 'attributes', {
+        ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
+        set(a) {
+            assignProps(this, a);
+        }
+    });
     if (prototypes)
         deepDefine(tagPrototypes, prototypes);
     function nodes(...c) {
@@ -102,7 +90,7 @@ export const tag = function (_1, _2, _3) {
                     g = n;
                 }, x => {
                     console.warn(x);
-                    appender(g[0])(DyamicElementError(x.toString()));
+                    appender(g[0])(DyamicElementError({ error: x }));
                 });
                 return;
             }
@@ -120,7 +108,7 @@ export const tag = function (_1, _2, _3) {
                     ap.return?.(errorValue);
                     const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
                     if (n[0].parentNode) {
-                        t = appender(n[0].parentNode, n[0])(DyamicElementError(errorValue.toString()));
+                        t = appender(n[0].parentNode, n[0])(DyamicElementError({ error: errorValue }));
                         n.forEach(e => e.parentNode?.removeChild(e));
                     }
                     else
@@ -129,9 +117,12 @@ export const tag = function (_1, _2, _3) {
                 const update = (es) => {
                     if (!es.done) {
                         const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
-                        if (!n.length || !n[0].parentNode)
-                            throw new Error("Element(s) no longer exist in document" + insertionStack);
-                        t = appender(n[0].parentNode, n[0])(es.value ?? DomPromiseContainer());
+                        if (!n.length || !n[0].parentNode) {
+                            // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                            error(new Error("Element(s) no longer exist in document" + insertionStack));
+                            return;
+                        }
+                        t = appender(n[0].parentNode, n[0])(unbox(es.value) ?? DomPromiseContainer());
                         n.forEach(e => e.parentNode?.removeChild(e));
                         ap.next().then(update).catch(error);
                     }
@@ -201,13 +192,14 @@ export const tag = function (_1, _2, _3) {
                             }
                             else {
                                 if (value instanceof Node) {
-                                    console.warn("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                    if (DEBUG)
+                                        console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                                     d[k] = value;
                                 }
                                 else {
                                     if (d[k] !== value) {
-                                        // Note - if we're copying to an array of different length 
-                                        // we're decoupling common object references, so we need a clean object to 
+                                        // Note - if we're copying to an array of different length
+                                        // we're decoupling common object references, so we need a clean object to
                                         // assign into
                                         if (Array.isArray(d[k]) && d[k].length !== value.length) {
                                             if (value.constructor === Object || value.constructor === Array) {
@@ -244,13 +236,31 @@ export const tag = function (_1, _2, _3) {
             }
         }
     }
+    function unbox(a) {
+        const v = a?.valueOf();
+        return Array.isArray(v) ? v.map(unbox) : v;
+    }
     function assignProps(base, props) {
         // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
         if (!(callStackSymbol in props)) {
             (function assign(d, s) {
                 if (s === null || s === undefined || typeof s !== 'object')
                     return;
-                for (const [k, srcDesc] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
+                // static props before getters/setters
+                const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
+                sourceEntries.sort((a, b) => {
+                    const desc = Object.getOwnPropertyDescriptor(d, a[0]);
+                    if (desc) {
+                        if ('value' in desc)
+                            return -1;
+                        if ('set' in desc)
+                            return 1;
+                        if ('get' in desc)
+                            return 0.5;
+                    }
+                    return 0;
+                });
+                for (const [k, srcDesc] of sourceEntries) {
                     try {
                         if ('value' in srcDesc) {
                             const value = srcDesc.value;
@@ -265,7 +275,8 @@ export const tag = function (_1, _2, _3) {
                                         return;
                                     }
                                     if (!es.done) {
-                                        if (typeof es.value === 'object' && es.value !== null) {
+                                        const value = unbox(es.value);
+                                        if (typeof value === 'object' && value !== null) {
                                             /*
                                             THIS IS JUST A HACK: `style` has to be set member by member, eg:
                                               e.style.color = 'blue'        --- works
@@ -280,14 +291,14 @@ export const tag = function (_1, _2, _3) {
                                             */
                                             const destDesc = Object.getOwnPropertyDescriptor(d, k);
                                             if (k === 'style' || !destDesc?.set)
-                                                assign(d[k], es.value);
+                                                assign(d[k], value);
                                             else
-                                                d[k] = es.value;
+                                                d[k] = value;
                                         }
                                         else {
                                             // Src is not an object (or is null) - just assign it, unless it's undefined
-                                            if (es.value !== undefined)
-                                                d[k] = es.value;
+                                            if (value !== undefined)
+                                                d[k] = value;
                                         }
                                         ap.next().then(update).catch(error);
                                     }
@@ -295,7 +306,7 @@ export const tag = function (_1, _2, _3) {
                                 const error = (errorValue) => {
                                     ap.return?.(errorValue);
                                     console.warn("Dynamic attribute error", errorValue, k, d, base);
-                                    appender(base)(DyamicElementError(errorValue.toString()));
+                                    appender(base)(DyamicElementError({ error: errorValue }));
                                 };
                                 ap.next().then(update).catch(error);
                             }
@@ -303,12 +314,13 @@ export const tag = function (_1, _2, _3) {
                                 // This has a real value, which might be an object
                                 if (value && typeof value === 'object' && !isPromiseLike(value)) {
                                     if (value instanceof Node) {
-                                        console.warn("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                        if (DEBUG)
+                                            console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                                         d[k] = value;
                                     }
                                     else {
-                                        // Note - if we're copying to ourself (or an array of different length), 
-                                        // we're decoupling common object references, so we need a clean object to 
+                                        // Note - if we're copying to ourself (or an array of different length),
+                                        // we're decoupling common object references, so we need a clean object to
                                         // assign into
                                         if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
                                             if (value.constructor === Object || value.constructor === Array) {
@@ -363,7 +375,7 @@ export const tag = function (_1, _2, _3) {
         let staticExtensions = overrides(staticInstance);
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
-            poStyleElt.appendChild(document.createTextNode(staticExtensions.styles));
+            poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
             if (!document.head.contains(poStyleElt)) {
                 document.head.appendChild(poStyleElt);
             }
@@ -381,13 +393,25 @@ export const tag = function (_1, _2, _3) {
             const tagDefinition = overrides(ped);
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
+            deepDefine(e, tagDefinition.override);
+            deepDefine(e, tagDefinition.declare);
+            tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
+                defineIterableProperty(e, k, tagDefinition.iterable[k]);
+            });
             if (combinedAttrs[callStackSymbol] === newCallStack) {
                 if (!noAttrs)
                     assignProps(e, attrs);
-                while (newCallStack.length) {
-                    const children = newCallStack.shift()?.constructed?.call(e);
+                for (const base of newCallStack) {
+                    const children = base?.constructed?.call(e);
                     if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
                         appender(e)(children);
+                }
+                // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
+                // so the full hierarchy gets to consume the initial state
+                for (const base of newCallStack) {
+                    base.iterable && Object.keys(base.iterable).forEach(
+                    // @ts-ignore
+                    k => e[k] = e[k].valueOf());
                 }
             }
             return e;
@@ -397,7 +421,7 @@ export const tag = function (_1, _2, _3) {
             overrides,
             extended,
             valueOf: () => {
-                const keys = Object.keys(staticExtensions.prototype || {});
+                const keys = [...Object.keys(staticExtensions.declare || {}) /*, ...Object.keys(staticExtensions.prototype || {})*/];
                 return `${extendTag.name}: {${keys.join(', ')}}\n \u21AA ${this.valueOf()}`;
             }
         });
@@ -405,22 +429,26 @@ export const tag = function (_1, _2, _3) {
         (function walkProto(creator) {
             if (creator?.super)
                 walkProto(creator.super);
-            const proto = creator.overrides?.(staticInstance)?.prototype;
+            const proto = creator.overrides?.(staticInstance);
             if (proto) {
-                deepDefine(fullProto, proto);
+                deepDefine(fullProto, proto?.prototype);
+                deepDefine(fullProto, proto?.override);
+                deepDefine(fullProto, proto?.declare);
             }
         })(this);
         deepDefine(fullProto, staticExtensions.prototype);
+        deepDefine(fullProto, staticExtensions.override);
+        deepDefine(fullProto, staticExtensions.declare);
         Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
         // Attempt to make up a meaningfu;l name for this extended tag
-        const creatorName = staticExtensions.prototype
-            && 'className' in staticExtensions.prototype
-            && typeof staticExtensions.prototype.className === 'string'
-            ? staticExtensions.prototype.className
+        const creatorName = fullProto
+            && 'className' in fullProto
+            && typeof fullProto.className === 'string'
+            ? fullProto.className
             : '?';
-        const callSite = (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?');
+        const callSite = DEBUG ? ' @' + (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?') : '';
         Object.defineProperty(extendTag, "name", {
-            value: "<ai-" + creatorName + " @" + callSite + ">"
+            value: "<ai-" + creatorName.replace(/\s+/g, '-') + callSite + ">"
         });
         return extendTag;
     }
@@ -459,7 +487,7 @@ export const tag = function (_1, _2, _3) {
         };
         const includingExtender = Object.assign(tagCreator, {
             super: () => { throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement()."); },
-            extended,
+            extended, // How to extend this (base) tag
             valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>`; }
         });
         Object.defineProperty(tagCreator, "name", { value: '<' + k + '>' });
@@ -481,7 +509,7 @@ const DomPromiseContainer = AsyncDOMContainer.extended({
   ai-ui-container.promise:after {
     content: "⋯";
   }`,
-    prototype: {
+    override: {
         className: 'promise'
     },
     constructed() {
@@ -495,9 +523,22 @@ const DyamicElementError = AsyncDOMContainer.extended({
   ai-ui-container.error {
     display: block;
     color: #b33;
+    white-space: pre;
   }`,
-    prototype: {
+    override: {
         className: 'error'
+    },
+    declare: {
+        error: undefined
+    },
+    constructed() {
+        if (!this.error)
+            return "Error";
+        if (this.error instanceof Error)
+            return this.error.stack;
+        if ('value' in this.error && this.error.value instanceof Error)
+            return this.error.value.stack;
+        return this.error.toString();
     }
 });
 export let enableOnRemovedFromDOM = function () {

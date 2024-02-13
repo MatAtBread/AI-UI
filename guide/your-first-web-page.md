@@ -99,7 +99,7 @@ In the following sections, we'll add:
 
 * [Extended: Create new tags](./extended.md) _coming soon_
 
-  Creating tags from one or more other tags using `constructed()`, setting styles, ensuring type-safety with prototype and `ids`. Using private element data with getters & setters.
+  Creating tags from one or more other tags using `constructed()`, setting styles, ensuring type-safety with `declare`, `override`, `iterable` and `ids`. Using private element data with getters & setters.
 
 * [Link elements dynamically](./when.md) _coming soon_
 
