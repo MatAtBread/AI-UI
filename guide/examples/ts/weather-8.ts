@@ -139,16 +139,18 @@ const Location = input.extended({
         this.disabled = false;
       }
     }
+    if (this.value)
+      this.dispatchEvent(new Event('change'));
   }
 });
 
 const App = div.extended({
-  constructed() {
+    constructed() {
     /* When we're constructed, create a Location element and a WeatherForecast element.
       The WeatherForecast is a Chart plus a `geo` attribute that is updated automatically
       from the Location.geo AsyncIterable.
     */
-    const location = Location();
+const location = Location({ value: 'london' });
     return [
       location,
       WeatherForecast({
