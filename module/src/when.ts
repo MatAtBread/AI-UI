@@ -209,8 +209,13 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
     const start: AsyncIterableIterator<{}> = {
       [Symbol.asyncIterator]: () => start,
       next() {
-        const d = deferred<IteratorReturnResult<{}>>();
-        requestAnimationFrame(() => d.resolve({ done: true, value: {} }));
+        const d = deferred<IteratorResult<{}>>();
+        requestAnimationFrame(() => {
+          // terminate on the next call to `next()`
+          start.next = ()=>Promise.resolve({ done: true, value: undefined })
+          // Yield a "start" event
+          d.resolve({ done: false, value: {} })
+        });
         return d;
       }
     };

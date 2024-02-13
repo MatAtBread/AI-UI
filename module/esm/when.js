@@ -111,7 +111,12 @@ export function when(container, ...sources) {
             [Symbol.asyncIterator]: () => start,
             next() {
                 const d = deferred();
-                requestAnimationFrame(() => d.resolve({ done: true, value: {} }));
+                requestAnimationFrame(() => {
+                    // terminate on the next call to `next()`
+                    start.next = () => Promise.resolve({ done: true, value: undefined });
+                    // Yield a "start" event
+                    d.resolve({ done: false, value: {} });
+                });
                 return d;
             }
         };
