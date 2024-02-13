@@ -127,8 +127,8 @@ type IterableProperties<IP> = {
   [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
 }
 
-type X = Array<X>
 type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never }; // Basically anything, _except_ an array
+type OptionalIterablePropertyValue = IterablePropertyValue | undefined | null;
 
 type NeverEmpty<O extends RootObj> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
@@ -188,7 +188,7 @@ type ExtensionDefinition<
   D extends RootObj,
   // Iterable properties
   IP extends {
-    [k: string]: IterablePropertyValue;
+    [k: string]: OptionalIterablePropertyValue;
   },
   // ids - tagCreators
   I extends {
@@ -211,7 +211,7 @@ type ExtensionDefinition<
   // The base, generic extension definition, used by ai-ui
   export type Overrides = ExtensionDefinition<
     object,object,object,
-    { [k: string]: IterablePropertyValue },
+    { [k: string]: OptionalIterablePropertyValue },
     { [id: string]: TagCreator<any, any>; },
     () => (ChildTags | void | Promise<void | ChildTags>),
     string>;
@@ -235,7 +235,7 @@ interface ExtendedTag {
       // ids - tagCreators
       I extends { [idExt: string]: TagCreator<any, any> } = {},
       // iterable properties - primitives (will be boxed)
-      IP extends { [k: string]: IterablePropertyValue } = {},
+      IP extends { [k: string]: OptionalIterablePropertyValue } = {},
       // Combined Effective Type of this extended tag
       CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>,
       // Combined ThisType
@@ -268,7 +268,7 @@ interface ExtendedTag {
     // ids - tagCreators
     I extends { [idExt: string]: TagCreator<any, any> } = {},
     // iterable properties - primitives (will be boxed)
-    IP extends { [k: string]: IterablePropertyValue } = {},
+    IP extends { [k: string]: OptionalIterablePropertyValue } = {},
     // Combined Effective Type of this extended tag
     CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>,
     // Combined ThisType
