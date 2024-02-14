@@ -1,4 +1,4 @@
-import { tag } from '../../../module/esm/ai-ui.js' // 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js';
 
 const { div, img, input } = tag();
 
@@ -63,18 +63,18 @@ const Chart = img.extended({
   constructed() {
     this.data.consume!(data => {
       if (data) {
-      this.style.opacity = '0.2';
-      this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=`
-        + encodeURIComponent(JSON.stringify({
-          type: 'line',
-          data: {
-            labels: data.x,
-            datasets: [{
-              label: this.label,
-              data: data.y
-            }]
-          }
-        }))
+        this.style.opacity = '0.2';
+        this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=`
+          + encodeURIComponent(JSON.stringify({
+            type: 'line',
+            data: {
+              labels: data.x,
+              datasets: [{
+                label: this.label,
+                data: data.y
+              }]
+            }
+          }))
       }
     })
   }
@@ -119,17 +119,15 @@ const Location = input.extended({
   iterable: {
     geo: undefined as GeoInfo | undefined
   },
-  override:{
+  override: {
     placeholder: 'Enter a town...',
     style: {
       display: 'block'
-    }
-  },
-  constructed() {
-    this.onkeydown = () => {
+    },
+    onkeydown() {
       this.style.backgroundColor = '';
-    }
-    this.onchange = async () => {
+    },
+    async onchange() {
       try {
         this.disabled = true;
         const g = await getGeoInfo(this.value);
@@ -139,18 +137,20 @@ const Location = input.extended({
         this.disabled = false;
       }
     }
+  },
+  constructed() {
     if (this.value)
       this.dispatchEvent(new Event('change'));
   }
 });
 
 const App = div.extended({
-    constructed() {
+  constructed() {
     /* When we're constructed, create a Location element and a WeatherForecast element.
       The WeatherForecast is a Chart plus a `geo` attribute that is updated automatically
       from the Location.geo AsyncIterable.
     */
-const location = Location({ value: 'london' });
+    const location = Location();
     return [
       location,
       WeatherForecast({
