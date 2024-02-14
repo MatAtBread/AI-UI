@@ -45,6 +45,7 @@ export const asyncExtras = {
   waitFor: wrapAsyncHelper(waitFor),
   count: wrapAsyncHelper(count),
   retain: wrapAsyncHelper(retain),
+  multi: wrapAsyncHelper(multi),
   broadcast: wrapAsyncHelper(broadcast),
   initially: wrapAsyncHelper(initially),
   consume: consume,
@@ -540,6 +541,41 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
   }
 }
 
+function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
+  const ai = this[Symbol.asyncIterator]();
+
+  let current = deferred<IteratorResult<T>>();
+
+  // The source has produced a new result
+  function update(it: IteratorResult<T, any>) {
+      current.resolve(it);
+      if (!it.done) {
+        current = deferred<IteratorResult<T>>();
+        ai.next().then(update).catch(error);
+      }
+  }
+
+  // The source has errored
+  function error(reason: any) {
+    current.reject({ done: true, value: reason });
+  }
+
+  ai.next().then(update).catch(error);
+
+  return {
+    [Symbol.asyncIterator]() { return this },
+    next() {
+      return current;
+    },
+    return(value?: any) {
+      return ai.return?.(value) ?? Promise.resolve({done: true as const, value });
+    },
+    throw(...args: any[]) {
+      return ai.throw?.(args) ?? Promise.resolve({done: true as const, value: args[0] })
+    },
+  };
+}
+
 function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   const b = broadcastIterator<U>(() => ai.return?.());
@@ -569,4 +605,6 @@ async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | 
   await last;
 }
 
-const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };
+const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, multi, broadcast, initially, consume, merge };
+
+

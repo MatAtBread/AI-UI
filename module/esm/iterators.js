@@ -32,6 +32,7 @@ export const asyncExtras = {
     waitFor: wrapAsyncHelper(waitFor),
     count: wrapAsyncHelper(count),
     retain: wrapAsyncHelper(retain),
+    multi: wrapAsyncHelper(multi),
     broadcast: wrapAsyncHelper(broadcast),
     initially: wrapAsyncHelper(initially),
     consume: consume,
@@ -499,6 +500,35 @@ function retain() {
         }
     };
 }
+function multi() {
+    const ai = this[Symbol.asyncIterator]();
+    let current = deferred();
+    // The source has produced a new result
+    function update(it) {
+        current.resolve(it);
+        if (!it.done) {
+            current = deferred();
+            ai.next().then(update).catch(error);
+        }
+    }
+    // The source has errored
+    function error(reason) {
+        current.reject({ done: true, value: reason });
+    }
+    ai.next().then(update).catch(error);
+    return {
+        [Symbol.asyncIterator]() { return this; },
+        next() {
+            return current;
+        },
+        return(value) {
+            return ai.return?.(value) ?? Promise.resolve({ done: true, value });
+        },
+        throw(...args) {
+            return ai.throw?.(args) ?? Promise.resolve({ done: true, value: args[0] });
+        },
+    };
+}
 function broadcast() {
     const ai = this[Symbol.asyncIterator]();
     const b = broadcastIterator(() => ai.return?.());
@@ -526,4 +556,4 @@ async function consume(f) {
         last = f?.(u);
     await last;
 }
-const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };
+const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, multi, broadcast, initially, consume, merge };

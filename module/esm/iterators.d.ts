@@ -27,10 +27,11 @@ export declare const asyncExtras: {
         value: U_7;
         done: boolean;
     } & AsyncExtraIterable<U_7>;
+    multi: <T>(this: Partial<AsyncIterable<T>>) => AsyncIterableIterator<T> & AsyncExtraIterable<T>;
     broadcast: <U_8>(this: Partial<AsyncIterable<U_8>>) => AsyncIterable<U_8> & AsyncExtraIterable<U_8>;
     initially: <U_9, I = U_9>(this: Partial<AsyncIterable<U_9>>, initValue: I) => AsyncIterable<U_9 | I> & AsyncExtraIterable<U_9 | I>;
     consume: typeof consume;
-    merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T>>, ...A][number]>>;
+    merge<T_1, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T_1>>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T_1>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T_1>>, ...A][number]>>;
 };
 export declare function pushIterator<T>(stop?: () => void, bufferWhenNoConsumers?: boolean): PushIterator<T>;
 export declare function broadcastIterator<T>(stop?: () => void): BroadcastIterator<T>;

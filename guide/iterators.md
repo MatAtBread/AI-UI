@@ -15,23 +15,23 @@ Meanwhile, AI-UI has a set of helpers you can use with async iterators.
 
 To use these with third-party async iterators, or the return of a standard async generator, use the `iterableHelpers` or `generatorHelpers` function, depdending on if you want to add helpers to a generator (that returns iterables), or an iterable itself.
 
-Of these, `map` and `filter` are the most useful with AI-UI, as you can see in the example following the defintions of the helpers. 
+Of these, `map` and `filter` are the most useful with AI-UI, as you can see in the example following the defintions of the helpers.
 
 ```javascript
 /* ES6 Import */
-import { Iterators } from 'https://www.unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'; 
+import { Iterators } from 'https://www.unpkg.com/@matatbread/ai-ui/esm/ai-ui.js';
 const { iterableHelpers, generatorHelpers } = Iterators;
 ```
 
 ```javascript
 /* CommonJS */
-const { Iterators } = require('@matatbread/ai-ui'); 
+const { Iterators } = require('@matatbread/ai-ui');
 const { iterableHelpers, generatorHelpers } = Iterators;
 ```
 
 
 ```html
-<script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.min.js"></script> 
+<script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.min.js"></script>
 <script>
   /* Static script */
   const { iterableHelpers, generatorHelpers } = AIUI.Iterators;
@@ -49,7 +49,7 @@ async function *count(limit) {
 }
 ```
 
-We can either add functionality to the generator with `generatorHelpers`, or to the result of calling the generator (the async iterable it returns) with `iterableHelpers`. 
+We can either add functionality to the generator with `generatorHelpers`, or to the result of calling the generator (the async iterable it returns) with `iterableHelpers`.
 
 ```javascript
 // Create a version of "count" whose returned iterators have helpers attached
@@ -164,6 +164,23 @@ Passes each yielded value to the specified function and returns on when the fina
 // Outputs all the values 0..9 and then continues
 await counter3.consume(n => console.log(n));
 ```
+
+## multi
+```typescript
+function multi<U>(this: AsyncIterable<U>): AsyncIterable<U>
+```
+
+Consume the source iterator, returning a common value to all current consumers. There is no buffering or queueing - if a consumer takes a long time to handle a value, it might miss some consumed by any other consumers, but will resume receiving values as soon as it calls next(). It is very similar to `broadcast`, except that `broadcast` queues any intermediate values. `multi` is significantly more efficient and is suitable for providing things like mousemove and scroll events, where a slow, asynchronous consumer does not want to process every value in turn, but simply wants to keep up to date when the value changes.
+
+Note: by default, AsyncIterators, if given more than one consumer, will yield different values to each consumer. Use `multi` or `broadcast` if you need all consumers to receive a value.
+
+```javascript
+const b = counter3.multi();
+
+// Outputs A0,B0,A1,B1.... note: if the functions in `consume` were asynchronous and slow, not every value will go to the slowest consumer under certain circumstances, but all values will
+
+b.consume(n => console.log("A",n));
+b.consume(n => console.log("B",n));
 
 ## broadcast
 ```typescript
