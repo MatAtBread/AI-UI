@@ -42,5 +42,5 @@
     "test": "tsc -p ../type_tests/tsconfig.json"
   },
   "types": "./esm/*.d.ts",
-  "version": "0.10.6-p1"
+  "version": "0.10.7"
 }

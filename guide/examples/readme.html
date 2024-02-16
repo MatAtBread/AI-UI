@@ -1,0 +1,25 @@
+<head>
+    <script src="https://unpkg.com/@matatbread/ai-ui/dist/ai-ui.js"></script>
+</head>
+
+<body>
+</body>
+<script>
+    /* Specify what base tags you reference in your UI */
+    const { div } = AIUI.tag();
+
+    const sleep = (t) => new Promise(resolve => setTimeout(resolve, t));
+
+    async function* ticktock() {
+        while (true) {
+            yield new Date().toString();
+            await sleep(1000);
+        }
+    }
+
+    document.body.appendChild(
+        div(
+            "The time is:", ticktock()
+        )
+    );
+</script>

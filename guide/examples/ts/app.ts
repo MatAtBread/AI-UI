@@ -58,6 +58,6 @@ function sleep(ms: number) {
 async function *clock() {
   while (1) {
     await sleep(1000);
-    yield new Date();
+    yield new Date().toString();
   }
 }

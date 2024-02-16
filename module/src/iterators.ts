@@ -45,6 +45,7 @@ export const asyncExtras = {
   waitFor: wrapAsyncHelper(waitFor),
   count: wrapAsyncHelper(count),
   retain: wrapAsyncHelper(retain),
+  multi: wrapAsyncHelper(multi),
   broadcast: wrapAsyncHelper(broadcast),
   initially: wrapAsyncHelper(initially),
   consume: consume,
@@ -191,13 +192,13 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   return b;
 }
 
-export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
+export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & AsyncExtraIterable<V> } {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
   let initIterator = () => {
     initIterator = ()=> b;
-    const bi = broadcastIterator<V>();
+    const bi = new QueueIteratableIterator<V>();
     extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
     push = bi.push;
     const b = bi[Symbol.asyncIterator]();
@@ -205,7 +206,7 @@ export function defineIterableProperty<T extends {}, N extends string | number |
       extras[k as keyof typeof extras] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
     )
     Object.defineProperties(a, extras)
-    return b;
+    return multi.call(b);
   }
 
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
@@ -230,7 +231,7 @@ export function defineIterableProperty<T extends {}, N extends string | number |
   )
 
   // Lazily initialize `push`
-  let push: BroadcastIterator<V>['push'] = (v:V) => {
+  let push: QueueIteratableIterator<V>['push'] = (v:V) => {
     initIterator(); // Updates `push` to reference the broadcaster
     return push(v);
   }
@@ -540,6 +541,41 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
   }
 }
 
+function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
+  const ai = this[Symbol.asyncIterator]();
+
+  let current = deferred<IteratorResult<T>>();
+
+  // The source has produced a new result
+  function update(it: IteratorResult<T, any>) {
+      current.resolve(it);
+      if (!it.done) {
+        current = deferred<IteratorResult<T>>();
+        ai.next().then(update).catch(error);
+      }
+  }
+
+  // The source has errored
+  function error(reason: any) {
+    current.reject({ done: true, value: reason });
+  }
+
+  ai.next().then(update).catch(error);
+
+  return {
+    [Symbol.asyncIterator]() { return this },
+    next() {
+      return current;
+    },
+    return(value?: any) {
+      return ai.return?.(value) ?? Promise.resolve({done: true as const, value });
+    },
+    throw(...args: any[]) {
+      return ai.throw?.(args) ?? Promise.resolve({done: true as const, value: args[0] })
+    },
+  };
+}
+
 function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   const b = broadcastIterator<U>(() => ai.return?.());
@@ -569,4 +605,6 @@ async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | 
   await last;
 }
 
-const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, broadcast, initially, consume, merge };
+const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, multi, broadcast, initially, consume, merge };
+
+

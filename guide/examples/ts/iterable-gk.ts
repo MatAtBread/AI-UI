@@ -9,7 +9,7 @@ const App = div.extended({
     num: 99
   },
   constructed() {
-    const colorTemp = this.hot.map!(v => v ? 'red' : 'green').broadcast();
+    const colorTemp = this.hot.map!(v => v ? 'red' : 'green').multi();
 
     return [
       h2({
