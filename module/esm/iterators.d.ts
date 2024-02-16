@@ -36,7 +36,7 @@ export declare const asyncExtras: {
 export declare function pushIterator<T>(stop?: () => void, bufferWhenNoConsumers?: boolean): PushIterator<T>;
 export declare function broadcastIterator<T>(stop?: () => void): BroadcastIterator<T>;
 export declare function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & {
-    [n in N]: V & BroadcastIterator<V>;
+    [n in N]: V & AsyncExtraIterable<V>;
 };
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;

@@ -208,15 +208,15 @@ type ExtensionDefinition<
     styles?: S;
   };
 
-  // The base, generic extension definition, used by ai-ui
-  export type Overrides = ExtensionDefinition<
-    object,object,object,
-    { [k: string]: OptionalIterablePropertyValue },
-    { [id: string]: TagCreator<any, any>; },
-    () => (ChildTags | void | Promise<void | ChildTags>),
-    string>;
+// The base, generic extension definition, used by ai-ui
+export type Overrides = ExtensionDefinition<
+  object,object,object,
+  { [k: string]: OptionalIterablePropertyValue },
+  { [id: string]: TagCreator<any, any>; },
+  () => (ChildTags | void | Promise<void | ChildTags>),
+  string>;
 
-  export type TagCreatorAttributes<T extends TagCreator<any,any>> = T extends TagCreator<infer B,any> ? B:never;
+export type TagCreatorAttributes<T extends TagCreator<any,any>> = T extends TagCreator<infer B,any> ? B:never;
 
 interface ExtendedTag {
   <
@@ -248,7 +248,7 @@ interface ExtendedTag {
         FlattenOthers<CET & IterableProperties<IP>>,
         BaseCreator,
         // Static members attached to the tag creator
-        PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
+        PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>
       >
     >;
 
@@ -280,7 +280,7 @@ interface ExtendedTag {
         FlattenOthers<CET & IterableProperties<IP>>,
         BaseCreator,
         // Static members attached to the tag creator
-        PickType<D & O & P & TagCreatorAttributes<BaseCreator>, Function>
+        PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>
     >
   >;
 }

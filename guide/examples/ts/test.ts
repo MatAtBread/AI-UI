@@ -1,5 +1,5 @@
 import { tag } from '../../../module/esm/ai-ui.js';
-import { broadcastIterator, iterableHelpers } from '../../../module/esm/iterators.js'
+import { iterableHelpers, pushIterator } from '../../../module/esm/iterators.js'
 
 const { div, h2, input, span, pre, button } = tag();
 
@@ -10,14 +10,15 @@ const sleep = function <T>(millis: number, r?: T) {
 };
 
 function mousemove(e: MouseEvent) {
-  if (!mousePos.push({x: e.clientX, y: e.clientY})) {
+  if (!mousePosPush.push({x: e.clientX, y: e.clientY})) {
     console.log("mousPos closed!!");
   }
 }
-const mousePos = broadcastIterator<{x: number, y: number}>(()=>{
+const mousePosPush = pushIterator<{x: number, y: number}>(()=>{
   console.log("stop mousePos")
   window.removeEventListener('mousemove', mousemove);
 });
+const mousePos = mousePosPush.multi(); 
 window.addEventListener('mousemove', mousemove);
 
 const Lazy = h2.extended((instance:{ myAttr: number }) => ({
@@ -186,7 +187,7 @@ const Block = div.extended({
   }
 });
 
-const xy = mousePos.waitFor(done => setTimeout(done, 40)).map(({x,y}) => ({
+const xy = mousePos.waitFor(done => requestAnimationFrame(time => done())).map(({x,y}) => ({
   left: `${x + 20}px`,
   top: `${y + 20}px`
 }));

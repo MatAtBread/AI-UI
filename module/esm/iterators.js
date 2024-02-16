@@ -184,13 +184,13 @@ export function defineIterableProperty(obj, name, v) {
     // never referenced, and therefore cannot be consumed and ultimately closed
     let initIterator = () => {
         initIterator = () => b;
-        const bi = broadcastIterator();
+        const bi = new QueueIteratableIterator();
         extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
         push = bi.push;
         const b = bi[Symbol.asyncIterator]();
         Object.keys(asyncHelperFunctions).map(k => extras[k] = { value: b[k], enumerable: false, writable: false });
         Object.defineProperties(a, extras);
-        return b;
+        return multi.call(b);
     };
     // Create stubs that lazily create the AsyncExtraIterable interface when invoked
     const lazyAsyncMethod = (method) => function (...args) {

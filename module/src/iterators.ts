@@ -192,13 +192,13 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   return b;
 }
 
-export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & BroadcastIterator<V> } {
+export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & AsyncExtraIterable<V> } {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
   let initIterator = () => {
     initIterator = ()=> b;
-    const bi = broadcastIterator<V>();
+    const bi = new QueueIteratableIterator<V>();
     extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
     push = bi.push;
     const b = bi[Symbol.asyncIterator]();
@@ -206,7 +206,7 @@ export function defineIterableProperty<T extends {}, N extends string | number |
       extras[k as keyof typeof extras] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
     )
     Object.defineProperties(a, extras)
-    return b;
+    return multi.call(b);
   }
 
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
@@ -231,7 +231,7 @@ export function defineIterableProperty<T extends {}, N extends string | number |
   )
 
   // Lazily initialize `push`
-  let push: BroadcastIterator<V>['push'] = (v:V) => {
+  let push: QueueIteratableIterator<V>['push'] = (v:V) => {
     initIterator(); // Updates `push` to reference the broadcaster
     return push(v);
   }
