@@ -2,9 +2,12 @@ import { DEBUG } from "./debug.js";
 import { DeferredPromise, deferred } from "./deferred.js";
 
 /* Things to suppliement the JS base AsyncIterable */
+export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & { 
+  push(value: T): boolean;
+};
 export type PushIterator<T> = AsyncExtraIterable<T> & {
-  push(value: T): boolean;  // Push a new value to consumers. Returns false if all the consumers have gone
-  close(ex?: Error): void;  // Tell the consumer we're done, with an optional error
+  push(value: T): boolean;
+  close(ex?: Error): void;  // Tell the consumer(s) we're done, with an optional error
 };
 export type BroadcastIterator<T> = PushIterator<T>;
 
@@ -54,64 +57,64 @@ export const asyncExtras = {
   }
 };
 
-class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
-  private _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
-  private _items = [] as T[] | null;
+function queueIteratableIterator<T>(stop = () => { }): QueueIteratableIterator<T> {
+  let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
+  let _items = [] as T[] | null;
 
-  constructor(private readonly stop = () => { }) {
-  }
+  const q: QueueIteratableIterator<T> = {
+    [Symbol.asyncIterator]() {
+      return q;
+    },
 
-  [Symbol.asyncIterator](this: AsyncIterableIterator<T>) {
-    return this;
-  }
-
-  next() {
-    if (this._items!.length) {
-      return Promise.resolve({ done: false, value: this._items!.shift()! });
-    }
-
-    const value = deferred<IteratorResult<T>>();
-    // We install a catch handler as the promise might be legitimately reject before anything waits for it,
-    // and this suppresses the uncaught exception warning.
-    value.catch(ex => {});
-    this._pending!.push(value);
-    return value;
-  }
-
-  return() {
-    const value = { done: true as const, value: undefined };
-    if (this._pending) {
-      try { this.stop() } catch (ex) { }
-      while(this._pending.length)
-        this._pending.shift()!.resolve(value);
-        this._items = this._pending = null;
+    next() {
+      if (_items!.length) {
+        return Promise.resolve({ done: false, value: _items!.shift()! });
       }
-    return Promise.resolve(value);
-  }
 
-  throw(...args: any[]) {
-    const value = { done: true as const, value: args[0] };
-    if (this._pending) {
-      try { this.stop() } catch (ex) { }
-      while(this._pending.length)
-        this._pending.shift()!.reject(value);
-      this._items = this._pending = null;
-    }
-    return Promise.reject(value);
-  }
+      const value = deferred<IteratorResult<T>>();
+      // We install a catch handler as the promise might be legitimately reject before anything waits for it,
+      // and q suppresses the uncaught exception warning.
+      value.catch(ex => { });
+      _pending!.push(value);
+      return value;
+    },
 
-  push(value: T) {
-    if (!this._pending) {
-      //throw new Error("pushIterator has stopped");
-      return false;
+    return() {
+      const value = { done: true as const, value: undefined };
+      if (_pending) {
+        try { stop() } catch (ex) { }
+        while (_pending.length)
+          _pending.shift()!.resolve(value);
+        _items = _pending = null;
+      }
+      return Promise.resolve(value);
+    },
+
+    throw(...args: any[]) {
+      const value = { done: true as const, value: args[0] };
+      if (_pending) {
+        try { stop() } catch (ex) { }
+        while (_pending.length)
+          _pending.shift()!.reject(value);
+        _items = _pending = null;
+      }
+      return Promise.reject(value);
+    },
+
+    push(value: T) {
+      if (!_pending) {
+        //throw new Error("queueIterator has stopped");
+        return false;
+      }
+      if (_pending.length) {
+        _pending.shift()!.resolve({ done: false, value });
+      } else {
+        _items!.push(value);
+      }
+      return true;
     }
-    if (this._pending.length) {
-      this._pending.shift()!.resolve({ done: false, value });
-    } else {
-      this._items!.push(value);
-    }
-    return true;
-  }
+  };
+  return q;
 }
 
 /* An AsyncIterable which typed objects can be published to.
@@ -120,7 +123,7 @@ class QueueIteratableIterator<T> implements AsyncIterableIterator<T> {
 */
 export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false): PushIterator<T> {
   let consumers = 0;
-  let ai: QueueIteratableIterator<T> = new QueueIteratableIterator<T>(() => {
+  let ai: QueueIteratableIterator<T> = queueIteratableIterator<T>(() => {
     consumers -= 1;
     if (consumers === 0 && !bufferWhenNoConsumers) {
       try { stop() } catch (ex) { }
@@ -161,7 +164,7 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
 
   const b = <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
     [Symbol.asyncIterator](): AsyncIterableIterator<T> {
-      const added = new QueueIteratableIterator<T>(() => {
+      const added = queueIteratableIterator<T>(() => {
         ai.delete(added);
         if (ai.size === 0) {
           try { stop() } catch (ex) { }
@@ -192,21 +195,29 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   return b;
 }
 
+/* Define a "iterable property" on `obj`.
+   This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
+   yields when the property is set.
+   This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
+*/
 export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & AsyncExtraIterable<V> } {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
   let initIterator = () => {
     initIterator = ()=> b;
-    const bi = new QueueIteratableIterator<V>();
+    // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
+    //const bi = pushIterator<V>(); 
+    //const b = bi.multi()[Symbol.asyncIterator]();
+    const bi = broadcastIterator<V>();
+    const b = bi[Symbol.asyncIterator]();
     extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
     push = bi.push;
-    const b = bi[Symbol.asyncIterator]();
     Object.keys(asyncHelperFunctions).map(k =>
       extras[k as keyof typeof extras] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
     )
-    Object.defineProperties(a, extras)
-    return multi.call(b);
+    Object.defineProperties(a, extras);
+    return b;
   }
 
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
@@ -232,7 +243,7 @@ export function defineIterableProperty<T extends {}, N extends string | number |
 
   // Lazily initialize `push`
   let push: QueueIteratableIterator<V>['push'] = (v:V) => {
-    initIterator(); // Updates `push` to reference the broadcaster
+    initIterator(); // Updates `push` to reference the multi-queue
     return push(v);
   }
 
@@ -277,7 +288,7 @@ function box(a: unknown, pds: Record<string | symbol, PropertyDescriptor>) {
     case 'number':
     case 'string':
       // Boxes types, including BigInt
-      return Object.defineProperties(Object.assign(a as any), {
+      return Object.defineProperties(Object(a), {
         ...pds,
         toJSON: { value() { return a.valueOf() }}
       });
@@ -298,7 +309,7 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
   const forever = new Promise<any>(() => { });
   let count = promises.length;
   const merged: AsyncIterableIterator<A[number]> = {
-    [Symbol.asyncIterator]() { return this },
+    [Symbol.asyncIterator]() { return merged },
     next() {
       return count
         ? Promise.race(promises).then(({ idx, result }) => {
@@ -308,14 +319,14 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
             results[idx] = result.value;
             // We don't yield intermediate return values, we just keep them in results
             // return { done: count === 0, value: result.value }
-            return this.next();
+            return merged.next();
           } else {
             // `ex` is the underlying async iteration exception
             promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
             return result;
           }
         }).catch(ex => {
-          return this.throw?.(ex) ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
+          return merged.throw?.(ex) ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
         })
       : Promise.reject({ done: true as const, value: new Error("Iterator merge complete") });
     },
