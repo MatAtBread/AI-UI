@@ -1,3 +1,6 @@
+export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
+    push(value: T): boolean;
+};
 export type PushIterator<T> = AsyncExtraIterable<T> & {
     push(value: T): boolean;
     close(ex?: Error): void;

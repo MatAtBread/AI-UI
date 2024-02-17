@@ -1,6 +1,5 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { deferred } from "./deferred.js";
 import { pushIterator, iterableHelpers, asyncExtras, merge } from "./iterators.js";
 const eventObservations = new Map();
 function docEventHandler(ev) {
@@ -110,14 +109,12 @@ export function when(container, ...sources) {
         const start = {
             [Symbol.asyncIterator]: () => start,
             next() {
-                const d = deferred();
-                requestAnimationFrame(() => {
+                return new Promise(resolve => requestAnimationFrame(() => {
                     // terminate on the next call to `next()`
                     start.next = () => Promise.resolve({ done: true, value: undefined });
                     // Yield a "start" event
-                    d.resolve({ done: false, value: {} });
-                });
-                return d;
+                    resolve({ done: false, value: {} });
+                }));
             }
         };
         iterators.push(start);
@@ -161,13 +158,12 @@ export function when(container, ...sources) {
 function elementIsInDOM(elt) {
     if (document.body.contains(elt))
         return Promise.resolve();
-    const d = deferred();
-    new MutationObserver((records, mutation) => {
+    return new Promise(resolve => new MutationObserver((records, mutation) => {
         for (const record of records) {
             if (record.addedNodes?.length) {
                 if (document.body.contains(elt)) {
                     mutation.disconnect();
-                    d.resolve();
+                    resolve();
                     return;
                 }
             }
@@ -175,29 +171,19 @@ function elementIsInDOM(elt) {
     }).observe(document.body, {
         subtree: true,
         childList: true
-    });
-    return d;
+    }));
 }
 function allSelectorsPresent(container, missing) {
     if (!missing.length) {
         return Promise.resolve();
     }
-    const d = deferred();
-    /* debugging help: warn if waiting a long time for a selectors to be ready */
-    if (DEBUG) {
-        const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
-        const warn = setTimeout(() => {
-            console.warn(stack, missing);
-        }, 5000);
-        d.finally(() => clearTimeout(warn));
-    }
-    new MutationObserver((records, mutation) => {
+    const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
         for (const record of records) {
             if (record.addedNodes?.length) {
                 missing = missing.filter(sel => !container.querySelector(sel));
                 if (!missing.length) {
                     mutation.disconnect();
-                    d.resolve();
+                    resolve();
                     return;
                 }
             }
@@ -205,6 +191,14 @@ function allSelectorsPresent(container, missing) {
     }).observe(container, {
         subtree: true,
         childList: true
-    });
-    return d;
+    }));
+    /* debugging help: warn if waiting a long time for a selectors to be ready */
+    if (DEBUG) {
+        const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
+        const warn = setTimeout(() => {
+            console.warn(stack, missing);
+        }, 5000);
+        promise.finally(() => clearTimeout(warn));
+    }
+    return promise;
 }

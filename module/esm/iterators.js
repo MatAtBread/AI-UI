@@ -40,65 +40,65 @@ export const asyncExtras = {
         return merge(this, ...m);
     }
 };
-class QueueIteratableIterator {
-    constructor(stop = () => { }) {
-        this.stop = stop;
-        this._pending = [];
-        this._items = [];
-    }
-    [Symbol.asyncIterator]() {
-        return this;
-    }
-    next() {
-        if (this._items.length) {
-            return Promise.resolve({ done: false, value: this._items.shift() });
-        }
-        const value = deferred();
-        // We install a catch handler as the promise might be legitimately reject before anything waits for it,
-        // and this suppresses the uncaught exception warning.
-        value.catch(ex => { });
-        this._pending.push(value);
-        return value;
-    }
-    return() {
-        const value = { done: true, value: undefined };
-        if (this._pending) {
-            try {
-                this.stop();
+function queueIteratableIterator(stop = () => { }) {
+    let _pending = [];
+    let _items = [];
+    const q = {
+        [Symbol.asyncIterator]() {
+            return q;
+        },
+        next() {
+            if (_items.length) {
+                return Promise.resolve({ done: false, value: _items.shift() });
             }
-            catch (ex) { }
-            while (this._pending.length)
-                this._pending.shift().resolve(value);
-            this._items = this._pending = null;
-        }
-        return Promise.resolve(value);
-    }
-    throw(...args) {
-        const value = { done: true, value: args[0] };
-        if (this._pending) {
-            try {
-                this.stop();
+            const value = deferred();
+            // We install a catch handler as the promise might be legitimately reject before anything waits for it,
+            // and q suppresses the uncaught exception warning.
+            value.catch(ex => { });
+            _pending.push(value);
+            return value;
+        },
+        return() {
+            const value = { done: true, value: undefined };
+            if (_pending) {
+                try {
+                    stop();
+                }
+                catch (ex) { }
+                while (_pending.length)
+                    _pending.shift().resolve(value);
+                _items = _pending = null;
             }
-            catch (ex) { }
-            while (this._pending.length)
-                this._pending.shift().reject(value);
-            this._items = this._pending = null;
+            return Promise.resolve(value);
+        },
+        throw(...args) {
+            const value = { done: true, value: args[0] };
+            if (_pending) {
+                try {
+                    stop();
+                }
+                catch (ex) { }
+                while (_pending.length)
+                    _pending.shift().reject(value);
+                _items = _pending = null;
+            }
+            return Promise.reject(value);
+        },
+        push(value) {
+            if (!_pending) {
+                //throw new Error("queueIterator has stopped");
+                return false;
+            }
+            if (_pending.length) {
+                _pending.shift().resolve({ done: false, value });
+            }
+            else {
+                _items.push(value);
+            }
+            return true;
         }
-        return Promise.reject(value);
-    }
-    push(value) {
-        if (!this._pending) {
-            //throw new Error("pushIterator has stopped");
-            return false;
-        }
-        if (this._pending.length) {
-            this._pending.shift().resolve({ done: false, value });
-        }
-        else {
-            this._items.push(value);
-        }
-        return true;
-    }
+    };
+    return q;
 }
 /* An AsyncIterable which typed objects can be published to.
   The queue can be read by multiple consumers, who will each receive
@@ -106,7 +106,7 @@ class QueueIteratableIterator {
 */
 export function pushIterator(stop = () => { }, bufferWhenNoConsumers = false) {
     let consumers = 0;
-    let ai = new QueueIteratableIterator(() => {
+    let ai = queueIteratableIterator(() => {
         consumers -= 1;
         if (consumers === 0 && !bufferWhenNoConsumers) {
             try {
@@ -146,7 +146,7 @@ export function broadcastIterator(stop = () => { }) {
     let ai = new Set();
     const b = Object.assign(Object.create(asyncExtras), {
         [Symbol.asyncIterator]() {
-            const added = new QueueIteratableIterator(() => {
+            const added = queueIteratableIterator(() => {
                 ai.delete(added);
                 if (ai.size === 0) {
                     try {
@@ -178,19 +178,27 @@ export function broadcastIterator(stop = () => { }) {
     });
     return b;
 }
+/* Define a "iterable property" on `obj`.
+   This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
+   yields when the property is set.
+   This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
+*/
 export function defineIterableProperty(obj, name, v) {
     // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
     // access the iterator methods to prevent leaks where an iterable is created, but
     // never referenced, and therefore cannot be consumed and ultimately closed
     let initIterator = () => {
         initIterator = () => b;
-        const bi = new QueueIteratableIterator();
+        // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
+        //const bi = pushIterator<V>(); 
+        //const b = bi.multi()[Symbol.asyncIterator]();
+        const bi = broadcastIterator();
+        const b = bi[Symbol.asyncIterator]();
         extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
         push = bi.push;
-        const b = bi[Symbol.asyncIterator]();
         Object.keys(asyncHelperFunctions).map(k => extras[k] = { value: b[k], enumerable: false, writable: false });
         Object.defineProperties(a, extras);
-        return multi.call(b);
+        return b;
     };
     // Create stubs that lazily create the AsyncExtraIterable interface when invoked
     const lazyAsyncMethod = (method) => function (...args) {
@@ -210,7 +218,7 @@ export function defineIterableProperty(obj, name, v) {
     });
     // Lazily initialize `push`
     let push = (v) => {
-        initIterator(); // Updates `push` to reference the broadcaster
+        initIterator(); // Updates `push` to reference the multi-queue
         return push(v);
     };
     let a = box(v, extras);
@@ -252,7 +260,7 @@ function box(a, pds) {
         case 'number':
         case 'string':
             // Boxes types, including BigInt
-            return Object.defineProperties(Object.assign(a), {
+            return Object.defineProperties(Object(a), {
                 ...pds,
                 toJSON: { value() { return a.valueOf(); } }
             });
@@ -266,7 +274,7 @@ export const merge = (...ai) => {
     const forever = new Promise(() => { });
     let count = promises.length;
     const merged = {
-        [Symbol.asyncIterator]() { return this; },
+        [Symbol.asyncIterator]() { return merged; },
         next() {
             return count
                 ? Promise.race(promises).then(({ idx, result }) => {
@@ -276,7 +284,7 @@ export const merge = (...ai) => {
                         results[idx] = result.value;
                         // We don't yield intermediate return values, we just keep them in results
                         // return { done: count === 0, value: result.value }
-                        return this.next();
+                        return merged.next();
                     }
                     else {
                         // `ex` is the underlying async iteration exception
@@ -284,7 +292,7 @@ export const merge = (...ai) => {
                         return result;
                     }
                 }).catch(ex => {
-                    return this.throw?.(ex) ?? Promise.reject({ done: true, value: new Error("Iterator merge exception") });
+                    return merged.throw?.(ex) ?? Promise.reject({ done: true, value: new Error("Iterator merge exception") });
                 })
                 : Promise.reject({ done: true, value: new Error("Iterator merge complete") });
         },

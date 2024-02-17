@@ -1,6 +1,5 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { deferred } from "./deferred.js";
 import { PushIterator, pushIterator, iterableHelpers, asyncExtras, merge, AsyncExtraIterable } from "./iterators.js";
 
 /*
@@ -209,14 +208,13 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
     const start: AsyncIterableIterator<{}> = {
       [Symbol.asyncIterator]: () => start,
       next() {
-        const d = deferred<IteratorResult<{}>>();
-        requestAnimationFrame(() => {
-          // terminate on the next call to `next()`
-          start.next = ()=>Promise.resolve({ done: true, value: undefined })
-          // Yield a "start" event
-          d.resolve({ done: false, value: {} })
-        });
-        return d;
+        return new Promise<IteratorResult<{}>>(resolve =>
+          requestAnimationFrame(() => {
+            // terminate on the next call to `next()`
+            start.next = () => Promise.resolve({ done: true, value: undefined })
+            // Yield a "start" event
+            resolve({ done: false, value: {} })
+          }));
       }
     };
     iterators.push(start);
@@ -271,13 +269,12 @@ function elementIsInDOM(elt: Element): Promise<void> {
   if (document.body.contains(elt))
     return Promise.resolve();
 
-  const d = deferred<void>();
-  new MutationObserver((records, mutation) => {
+  return new Promise<void>(resolve => new MutationObserver((records, mutation) => {
     for (const record of records) {
       if (record.addedNodes?.length) {
         if (document.body.contains(elt)) {
           mutation.disconnect();
-          d.resolve();
+          resolve();
           return;
         }
       }
@@ -285,8 +282,7 @@ function elementIsInDOM(elt: Element): Promise<void> {
   }).observe(document.body, {
     subtree: true,
     childList: true
-  });
-  return d;
+  }));
 }
 
 function allSelectorsPresent(container: Element, missing: string[]): Promise<void> {
@@ -294,24 +290,13 @@ function allSelectorsPresent(container: Element, missing: string[]): Promise<voi
     return Promise.resolve();
   }
 
-  const d = deferred<void>();
-  /* debugging help: warn if waiting a long time for a selectors to be ready */
-  if (DEBUG) {
-    const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
-    const warn = setTimeout(() => {
-      console.warn(stack, missing);
-    }, 5000);
-
-    d.finally(() => clearTimeout(warn))
-  }
-
-  new MutationObserver((records, mutation) => {
+  const promise = new Promise<void>(resolve => new MutationObserver((records, mutation) => {
     for (const record of records) {
       if (record.addedNodes?.length) {
         missing = missing.filter(sel => !container.querySelector(sel));
         if (!missing.length) {
           mutation.disconnect();
-          d.resolve();
+          resolve();
           return;
         }
       }
@@ -319,6 +304,17 @@ function allSelectorsPresent(container: Element, missing: string[]): Promise<voi
   }).observe(container, {
     subtree: true,
     childList: true
-  });
-  return d;
+  }));
+
+  /* debugging help: warn if waiting a long time for a selectors to be ready */
+  if (DEBUG) {
+    const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
+    const warn = setTimeout(() => {
+      console.warn(stack, missing);
+    }, 5000);
+
+    promise.finally(() => clearTimeout(warn))
+  }
+
+  return promise;
 }
