@@ -41,6 +41,6 @@
     "prepublishOnly": "npm run build",
     "test": "tsc -p ../type_tests/tsconfig.json"
   },
-  "types": "./esm/*.d.ts",
+  "types": "./esm/ai-ui.d.ts",
   "version": "0.10.9"
 }
