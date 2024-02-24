@@ -1,7 +1,7 @@
 import { isPromiseLike } from './deferred.js';
 import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { ChildTags, Instance, Overrides, TagCreator } from './tags'
+import { ChildTags, Instance, Overrides, TagCreator } from './tags.js'
 import { DEBUG } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
@@ -448,11 +448,13 @@ export const tag = <TagLoader>function <Tags extends string,
     // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
     // Here's where we actually create the tag, by accumulating all the base attributes and
     // (finally) assigning those specified by the instantiation
-    const extendTagFn = (attrs: {
+    type ExtendTagFunction = (attrs:{
       debugger?: any;
       document?: Document;
       [callStackSymbol]?: Overrides[];
-    } | ChildTags, ...children: ChildTags[]) => {
+    } | ChildTags, ...children: ChildTags[]) => Element
+
+    const extendTagFn: ExtendTagFunction = (attrs, ...children) => {
       const noAttrs = isChildTag(attrs) ;
       const newCallStack: Overrides[] = [];
       const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack  };
@@ -486,7 +488,7 @@ export const tag = <TagLoader>function <Tags extends string,
       return e;
     }
 
-    const extendTag = </*TagCreator<Element>*/any>Object.assign(extendTagFn, {
+    const extendTag = Object.assign(extendTagFn, {
       super: this,
       overrides,
       extended,
@@ -664,7 +666,8 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
       if (elt.id) {
         if (!ids![elt.id])
           ids![elt.id] = elt;
-        //else console.warn("Shadowed element ID",elt.id,elt,ids[elt.id])
+        else if (DEBUG)
+          console.info("Shadowed multiple element IDs", elt.id, elt, ids![elt.id])
       }
     });
   }

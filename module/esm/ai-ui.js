@@ -380,9 +380,6 @@ export const tag = function (_1, _2, _3) {
                 document.head.appendChild(poStyleElt);
             }
         }
-        // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
-        // Here's where we actually create the tag, by accumulating all the base attributes and
-        // (finally) assigning those specified by the instantiation
         const extendTagFn = (attrs, ...children) => {
             const noAttrs = isChildTag(attrs);
             const newCallStack = [];
@@ -562,7 +559,8 @@ export function getElementIdMap(node, ids) {
             if (elt.id) {
                 if (!ids[elt.id])
                     ids[elt.id] = elt;
-                //else console.warn("Shadowed element ID",elt.id,elt,ids[elt.id])
+                else if (DEBUG)
+                    console.info("Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
             }
         });
     }

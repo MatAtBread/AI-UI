@@ -1,5 +1,5 @@
 import { WhenParameters, WhenReturn } from './when.js';
-import { ChildTags, TagCreator } from './tags';
+import { ChildTags, TagCreator } from './tags.js';
 export { when } from './when.js';
 export { ChildTags, Instance, TagCreator } from './tags';
 export * as Iterators from './iterators.js';
