@@ -551,6 +551,7 @@ export let enableOnRemovedFromDOM = function () {
         });
     }).observe(document.body, { subtree: true, childList: true });
 };
+const warned = new Set();
 export function getElementIdMap(node, ids) {
     node = node || document;
     ids = ids || {};
@@ -559,8 +560,12 @@ export function getElementIdMap(node, ids) {
             if (elt.id) {
                 if (!ids[elt.id])
                     ids[elt.id] = elt;
-                else if (DEBUG)
-                    console.info("Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
+                else if (DEBUG) {
+                    if (!warned.has(elt.id)) {
+                        warned.add(elt.id);
+                        console.info("Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
+                    }
+                }
             }
         });
     }
