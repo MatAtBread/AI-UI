@@ -345,6 +345,7 @@ export function generatorHelpers(g) {
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
 async function* map(...mapper) {
     const ai = this[Symbol.asyncIterator]();
+    let exit = () => ai.return?.();
     try {
         while (true) {
             const p = await ai.next();
@@ -356,11 +357,15 @@ async function* map(...mapper) {
         }
     }
     catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
+        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+    }
+    finally {
+        exit();
     }
 }
 async function* filter(fn) {
     const ai = this[Symbol.asyncIterator]();
+    let exit = () => ai.return?.();
     try {
         while (true) {
             const p = await ai.next();
@@ -373,12 +378,16 @@ async function* filter(fn) {
         }
     }
     catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
+        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+    }
+    finally {
+        exit();
     }
 }
 const noUniqueValue = Symbol('noUniqueValue');
 async function* unique(fn) {
     const ai = this[Symbol.asyncIterator]();
+    let exit = () => ai.return?.();
     let prev = noUniqueValue;
     try {
         while (true) {
@@ -393,7 +402,10 @@ async function* unique(fn) {
         }
     }
     catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
+        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+    }
+    finally {
+        exit();
     }
 }
 async function* initially(initValue) {
@@ -403,6 +415,7 @@ async function* initially(initValue) {
 }
 async function* throttle(milliseconds) {
     const ai = this[Symbol.asyncIterator]();
+    let exit = () => ai.return?.();
     let paused = 0;
     try {
         while (true) {
@@ -418,13 +431,17 @@ async function* throttle(milliseconds) {
         }
     }
     catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
+        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+    }
+    finally {
+        exit();
     }
 }
 const forever = new Promise(() => { });
 // NB: DEBOUNCE IS CURRENTLY BROKEN
 async function* debounce(milliseconds) {
     const ai = this[Symbol.asyncIterator]();
+    let exit = () => ai.return?.();
     let timer = forever;
     let last = -1;
     try {
@@ -448,11 +465,15 @@ async function* debounce(milliseconds) {
         }
     }
     catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
+        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+    }
+    finally {
+        exit();
     }
 }
 async function* waitFor(cb) {
     const ai = this[Symbol.asyncIterator]();
+    let exit = () => ai.return?.();
     try {
         while (true) {
             const p = await ai.next();
@@ -464,11 +485,15 @@ async function* waitFor(cb) {
         }
     }
     catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
+        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+    }
+    finally {
+        exit();
     }
 }
 async function* count(field) {
     const ai = this[Symbol.asyncIterator]();
+    let exit = () => ai.return?.();
     let count = 0;
     try {
         for await (const value of this) {
@@ -481,7 +506,10 @@ async function* count(field) {
         ai.return?.();
     }
     catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
+        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+    }
+    finally {
+        exit();
     }
 }
 function retain() {

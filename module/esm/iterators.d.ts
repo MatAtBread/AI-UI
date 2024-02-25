@@ -23,7 +23,7 @@ export declare const asyncExtras: {
     waitFor: <U_5>(this: Partial<AsyncIterable<U_5>>, cb: (done: (value: void | PromiseLike<void>) => void) => void) => AsyncIterable<U_5> & AsyncExtraIterable<U_5>;
     count: <U_6 extends {}, K extends string>(this: Partial<AsyncIterable<U_6>>, field: K) => AsyncGenerator<Awaited<U_6> & {
         [x: string]: number;
-    }, IteratorResult<U_6, any> | undefined, unknown> & AsyncExtraIterable<Awaited<U_6> & {
+    }, void, unknown> & AsyncExtraIterable<Awaited<U_6> & {
         [x: string]: number;
     }>;
     retain: <U_7 extends {}>(this: Partial<AsyncIterable<U_7>>) => AsyncIterableIterator<U_7> & {
