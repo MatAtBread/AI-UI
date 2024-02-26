@@ -178,16 +178,29 @@ function allSelectorsPresent(container, missing) {
         return Promise.resolve();
     }
     const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
-        for (const record of records) {
-            if (record.addedNodes?.length) {
-                missing = missing.filter(sel => !container.querySelector(sel));
-                if (!missing.length) {
-                    mutation.disconnect();
-                    resolve();
-                    return;
-                }
+        // If any nodes were added to the container, check if our selectors are all present.
+        // We don't bother doing this in a smart way - of anything is added check all selectors,
+        // otherwise we might have issues with a node that is added and later removed before the
+        // others turn up.
+        if (records.some(r => r.addedNodes?.length)) {
+            const allPresent = missing.every(sel => container.querySelector(sel) !== null);
+            if (allPresent) {
+                mutation.disconnect();
+                resolve();
             }
         }
+        /*
+        for (const record of records) {
+          if (record.addedNodes?.length) {
+            missing = missing.filter(sel => !container.querySelector(sel));
+            if (!missing.length) {
+              mutation.disconnect();
+              resolve();
+              return;
+            }
+          }
+        }
+        */
     }).observe(container, {
         subtree: true,
         childList: true
@@ -196,7 +209,7 @@ function allSelectorsPresent(container, missing) {
     if (DEBUG) {
         const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
         const warn = setTimeout(() => {
-            console.warn(stack, missing);
+            console.warn(stack, missing.filter(sel => container.querySelector(sel) === null), container);
         }, 5000);
         promise.finally(() => clearTimeout(warn));
     }
