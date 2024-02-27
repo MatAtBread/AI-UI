@@ -696,6 +696,7 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
 }
 */
 function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
+  const source = this;
   let consumers = 0;
   let current = deferred<IteratorResult<T>>();
   let ai: AsyncIterator<T, any, undefined>;
@@ -718,7 +719,7 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
           current.reject({ done: true, value: reason });
         }
 
-        ai = this[Symbol.asyncIterator]()
+        ai = source[Symbol.asyncIterator]()
         ai.next().then(update).catch(error);
       }
       consumers += 1;

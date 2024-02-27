@@ -13,7 +13,7 @@ async function* g(label: string, t: number, ret = -1, ex = -1) {
     while(1) {
       i += 1;
       console.log(label, "yield", i);
-      const y = [label, i] as [string, number]; 
+      const y = [label, i] as [string, number];
       yield y;
       if (i===2)
         yield y;
@@ -49,10 +49,16 @@ async function run(i: AsyncIterable<any>, ex = -1) {
   }
 }
 
-(async function(){
-  await run(iterableHelpers(g("waitFor", 0.3, 5)).waitFor(done => setTimeout(done,500)));
 
-/*   await run(iterableHelpers(g("slow", 0.3, 5)).filter(v => sleep(5,true)));
+
+(async function(){
+  const m = iterableHelpers(g("multi", 0.3, 5)).waitFor(done => setTimeout(done,1000)).multi();
+  run(m.map(v => ['first', ...v]));
+  await sleep(70)
+  run(m.map(v => ['second', ...v]));
+/*  await run(iterableHelpers(g("waitFor", 0.3, 5)).waitFor(done => setTimeout(done,500)));
+
+   await run(iterableHelpers(g("slow", 0.3, 5)).filter(v => sleep(5,true)));
   await run(g("gen", 0.3, 5));
   await run(iterableHelpers(g("filter", 0.3, 5)).filter(v => Boolean(v[1]&1)));
   await run(iterableHelpers(g("unique", 0.3, 5)).unique());
