@@ -302,10 +302,10 @@ function box(a: unknown, pds: Record<string | symbol, PropertyDescriptor>) {
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 
-export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
+export const merge = <TNext, TReturn, A extends Partial<AsyncIterable<TNext> | AsyncIterator<TNext, TReturn>>[]>(...ai: A) => {
   const it = (ai as AsyncIterable<any>[]).map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
   const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
-  const results: CollapseIterableType<A[number]>[] = [];
+  const results: IteratorResult<TNext, TReturn>[] = [];
   const forever = new Promise<any>(() => { });
   let count = promises.length;
   const merged: AsyncIterableIterator<A[number]> = {
@@ -328,17 +328,16 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
         }).catch(ex => {
           return merged.throw?.(ex) ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
         })
-        : Promise.reject({ done: true as const, value: new Error("Iterator merge complete") });
+        : Promise.resolve({ done: true as const, value: results.map(r => r.value) });
     },
-    async return() {
-      const ex = new Error("Merge terminated");
+    async return(r) {
       for (let i = 0; i < it.length; i++) {
         if (promises[i] !== forever) {
           promises[i] = forever;
-          results[i] = await it[i].return?.({ done: true, value: ex }).then(v => v.value, ex => ex);
+          results[i] = await it[i].return?.({ done: true, value: r }).then(v => v.value, ex => ex);
         }
       }
-      return { done: true, value: results };
+      return { done: true, value: results.map(r => r.value) };
     },
     async throw(ex: any) {
       for (let i = 0; i < it.length; i++) {
@@ -354,7 +353,6 @@ export const merge = <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => {
   };
   return iterableHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
 }
-
 
 /*
   Extensions to the AsyncIterable:
@@ -384,43 +382,98 @@ export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A ext
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
-async function* map<U, R>(this: AsyncIterable<U>, ...mapper: ((o: U) => R | PromiseLike<R>)[]): AsyncIterable<Awaited<R>> {
+// There is an issue with the types here when used with more than one mapper. The intention (and implementation) is that each mapper feeds the next in
+// turn, so this => m1 => m2 => m3...., but TS doesn't really have syntax to represent this without potentially a lot of recursion, so
+// we simply map from the first to the last, making the intermediate ones a bit typeless
+
+type Mapper<U,R> = ((o: U) => R | PromiseLike<R>);
+
+/* WIP:
+type X<MS> = MS extends [Mapper<infer A0, infer _B0>,...Mapper<any,any>[],Mapper<infer _An, infer Bn>] ? Mapper<A0,Bn>: 
+  MS extends [Mapper<infer A, infer B>] ? Mapper<A,B>:
+  never;
+
+var x1:X<[Mapper<number,string>, Mapper<string,boolean>]>;
+var x2:X<[Mapper<string,boolean>]>;
+var x3:X<[Mapper<number,string>, Mapper<Window,Document>, Mapper<string,boolean>]>;
+*/
+
+async function* map<U, R>(this: AsyncIterable<U>, ...mapper: Mapper<U, R>[]): AsyncIterable<Awaited<R>> {
   const ai = this[Symbol.asyncIterator]();
-  let exit = () => ai.return?.();
   try {
     while (true) {
-      const p = await ai.next();
-      if (p.done) {
-        return ai.return?.(p.value);
+      let p: IteratorResult<U, any>;
+      try {
+        p = await ai.next();
+      } catch (ex) {
+        // The source threw, so we tell the consumer
+        throw { done: true, value: ex }
       }
-      for (const m of mapper)
-        yield m(p.value);
+
+      let v: U | R = p.value;
+      try {
+        for (const m of mapper)
+          v = await m(v as U);
+      } catch (ex) {
+        // The mapper threw, we need to terminate the source and throw the error
+        ai.throw ? ai.throw(ex) : ai.return?.();
+        throw { done: true, value: ex }
+      }
+      if (p.done)
+        return v;
+      try {
+        yield v as R;
+      } catch (ex) {
+        // The consumer told us to throw, so we need to terminate the source
+        ai.throw?.(ex);
+        break;
+      }
     }
-  } catch (ex) {
-    exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+  } finally {
+    // The consumer told us to return, so we need to terminate the source
+    ai.return?.()
   }
-  finally { exit() }
 }
 
 async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<boolean>): AsyncIterable<U> {
-  const ai = this[Symbol.asyncIterator]();
-  let exit = () => ai.return?.();
-  try {
-    while (true) {
-      const p = await ai.next();
-      if (p.done) {
-        return ai.return?.(p.value);
-      }
-      if (await fn(p.value)) {
-        yield p.value;
-      }
-    }
-  } catch (ex) {
-    exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-  }
-  finally { exit() }
-}
+    const ai = this[Symbol.asyncIterator]();
+    try {
+      while (true) {
+        let p: IteratorResult<U, any>;
+        try {
+          p = await ai.next();
+        } catch (ex) {
+          // The source threw, so we tell the consumer
+          throw { done: true, value: ex }
+        }
 
+        if (p.done)
+          return p.value;
+
+        let f: boolean;
+        try {
+            f = await fn(p.value);
+        } catch (ex) {
+          // The filter threw, we need to terminate the source and throw the error
+          ai.throw ? ai.throw(ex) : ai.return?.();
+          throw { done: true, value: ex }
+        }
+        if (f) {
+          try {
+            yield p.value;
+          } catch (ex) {
+            // The consumer told us to throw, so we need to terminate the source
+            ai.throw?.(ex);
+            break;
+          }
+        }
+      }
+    } finally {
+      // The consumer told us to return, so we need to terminate the source
+      ai.return?.()
+    }
+  }
+  
 const noUniqueValue = Symbol('noUniqueValue');
 async function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();

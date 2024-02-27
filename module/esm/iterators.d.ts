@@ -15,7 +15,7 @@ export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
-    map: <U, R>(this: Partial<AsyncIterable<U>>, ...args: ((o: U) => R | PromiseLike<R>)[]) => AsyncIterable<Awaited<R>> & AsyncExtraIterable<Awaited<R>>;
+    map: <U, R>(this: Partial<AsyncIterable<U>>, ...args: Mapper<U, R>[]) => AsyncIterable<Awaited<R>> & AsyncExtraIterable<Awaited<R>>;
     filter: <U_1>(this: Partial<AsyncIterable<U_1>>, fn: (o: U_1) => boolean | PromiseLike<boolean>) => AsyncIterable<U_1> & AsyncExtraIterable<U_1>;
     unique: <U_2>(this: Partial<AsyncIterable<U_2>>, fn?: ((next: U_2, prev: U_2) => boolean | PromiseLike<boolean>) | undefined) => AsyncIterable<U_2> & AsyncExtraIterable<U_2>;
     throttle: <U_3>(this: Partial<AsyncIterable<U_3>>, milliseconds: number) => AsyncIterable<U_3> & AsyncExtraIterable<U_3>;
@@ -43,8 +43,9 @@ export declare function defineIterableProperty<T extends {}, N extends string | 
 };
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
-export declare const merge: <A extends Partial<AsyncIterable<any>>[]>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
+export declare const merge: <TNext, TReturn, A extends Partial<AsyncIterable<TNext> | AsyncIterator<TNext, TReturn, undefined>>[]>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
 export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never);
 export declare function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G): (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never);
+type Mapper<U, R> = ((o: U) => R | PromiseLike<R>);
 declare function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void>;
 export {};

@@ -294,17 +294,16 @@ export const merge = (...ai) => {
                 }).catch(ex => {
                     return merged.throw?.(ex) ?? Promise.reject({ done: true, value: new Error("Iterator merge exception") });
                 })
-                : Promise.reject({ done: true, value: new Error("Iterator merge complete") });
+                : Promise.resolve({ done: true, value: results.map(r => r.value) });
         },
-        async return() {
-            const ex = new Error("Merge terminated");
+        async return(r) {
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    results[i] = await it[i].return?.({ done: true, value: ex }).then(v => v.value, ex => ex);
+                    results[i] = await it[i].return?.({ done: true, value: r }).then(v => v.value, ex => ex);
                 }
             }
-            return { done: true, value: results };
+            return { done: true, value: results.map(r => r.value) };
         },
         async throw(ex) {
             for (let i = 0; i < it.length; i++) {
@@ -342,46 +341,92 @@ export function generatorHelpers(g) {
         return iterableHelpers(g(...args));
     };
 }
-/* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
+/* WIP:
+type X<MS> = MS extends [Mapper<infer A0, infer _B0>,...Mapper<any,any>[],Mapper<infer _An, infer Bn>] ? Mapper<A0,Bn>:
+  MS extends [Mapper<infer A, infer B>] ? Mapper<A,B>:
+  never;
+
+var x1:X<[Mapper<number,string>, Mapper<string,boolean>]>;
+var x2:X<[Mapper<string,boolean>]>;
+var x3:X<[Mapper<number,string>, Mapper<Window,Document>, Mapper<string,boolean>]>;
+*/
 async function* map(...mapper) {
     const ai = this[Symbol.asyncIterator]();
-    let exit = () => ai.return?.();
     try {
         while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
+            let p;
+            try {
+                p = await ai.next();
             }
-            for (const m of mapper)
-                yield m(p.value);
+            catch (ex) {
+                // The source threw, so we tell the consumer
+                throw { done: true, value: ex };
+            }
+            let v = p.value;
+            try {
+                for (const m of mapper)
+                    v = await m(v);
+            }
+            catch (ex) {
+                // The mapper threw, we need to terminate the source and throw the error
+                ai.throw ? ai.throw(ex) : ai.return?.();
+                throw { done: true, value: ex };
+            }
+            if (p.done)
+                return v;
+            try {
+                yield v;
+            }
+            catch (ex) {
+                // The consumer told us to throw, so we need to terminate the source
+                ai.throw?.(ex);
+                break;
+            }
         }
     }
-    catch (ex) {
-        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-    }
     finally {
-        exit();
+        // The consumer told us to return, so we need to terminate the source
+        ai.return?.();
     }
 }
 async function* filter(fn) {
     const ai = this[Symbol.asyncIterator]();
-    let exit = () => ai.return?.();
     try {
         while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
+            let p;
+            try {
+                p = await ai.next();
             }
-            if (await fn(p.value)) {
-                yield p.value;
+            catch (ex) {
+                // The source threw, so we tell the consumer
+                throw { done: true, value: ex };
+            }
+            if (p.done)
+                return p.value;
+            let f;
+            try {
+                f = await fn(p.value);
+            }
+            catch (ex) {
+                // The filter threw, we need to terminate the source and throw the error
+                ai.throw ? ai.throw(ex) : ai.return?.();
+                throw { done: true, value: ex };
+            }
+            if (f) {
+                try {
+                    yield p.value;
+                }
+                catch (ex) {
+                    // The consumer told us to throw, so we need to terminate the source
+                    ai.throw?.(ex);
+                    break;
+                }
             }
         }
     }
-    catch (ex) {
-        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-    }
     finally {
-        exit();
+        // The consumer told us to return, so we need to terminate the source
+        ai.return?.();
     }
 }
 const noUniqueValue = Symbol('noUniqueValue');
