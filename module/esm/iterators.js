@@ -190,7 +190,7 @@ export function defineIterableProperty(obj, name, v) {
     let initIterator = () => {
         initIterator = () => b;
         // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
-        //const bi = pushIterator<V>(); 
+        //const bi = pushIterator<V>();
         //const b = bi.multi()[Symbol.asyncIterator]();
         const bi = broadcastIterator();
         const b = bi[Symbol.asyncIterator]();
@@ -294,7 +294,7 @@ export const merge = (...ai) => {
                 }).catch(ex => {
                     return merged.throw?.(ex) ?? Promise.reject({ done: true, value: new Error("Iterator merge exception") });
                 })
-                : Promise.resolve({ done: true, value: results.map(r => r.value) });
+                : Promise.resolve({ done: true, value: results });
         },
         async return(r) {
             for (let i = 0; i < it.length; i++) {
@@ -303,7 +303,7 @@ export const merge = (...ai) => {
                     results[i] = await it[i].return?.({ done: true, value: r }).then(v => v.value, ex => ex);
                 }
             }
-            return { done: true, value: results.map(r => r.value) };
+            return { done: true, value: results };
         },
         async throw(ex) {
             for (let i = 0; i < it.length; i++) {

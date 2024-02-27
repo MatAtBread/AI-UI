@@ -207,7 +207,7 @@ export function defineIterableProperty<T extends {}, N extends string | number |
   let initIterator = () => {
     initIterator = () => b;
     // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
-    //const bi = pushIterator<V>(); 
+    //const bi = pushIterator<V>();
     //const b = bi.multi()[Symbol.asyncIterator]();
     const bi = broadcastIterator<V>();
     const b = bi[Symbol.asyncIterator]();
@@ -302,10 +302,10 @@ function box(a: unknown, pds: Record<string | symbol, PropertyDescriptor>) {
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 
-export const merge = <TNext, TReturn, A extends Partial<AsyncIterable<TNext> | AsyncIterator<TNext, TReturn>>[]>(...ai: A) => {
+export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => {
   const it = (ai as AsyncIterable<any>[]).map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
   const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
-  const results: IteratorResult<TNext, TReturn>[] = [];
+  const results: (TYield | TReturn)[] = [];
   const forever = new Promise<any>(() => { });
   let count = promises.length;
   const merged: AsyncIterableIterator<A[number]> = {
@@ -328,7 +328,7 @@ export const merge = <TNext, TReturn, A extends Partial<AsyncIterable<TNext> | A
         }).catch(ex => {
           return merged.throw?.(ex) ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
         })
-        : Promise.resolve({ done: true as const, value: results.map(r => r.value) });
+        : Promise.resolve({ done: true as const, value: results });
     },
     async return(r) {
       for (let i = 0; i < it.length; i++) {
@@ -337,7 +337,7 @@ export const merge = <TNext, TReturn, A extends Partial<AsyncIterable<TNext> | A
           results[i] = await it[i].return?.({ done: true, value: r }).then(v => v.value, ex => ex);
         }
       }
-      return { done: true, value: results.map(r => r.value) };
+      return { done: true, value: results };
     },
     async throw(ex: any) {
       for (let i = 0; i < it.length; i++) {
@@ -389,7 +389,7 @@ export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A ext
 type Mapper<U, R> = ((o: U) => R | PromiseLike<R>);
 
 /* WIP:
-type X<MS> = MS extends [Mapper<infer A0, infer _B0>,...Mapper<any,any>[],Mapper<infer _An, infer Bn>] ? Mapper<A0,Bn>: 
+type X<MS> = MS extends [Mapper<infer A0, infer _B0>,...Mapper<any,any>[],Mapper<infer _An, infer Bn>] ? Mapper<A0,Bn>:
   MS extends [Mapper<infer A, infer B>] ? Mapper<A,B>:
   never;
 
@@ -718,10 +718,10 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
           current.reject({ done: true, value: reason });
         }
 
-        ai = this[Symbol.asyncIterator]()        
+        ai = this[Symbol.asyncIterator]()
         ai.next().then(update).catch(error);
       }
-      consumers += 1; 
+      consumers += 1;
       return this;
     },
 

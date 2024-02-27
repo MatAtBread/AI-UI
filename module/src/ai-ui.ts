@@ -666,8 +666,8 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
       if (elt.id) {
         if (!ids![elt.id])
           ids![elt.id] = elt;
-        else if (DEBUG)
-          console.info("Shadowed multiple element IDs", elt.id, elt, ids![elt.id])
+        //else if (DEBUG)
+        //  console.info("Shadowed multiple element IDs", elt.id/*, elt, ids![elt.id]*/)
       }
     });
   }
