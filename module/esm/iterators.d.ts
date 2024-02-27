@@ -36,5 +36,8 @@ export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIter
 export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never);
 export declare function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G): (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never);
 type Mapper<U, R> = ((o: U) => R | PromiseLike<R>);
+type MaybePromised<T> = PromiseLike<T> | T;
+export declare const Ignore: unique symbol;
+export declare function filterMap<U, R>(source: AsyncIterable<U>, fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncIterableIterator<R>;
 declare function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void>;
 export {};
