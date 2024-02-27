@@ -40,14 +40,14 @@ function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(f
 
 type AsyncIterableHelpers = typeof asyncExtras;
 export const asyncExtras = {
+  // throttle: wrapAsyncHelper(throttle),
+  // debounce: wrapAsyncHelper(debounce),
+  // count: wrapAsyncHelper(count),
+  // retain: wrapAsyncHelper(retain),
   map: wrapAsyncHelper(map),
   filter: wrapAsyncHelper(filter),
   unique: wrapAsyncHelper(unique),
-  throttle: wrapAsyncHelper(throttle),
-  debounce: wrapAsyncHelper(debounce),
   waitFor: wrapAsyncHelper(waitFor),
-  count: wrapAsyncHelper(count),
-  retain: wrapAsyncHelper(retain),
   multi: wrapAsyncHelper(multi),
   broadcast: wrapAsyncHelper(broadcast),
   initially: wrapAsyncHelper(initially),
@@ -386,7 +386,7 @@ export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A ext
 // turn, so this => m1 => m2 => m3...., but TS doesn't really have syntax to represent this without potentially a lot of recursion, so
 // we simply map from the first to the last, making the intermediate ones a bit typeless
 
-type Mapper<U,R> = ((o: U) => R | PromiseLike<R>);
+type Mapper<U, R> = ((o: U) => R | PromiseLike<R>);
 
 /* WIP:
 type X<MS> = MS extends [Mapper<infer A0, infer _B0>,...Mapper<any,any>[],Mapper<infer _An, infer Bn>] ? Mapper<A0,Bn>: 
@@ -398,6 +398,84 @@ var x2:X<[Mapper<string,boolean>]>;
 var x3:X<[Mapper<number,string>, Mapper<Window,Document>, Mapper<string,boolean>]>;
 */
 
+type MaybePromised<T> = PromiseLike<T> | T;
+
+const Ignore = Symbol("Ignore");
+function filterMap<U, R>(source: AsyncIterable<U>,
+  fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
+  initialValue: R | typeof Ignore = Ignore
+): AsyncIterableIterator<R> {
+  const ai = source[Symbol.asyncIterator]();
+  let prev: R | typeof Ignore = Ignore;
+  return {
+    [Symbol.asyncIterator]() {
+      return this;
+    },
+
+    next(...args: [] | [undefined]) {
+      if (initialValue !== Ignore) {
+        const init = Promise.resolve(initialValue).then(value => ({ done: false, value }));
+        initialValue = Ignore;
+        return init;
+      }
+
+      return new Promise<IteratorResult<R>>(function step(resolve, reject) {
+        ai.next(...args).then(
+          p => p.done
+            ? resolve(p)
+            : Promise.resolve(fn(p.value, prev))/*new Promise<R | typeof Ignore>(pass => pass(fn(p.value, prev)))*/.then(
+              f => f === Ignore
+                ? step(resolve, reject)
+                : resolve({ done: false, value: prev = f }),
+              ex => {
+                // The filter function failed...
+                ai.throw ? ai.throw(ex) : ai.return?.(ex) // ?.then(r => r, ex => ex); // Terminate the source - for now we ignore the result of the termination
+                reject({ done: true, value: ex }); // Terminate the consumer
+              }
+            ),
+
+          ex =>
+            // The source threw. Tell the consumer
+            reject({ done: true, value: ex })
+        )
+      })
+    },
+
+    throw(ex: any) {
+      // The consumer wants us to exit with an exception. Tell the source
+      return Promise.resolve(ai.throw ? ai.throw(ex) : ai.return?.(ex)).then(v => ({ done: true, value: v?.value }))
+    },
+
+    return(v?: any) {
+      // The consumer told us to return, so we need to terminate the source
+      return Promise.resolve(ai.return?.(v)).then(v => ({ done: true, value: v?.value }))
+    }
+  }
+}
+
+function map<U, R>(this: AsyncIterable<U>, mapper: Mapper<U, R>) {
+  return filterMap(this, mapper);
+}
+
+function filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<boolean>) {
+  return filterMap(this, async o => (await fn(o) ? o : Ignore));
+}
+
+function unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterableIterator<U> {
+  return fn
+    ? filterMap(this, async (o, p) => (p === Ignore || await fn(o, p)) ? o : Ignore)
+    : filterMap(this, (o, p) => o === p ? Ignore : o);
+}
+
+function initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I> {
+  return filterMap(this as AsyncIterable<U | I>, o => o, initValue);
+}
+
+function waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void) {
+  return filterMap(this, o => new Promise<U>(resolve => { cb(() => resolve(o)); return o }));
+}
+
+/*
 async function* map<U, R>(this: AsyncIterable<U>, ...mapper: Mapper<U, R>[]): AsyncIterable<Awaited<R>> {
   const ai = this[Symbol.asyncIterator]();
   try {
@@ -473,7 +551,6 @@ async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | Promis
       ai.return?.()
     }
   }
-  
 const noUniqueValue = Symbol('noUniqueValue');
 async function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
@@ -501,7 +578,6 @@ async function* initially<U, I = U>(this: AsyncIterable<U>, initValue: I): Async
   for await (const u of this)
     yield u;
 }
-
 
 async function* throttle<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
@@ -618,39 +694,55 @@ function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> 
     }
   }
 }
-
+*/
 function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
-  const ai = this[Symbol.asyncIterator]();
-
+  let consumers = 0;
   let current = deferred<IteratorResult<T>>();
-
-  // The source has produced a new result
-  function update(it: IteratorResult<T, any>) {
-    current.resolve(it);
-    if (!it.done) {
-      current = deferred<IteratorResult<T>>();
-      ai.next().then(update).catch(error);
-    }
-  }
-
-  // The source has errored
-  function error(reason: any) {
-    current.reject({ done: true, value: reason });
-  }
-
-  ai.next().then(update).catch(error);
+  let ai: AsyncIterator<T, any, undefined>;
 
   return {
-    [Symbol.asyncIterator]() { return this },
+    [Symbol.asyncIterator]() {
+      // Someone wants to start consuming. Start the source if we're the first
+      if (!consumers) {
+        // The source has produced a new result
+        function update(it: IteratorResult<T, any>) {
+          current.resolve(it);
+          if (!it.done) {
+            current = deferred<IteratorResult<T>>();
+            ai.next().then(update).catch(error);
+          }
+        }
+
+        // The source has errored, reject any consumers and reset the iterator
+        function error(reason: any) {
+          current.reject({ done: true, value: reason });
+        }
+
+        ai = this[Symbol.asyncIterator]()        
+        ai.next().then(update).catch(error);
+      }
+      consumers += 1; 
+      return this;
+    },
+
     next() {
       return current;
     },
-    return(value?: any) {
-      return ai.return?.(value) ?? Promise.resolve({ done: true as const, value });
+    throw(ex: any) {
+      // The consumer wants us to exit with an exception. Tell the source if we're the final one
+      consumers -= 1;
+      if (consumers)
+        return Promise.resolve({ done: true, value: ex });
+      return Promise.resolve(ai.throw ? ai.throw(ex) : ai.return?.(ex)).then(v => ({ done: true, value: v?.value }))
     },
-    throw(...args: any[]) {
-      return ai.throw?.(args) ?? Promise.resolve({ done: true as const, value: args[0] })
-    },
+
+    return(v?: any) {
+      // The consumer told us to return, so we need to terminate the source if we're the only one
+      consumers -= 1;
+      if (consumers)
+        return Promise.resolve({ done: true, value: v });
+      return Promise.resolve(ai.return?.(v)).then(v => ({ done: true, value: v?.value }))
+    }
   };
 }
 
@@ -683,4 +775,4 @@ async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | 
   await last;
 }
 
-const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, multi, broadcast, initially, consume, merge };
+const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge /*, throttle, debounce, count, retain */ };

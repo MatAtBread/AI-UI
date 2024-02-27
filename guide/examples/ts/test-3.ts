@@ -1,8 +1,10 @@
 import { iterableHelpers } from '../../../module/esm/iterators.js';
 
 // Async Iteratots tests
-function sleep<T>(d: number, ret?: T | undefined): Promise<T | undefined> {
-  return new Promise(resolve => setTimeout(() => resolve(ret), d * 50))
+function sleep<T>(d: number):Promise<void>;
+function sleep<T>(d: number, ret: T): Promise<T>;
+function sleep<T>(d: number, ret?: T) {
+  return new Promise<T | undefined>(resolve => setTimeout(() => resolve(ret), d * 50))
 }
 
 async function* g(label: string, t: number, ret = -1, ex = -1) {
@@ -10,8 +12,11 @@ async function* g(label: string, t: number, ret = -1, ex = -1) {
   try {
     while(1) {
       i += 1;
-//      console.log(label, "yield", i);
-      yield [label, i] as [string, number];
+      console.log(label, "yield", i);
+      const y = [label, i] as [string, number]; 
+      yield y;
+      if (i===2)
+        yield y;
       await sleep(t);
       if (i === ret)
         return label + " return "+i;
@@ -35,7 +40,7 @@ async function run(i: AsyncIterable<any>, ex = -1) {
     for await (const v of i) {
       if (++count === ex)
         throw "run Exit "+count;
-      // console.log("next",v);
+      console.log("next",v);
     }
   } catch (ex) {
     console.warn("run ex",ex);
@@ -45,8 +50,13 @@ async function run(i: AsyncIterable<any>, ex = -1) {
 }
 
 (async function(){
+  await run(iterableHelpers(g("waitFor", 0.3, 5)).waitFor(done => setTimeout(done,500)));
 
+/*   await run(iterableHelpers(g("slow", 0.3, 5)).filter(v => sleep(5,true)));
   await run(g("gen", 0.3, 5));
+  await run(iterableHelpers(g("filter", 0.3, 5)).filter(v => Boolean(v[1]&1)));
+  await run(iterableHelpers(g("unique", 0.3, 5)).unique());
+  await run(iterableHelpers(g("initially", 0.3, 5)).initially(["InitialValue",0]));
   await run(iterableHelpers(g("map", 0.3, 5)).map(v => ["mapped",...v]));
 
   await run(g("genThrow", 0.3, 0, 5));
@@ -57,4 +67,4 @@ async function run(i: AsyncIterable<any>, ex = -1) {
 
   await run(iterableHelpers(g("map", 0.3, 0, 5)).map(v => ["mapped",...v]));
   await run(iterableHelpers(g("mapperEx", 0.3, 9)).map(v => {if (v[1] === 3) throw "MapperEX"; return ["mapped",...v]}));
-})();
+ */})();

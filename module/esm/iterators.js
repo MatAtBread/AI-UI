@@ -24,14 +24,14 @@ function wrapAsyncHelper(fn) {
     return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
 }
 export const asyncExtras = {
+    // throttle: wrapAsyncHelper(throttle),
+    // debounce: wrapAsyncHelper(debounce),
+    // count: wrapAsyncHelper(count),
+    // retain: wrapAsyncHelper(retain),
     map: wrapAsyncHelper(map),
     filter: wrapAsyncHelper(filter),
     unique: wrapAsyncHelper(unique),
-    throttle: wrapAsyncHelper(throttle),
-    debounce: wrapAsyncHelper(debounce),
     waitFor: wrapAsyncHelper(waitFor),
-    count: wrapAsyncHelper(count),
-    retain: wrapAsyncHelper(retain),
     multi: wrapAsyncHelper(multi),
     broadcast: wrapAsyncHelper(broadcast),
     initially: wrapAsyncHelper(initially),
@@ -341,273 +341,324 @@ export function generatorHelpers(g) {
         return iterableHelpers(g(...args));
     };
 }
-/* WIP:
-type X<MS> = MS extends [Mapper<infer A0, infer _B0>,...Mapper<any,any>[],Mapper<infer _An, infer Bn>] ? Mapper<A0,Bn>:
-  MS extends [Mapper<infer A, infer B>] ? Mapper<A,B>:
-  never;
-
-var x1:X<[Mapper<number,string>, Mapper<string,boolean>]>;
-var x2:X<[Mapper<string,boolean>]>;
-var x3:X<[Mapper<number,string>, Mapper<Window,Document>, Mapper<string,boolean>]>;
-*/
-async function* map(...mapper) {
-    const ai = this[Symbol.asyncIterator]();
-    try {
-        while (true) {
-            let p;
-            try {
-                p = await ai.next();
-            }
-            catch (ex) {
-                // The source threw, so we tell the consumer
-                throw { done: true, value: ex };
-            }
-            let v = p.value;
-            try {
-                for (const m of mapper)
-                    v = await m(v);
-            }
-            catch (ex) {
-                // The mapper threw, we need to terminate the source and throw the error
-                ai.throw ? ai.throw(ex) : ai.return?.();
-                throw { done: true, value: ex };
-            }
-            if (p.done)
-                return v;
-            try {
-                yield v;
-            }
-            catch (ex) {
-                // The consumer told us to throw, so we need to terminate the source
-                ai.throw?.(ex);
-                break;
-            }
-        }
-    }
-    finally {
-        // The consumer told us to return, so we need to terminate the source
-        ai.return?.();
-    }
-}
-async function* filter(fn) {
-    const ai = this[Symbol.asyncIterator]();
-    try {
-        while (true) {
-            let p;
-            try {
-                p = await ai.next();
-            }
-            catch (ex) {
-                // The source threw, so we tell the consumer
-                throw { done: true, value: ex };
-            }
-            if (p.done)
-                return p.value;
-            let f;
-            try {
-                f = await fn(p.value);
-            }
-            catch (ex) {
-                // The filter threw, we need to terminate the source and throw the error
-                ai.throw ? ai.throw(ex) : ai.return?.();
-                throw { done: true, value: ex };
-            }
-            if (f) {
-                try {
-                    yield p.value;
-                }
-                catch (ex) {
-                    // The consumer told us to throw, so we need to terminate the source
-                    ai.throw?.(ex);
-                    break;
-                }
-            }
-        }
-    }
-    finally {
-        // The consumer told us to return, so we need to terminate the source
-        ai.return?.();
-    }
-}
-const noUniqueValue = Symbol('noUniqueValue');
-async function* unique(fn) {
-    const ai = this[Symbol.asyncIterator]();
-    let exit = () => ai.return?.();
-    let prev = noUniqueValue;
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            if (fn && prev !== noUniqueValue ? await fn(p.value, prev) : p.value != prev) {
-                yield p.value;
-            }
-            prev = p.value;
-        }
-    }
-    catch (ex) {
-        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-    finally {
-        exit();
-    }
-}
-async function* initially(initValue) {
-    yield initValue;
-    for await (const u of this)
-        yield u;
-}
-async function* throttle(milliseconds) {
-    const ai = this[Symbol.asyncIterator]();
-    let exit = () => ai.return?.();
-    let paused = 0;
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            const now = Date.now();
-            if (paused < now) {
-                paused = now + milliseconds;
-                yield p.value;
-            }
-        }
-    }
-    catch (ex) {
-        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-    finally {
-        exit();
-    }
-}
-const forever = new Promise(() => { });
-// NB: DEBOUNCE IS CURRENTLY BROKEN
-async function* debounce(milliseconds) {
-    const ai = this[Symbol.asyncIterator]();
-    let exit = () => ai.return?.();
-    let timer = forever;
-    let last = -1;
-    try {
-        while (true) {
-            const p = await Promise.race([ai.next(), timer]);
-            if ('done' in p && p.done)
-                return ai.return?.(p.value);
-            if ('debounced' in p && p.debounced) {
-                if (p.debounced === last)
-                    yield p.value;
-            }
-            else {
-                // We have a new value from the src
-                clearTimeout(last);
-                timer = new Promise(resolve => {
-                    last = setTimeout(() => {
-                        resolve({ debounced: last, value: p.value });
-                    }, milliseconds);
-                });
-            }
-        }
-    }
-    catch (ex) {
-        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-    finally {
-        exit();
-    }
-}
-async function* waitFor(cb) {
-    const ai = this[Symbol.asyncIterator]();
-    let exit = () => ai.return?.();
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            await new Promise(resolve => cb(resolve));
-            yield p.value;
-        }
-    }
-    catch (ex) {
-        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-    finally {
-        exit();
-    }
-}
-async function* count(field) {
-    const ai = this[Symbol.asyncIterator]();
-    let exit = () => ai.return?.();
-    let count = 0;
-    try {
-        for await (const value of this) {
-            const counted = {
-                ...value,
-                [field]: count++
-            };
-            yield counted;
-        }
-        ai.return?.();
-    }
-    catch (ex) {
-        exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-    finally {
-        exit();
-    }
-}
-function retain() {
-    const ai = this[Symbol.asyncIterator]();
-    let prev;
+const Ignore = Symbol("Ignore");
+function filterMap(source, fn, initialValue = Ignore) {
+    const ai = source[Symbol.asyncIterator]();
+    let prev = Ignore;
     return {
-        [Symbol.asyncIterator]() { return this; },
-        next() {
-            const n = ai.next();
-            n.then(p => prev = p);
-            return n;
+        [Symbol.asyncIterator]() {
+            return this;
         },
-        return(value) {
-            return ai.return?.(value) ?? Promise.resolve({ done: true, value });
+        next(...args) {
+            if (initialValue !== Ignore) {
+                const init = Promise.resolve(initialValue).then(value => ({ done: false, value }));
+                initialValue = Ignore;
+                return init;
+            }
+            return new Promise(function step(resolve, reject) {
+                ai.next(...args).then(p => p.done
+                    ? resolve(p)
+                    : Promise.resolve(fn(p.value, prev)) /*new Promise<R | typeof Ignore>(pass => pass(fn(p.value, prev)))*/.then(f => f === Ignore
+                        ? step(resolve, reject)
+                        : resolve({ done: false, value: prev = f }), ex => {
+                        // The filter function failed...
+                        ai.throw ? ai.throw(ex) : ai.return?.(ex); // ?.then(r => r, ex => ex); // Terminate the source - for now we ignore the result of the termination
+                        reject({ done: true, value: ex }); // Terminate the consumer
+                    }), ex => 
+                // The source threw. Tell the consumer
+                reject({ done: true, value: ex }));
+            });
         },
-        throw(...args) {
-            return ai.throw?.(args) ?? Promise.resolve({ done: true, value: args[0] });
+        throw(ex) {
+            // The consumer wants us to exit with an exception. Tell the source
+            return Promise.resolve(ai.throw ? ai.throw(ex) : ai.return?.(ex)).then(v => ({ done: true, value: v?.value }));
         },
-        get value() {
-            return prev.value;
-        },
-        get done() {
-            return Boolean(prev.done);
+        return(v) {
+            // The consumer told us to return, so we need to terminate the source
+            return Promise.resolve(ai.return?.(v)).then(v => ({ done: true, value: v?.value }));
         }
     };
 }
-function multi() {
+function map(mapper) {
+    return filterMap(this, mapper);
+}
+function filter(fn) {
+    return filterMap(this, async (o) => (await fn(o) ? o : Ignore));
+}
+function unique(fn) {
+    return fn
+        ? filterMap(this, async (o, p) => (p === Ignore || await fn(o, p)) ? o : Ignore)
+        : filterMap(this, (o, p) => o === p ? Ignore : o);
+}
+function initially(initValue) {
+    return filterMap(this, o => o, initValue);
+}
+function waitFor(cb) {
+    return filterMap(this, o => new Promise(resolve => { cb(() => resolve(o)); return o; }));
+}
+/*
+async function* map<U, R>(this: AsyncIterable<U>, ...mapper: Mapper<U, R>[]): AsyncIterable<Awaited<R>> {
+  const ai = this[Symbol.asyncIterator]();
+  try {
+    while (true) {
+      let p: IteratorResult<U, any>;
+      try {
+        p = await ai.next();
+      } catch (ex) {
+        // The source threw, so we tell the consumer
+        throw { done: true, value: ex }
+      }
+
+      let v: U | R = p.value;
+      try {
+        for (const m of mapper)
+          v = await m(v as U);
+      } catch (ex) {
+        // The mapper threw, we need to terminate the source and throw the error
+        ai.throw ? ai.throw(ex) : ai.return?.();
+        throw { done: true, value: ex }
+      }
+      if (p.done)
+        return v;
+      try {
+        yield v as R;
+      } catch (ex) {
+        // The consumer told us to throw, so we need to terminate the source
+        ai.throw?.(ex);
+        break;
+      }
+    }
+  } finally {
+    // The consumer told us to return, so we need to terminate the source
+    ai.return?.()
+  }
+}
+
+async function* filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<boolean>): AsyncIterable<U> {
     const ai = this[Symbol.asyncIterator]();
-    let current = deferred();
-    // The source has produced a new result
-    function update(it) {
-        current.resolve(it);
-        if (!it.done) {
-            current = deferred();
-            ai.next().then(update).catch(error);
+    try {
+      while (true) {
+        let p: IteratorResult<U, any>;
+        try {
+          p = await ai.next();
+        } catch (ex) {
+          // The source threw, so we tell the consumer
+          throw { done: true, value: ex }
         }
+
+        if (p.done)
+          return p.value;
+
+        let f: boolean;
+        try {
+            f = await fn(p.value);
+        } catch (ex) {
+          // The filter threw, we need to terminate the source and throw the error
+          ai.throw ? ai.throw(ex) : ai.return?.();
+          throw { done: true, value: ex }
+        }
+        if (f) {
+          try {
+            yield p.value;
+          } catch (ex) {
+            // The consumer told us to throw, so we need to terminate the source
+            ai.throw?.(ex);
+            break;
+          }
+        }
+      }
+    } finally {
+      // The consumer told us to return, so we need to terminate the source
+      ai.return?.()
     }
-    // The source has errored
-    function error(reason) {
-        current.reject({ done: true, value: reason });
+  }
+const noUniqueValue = Symbol('noUniqueValue');
+async function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U> {
+  const ai = this[Symbol.asyncIterator]();
+  let exit = () => ai.return?.();
+  let prev: U | typeof noUniqueValue = noUniqueValue;
+  try {
+    while (true) {
+      const p = await ai.next();
+      if (p.done) {
+        return ai.return?.(p.value);
+      }
+      if (fn && prev !== noUniqueValue ? await fn(p.value, prev) : p.value != prev) {
+        yield p.value;
+      }
+      prev = p.value;
     }
-    ai.next().then(update).catch(error);
+  } catch (ex) {
+    exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+  }
+  finally { exit() }
+}
+
+async function* initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I> {
+  yield initValue;
+  for await (const u of this)
+    yield u;
+}
+
+async function* throttle<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U> {
+  const ai = this[Symbol.asyncIterator]();
+  let exit = () => ai.return?.();
+  let paused = 0;
+  try {
+    while (true) {
+      const p = await ai.next();
+      if (p.done) {
+        return ai.return?.(p.value);
+      }
+      const now = Date.now();
+      if (paused < now) {
+        paused = now + milliseconds;
+        yield p.value;
+      }
+    }
+  } catch (ex) {
+    exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+  }
+  finally { exit() }
+}
+
+const forever = new Promise<any>(() => { });
+
+// NB: DEBOUNCE IS CURRENTLY BROKEN
+async function* debounce<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U> {
+  const ai = this[Symbol.asyncIterator]();
+  let exit = () => ai.return?.();
+  let timer: Promise<{ debounced: number, value: U }> = forever;
+  let last: any = -1;
+  try {
+    while (true) {
+      const p = await Promise.race([ai.next(), timer]);
+      if ('done' in p && p.done)
+        return ai.return?.(p.value);
+      if ('debounced' in p && p.debounced) {
+        if (p.debounced === last)
+          yield p.value;
+      } else {
+        // We have a new value from the src
+        clearTimeout(last);
+        timer = new Promise(resolve => {
+          last = setTimeout(() => {
+            resolve({ debounced: last, value: p.value })
+          }, milliseconds);
+        });
+      }
+    }
+  } catch (ex) {
+    exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+  }
+  finally { exit() }
+}
+
+async function* waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncIterable<U> {
+  const ai = this[Symbol.asyncIterator]();
+  let exit = () => ai.return?.();
+  try {
+    while (true) {
+      const p = await ai.next();
+      if (p.done) {
+        return ai.return?.(p.value);
+      }
+      await new Promise<void>(resolve => cb(resolve));
+      yield p.value;
+    }
+  } catch (ex) {
+    exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+  }
+  finally { exit() }
+}
+
+async function* count<U extends {}, K extends string>(this: AsyncIterable<U>, field: K) {
+  const ai = this[Symbol.asyncIterator]();
+  let exit = () => ai.return?.();
+  let count = 0;
+  try {
+    for await (const value of this) {
+      const counted = {
+        ...value,
+        [field]: count++
+      }
+      yield counted;
+    }
+    ai.return?.();
+  } catch (ex) {
+    exit = () => ai.throw ? ai.throw(ex) : ai.return?.();
+  }
+  finally { exit() }
+}
+
+function retain<U extends {}>(this: AsyncIterable<U>): AsyncIterableIterator<U> & { value: U, done: boolean } {
+  const ai = this[Symbol.asyncIterator]();
+  let prev: IteratorResult<U, any>;
+  return {
+    [Symbol.asyncIterator]() { return this },
+    next() {
+      const n = ai.next();
+      n.then(p => prev = p);
+      return n;
+    },
+    return(value?: any) {
+      return ai.return?.(value) ?? Promise.resolve({ done: true as const, value });
+    },
+    throw(...args: any[]) {
+      return ai.throw?.(args) ?? Promise.resolve({ done: true as const, value: args[0] })
+    },
+    get value() {
+      return prev.value;
+    },
+    get done() {
+      return Boolean(prev.done);
+    }
+  }
+}
+*/
+function multi() {
+    let consumers = 0;
+    let current = deferred();
+    let ai;
     return {
-        [Symbol.asyncIterator]() { return this; },
+        [Symbol.asyncIterator]() {
+            // Someone wants to start consuming. Start the source if we're the first
+            if (!consumers) {
+                // The source has produced a new result
+                function update(it) {
+                    current.resolve(it);
+                    if (!it.done) {
+                        current = deferred();
+                        ai.next().then(update).catch(error);
+                    }
+                }
+                // The source has errored, reject any consumers and reset the iterator
+                function error(reason) {
+                    current.reject({ done: true, value: reason });
+                }
+                ai = this[Symbol.asyncIterator]();
+                ai.next().then(update).catch(error);
+            }
+            consumers += 1;
+            return this;
+        },
         next() {
             return current;
         },
-        return(value) {
-            return ai.return?.(value) ?? Promise.resolve({ done: true, value });
+        throw(ex) {
+            // The consumer wants us to exit with an exception. Tell the source if we're the final one
+            consumers -= 1;
+            if (consumers)
+                return Promise.resolve({ done: true, value: ex });
+            return Promise.resolve(ai.throw ? ai.throw(ex) : ai.return?.(ex)).then(v => ({ done: true, value: v?.value }));
         },
-        throw(...args) {
-            return ai.throw?.(args) ?? Promise.resolve({ done: true, value: args[0] });
-        },
+        return(v) {
+            // The consumer told us to return, so we need to terminate the source if we're the only one
+            consumers -= 1;
+            if (consumers)
+                return Promise.resolve({ done: true, value: v });
+            return Promise.resolve(ai.return?.(v)).then(v => ({ done: true, value: v?.value }));
+        }
     };
 }
 function broadcast() {
@@ -637,4 +688,4 @@ async function consume(f) {
         last = f?.(u);
     await last;
 }
-const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, multi, broadcast, initially, consume, merge };
+const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge /*, throttle, debounce, count, retain */ };
