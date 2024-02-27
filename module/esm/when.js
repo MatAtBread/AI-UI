@@ -159,15 +159,21 @@ function elementIsInDOM(elt) {
     if (document.body.contains(elt))
         return Promise.resolve();
     return new Promise(resolve => new MutationObserver((records, mutation) => {
-        for (const record of records) {
-            if (record.addedNodes?.length) {
-                if (document.body.contains(elt)) {
-                    mutation.disconnect();
-                    resolve();
-                    return;
-                }
+        if (records.some(r => r.addedNodes?.length)) {
+            if (document.body.contains(elt)) {
+                mutation.disconnect();
+                resolve();
             }
         }
+        // for (const record of records) {
+        //   if (record.addedNodes?.length) {
+        //     if (document.body.contains(elt)) {
+        //       mutation.disconnect();
+        //       resolve();
+        //       return;
+        //     }
+        //   }
+        // }
     }).observe(document.body, {
         subtree: true,
         childList: true
@@ -178,16 +184,22 @@ function allSelectorsPresent(container, missing) {
         return Promise.resolve();
     }
     const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
-        for (const record of records) {
-            if (record.addedNodes?.length) {
-                missing = missing.filter(sel => !container.querySelector(sel));
-                if (!missing.length) {
-                    mutation.disconnect();
-                    resolve();
-                    return;
-                }
+        if (records.some(r => r.addedNodes?.length)) {
+            if (missing.every(sel => container.querySelector(sel))) {
+                mutation.disconnect();
+                resolve();
             }
         }
+        // for (const record of records) {
+        //   if (record.addedNodes?.length) {
+        //     missing = missing.filter(sel => !container.querySelector(sel));
+        //     if (!missing.length) {
+        //       mutation.disconnect();
+        //       resolve();
+        //       return;
+        //     }
+        //   }
+        // }
     }).observe(container, {
         subtree: true,
         childList: true
