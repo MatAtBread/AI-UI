@@ -52,10 +52,15 @@ async function run(i: AsyncIterable<any>, ex = -1) {
 
 
 (async function(){
-  const m = iterableHelpers(g("multi", 0.3, 5)).waitFor(done => setTimeout(done,1000)).multi();
+  const m = iterableHelpers(g("multi", 0.3, 5, 3)).waitFor(done => setTimeout(done,1000)).multi();
   run(m.map(v => ['first', ...v]));
   await sleep(70)
   run(m.map(v => ['second', ...v]));
+/*
+  const n = iterableHelpers(g("consume", 0.3, 5, 3)).waitFor(done => setTimeout(done,1000)).multi();
+  n.consume(v => console.log("consume 1st",v));
+  await sleep(70)
+  n.consume(v => console.log("consume 2nd",v));
 /*  await run(iterableHelpers(g("waitFor", 0.3, 5)).waitFor(done => setTimeout(done,500)));
 
    await run(iterableHelpers(g("slow", 0.3, 5)).filter(v => sleep(5,true)));
