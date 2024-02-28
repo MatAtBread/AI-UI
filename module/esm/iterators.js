@@ -331,7 +331,6 @@ export const merge = (...ai) => {
 };
 /*
   Extensions to the AsyncIterable:
-  calling `bind(ai)` adds "standard" methods to the specified AsyncIterable
 */
 function isExtraIterable(i) {
     return isAsyncIterable(i)

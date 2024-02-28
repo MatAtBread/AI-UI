@@ -369,7 +369,6 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
 
 /*
   Extensions to the AsyncIterable:
-  calling `bind(ai)` adds "standard" methods to the specified AsyncIterable
 */
 
 function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
