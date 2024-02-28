@@ -264,14 +264,26 @@ function box(a, pds) {
     throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
 }
 export const merge = (...ai) => {
-    const it = ai.map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
-    const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
+    const it = new Array(ai.length);
+    const promises = new Array(ai.length);
+    let init = () => {
+        init = () => { };
+        for (let n = 0; n < ai.length; n++) {
+            const a = ai[n];
+            promises[n] = (it[n] = Symbol.asyncIterator in a
+                ? a[Symbol.asyncIterator]()
+                : a)
+                .next()
+                .then(result => ({ idx: n, result }));
+        }
+    };
     const results = [];
     const forever = new Promise(() => { });
     let count = promises.length;
     const merged = {
         [Symbol.asyncIterator]() { return merged; },
         next() {
+            init();
             return count
                 ? Promise.race(promises).then(({ idx, result }) => {
                     if (result.done) {
@@ -284,7 +296,9 @@ export const merge = (...ai) => {
                     }
                     else {
                         // `ex` is the underlying async iteration exception
-                        promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
+                        promises[idx] = it[idx]
+                            ? it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: { done: true, value: ex } }))
+                            : Promise.resolve({ idx, result: { done: true, value: undefined } });
                         return result;
                     }
                 }).catch(ex => {
@@ -296,7 +310,7 @@ export const merge = (...ai) => {
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    results[i] = await it[i].return?.({ done: true, value: r }).then(v => v.value, ex => ex);
+                    results[i] = await it[i]?.return?.({ done: true, value: r }).then(v => v.value, ex => ex);
                 }
             }
             return { done: true, value: results };
@@ -305,7 +319,7 @@ export const merge = (...ai) => {
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    results[i] = await it[i].throw?.(ex).then(v => v.value, ex => ex);
+                    results[i] = await it[i]?.throw?.(ex).then(v => v.value, ex => ex);
                 }
             }
             // Because we've passed the exception on to all the sources, we're now done
@@ -340,7 +354,7 @@ export function generatorHelpers(g) {
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 export function filterMap(source, fn, initialValue = Ignore) {
-    const ai = source[Symbol.asyncIterator]();
+    let ai;
     let prev = Ignore;
     return {
         [Symbol.asyncIterator]() {
@@ -353,6 +367,9 @@ export function filterMap(source, fn, initialValue = Ignore) {
                 return init;
             }
             return new Promise(function step(resolve, reject) {
+                if (!ai)
+                    ai = source[Symbol.asyncIterator]();
+                ;
                 ai.next(...args).then(p => p.done
                     ? resolve(p)
                     : Promise.resolve(fn(p.value, prev)) /*new Promise<R | typeof Ignore>(pass => pass(fn(p.value, prev)))*/.then(f => f === Ignore
@@ -368,11 +385,11 @@ export function filterMap(source, fn, initialValue = Ignore) {
         },
         throw(ex) {
             // The consumer wants us to exit with an exception. Tell the source
-            return Promise.resolve(ai.throw ? ai.throw(ex) : ai.return?.(ex)).then(v => ({ done: true, value: v?.value }));
+            return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }));
         },
         return(v) {
             // The consumer told us to return, so we need to terminate the source
-            return Promise.resolve(ai.return?.(v)).then(v => ({ done: true, value: v?.value }));
+            return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
         }
     };
 }

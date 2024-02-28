@@ -43,5 +43,5 @@
     "test": "tsc -p ../type_tests/tsconfig.json"
   },
   "types": "./esm/ai-ui.d.ts",
-  "version": "0.10.11"
+  "version": "0.10.12"
 }

@@ -299,14 +299,29 @@ type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 
 export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => {
-  const it = (ai as AsyncIterable<any>[]).map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
-  const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
+  const it: (undefined | AsyncIterator<any>)[] = new Array(ai.length);
+  const promises: Promise<{idx: number, result: IteratorResult<any>}>[] = new Array(ai.length);
+
+  let init = () => {
+    init = ()=>{}
+    for (let n = 0; n < ai.length; n++) {
+      const a = ai[n] as AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>;
+      promises[n] = (it[n] = Symbol.asyncIterator in a
+        ? a[Symbol.asyncIterator]()
+        : a as AsyncIterator<any>)
+        .next()
+        .then(result => ({ idx: n, result }));
+    }
+  }
+
   const results: (TYield | TReturn)[] = [];
   const forever = new Promise<any>(() => { });
   let count = promises.length;
+
   const merged: AsyncIterableIterator<A[number]> = {
     [Symbol.asyncIterator]() { return merged },
     next() {
+      init();
       return count
         ? Promise.race(promises).then(({ idx, result }) => {
           if (result.done) {
@@ -318,7 +333,9 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
             return merged.next();
           } else {
             // `ex` is the underlying async iteration exception
-            promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
+            promises[idx] = it[idx]
+              ? it[idx]!.next().then(result => ({ idx, result })).catch(ex => ({ idx, result: { done: true, value: ex }}))
+              : Promise.resolve({ idx, result: {done: true, value: undefined} })
             return result;
           }
         }).catch(ex => {
@@ -330,7 +347,7 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
       for (let i = 0; i < it.length; i++) {
         if (promises[i] !== forever) {
           promises[i] = forever;
-          results[i] = await it[i].return?.({ done: true, value: r }).then(v => v.value, ex => ex);
+          results[i] = await it[i]?.return?.({ done: true, value: r }).then(v => v.value, ex => ex);
         }
       }
       return { done: true, value: results };
@@ -339,7 +356,7 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
       for (let i = 0; i < it.length; i++) {
         if (promises[i] !== forever) {
           promises[i] = forever;
-          results[i] = await it[i].throw?.(ex).then(v => v.value, ex => ex);
+          results[i] = await it[i]?.throw?.(ex).then(v => v.value, ex => ex);
         }
       }
       // Because we've passed the exception on to all the sources, we're now done
@@ -387,7 +404,7 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
   fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
   initialValue: R | typeof Ignore = Ignore
 ): AsyncIterableIterator<R> {
-  const ai = source[Symbol.asyncIterator]();
+  let ai: AsyncIterator<U>;
   let prev: R | typeof Ignore = Ignore;
   return {
     [Symbol.asyncIterator]() {
@@ -402,6 +419,8 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
       }
 
       return new Promise<IteratorResult<R>>(function step(resolve, reject) {
+        if (!ai)
+          ai = source[Symbol.asyncIterator]();;
         ai.next(...args).then(
           p => p.done
             ? resolve(p)
@@ -425,12 +444,12 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
 
     throw(ex: any) {
       // The consumer wants us to exit with an exception. Tell the source
-      return Promise.resolve(ai.throw ? ai.throw(ex) : ai.return?.(ex)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }))
     },
 
     return(v?: any) {
       // The consumer told us to return, so we need to terminate the source
-      return Promise.resolve(ai.return?.(v)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
     }
   }
 }
