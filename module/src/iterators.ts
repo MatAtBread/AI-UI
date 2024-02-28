@@ -420,7 +420,7 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
 
       return new Promise<IteratorResult<R>>(function step(resolve, reject) {
         if (!ai)
-          ai = source[Symbol.asyncIterator]();;
+          ai = source[Symbol.asyncIterator]();
         ai.next(...args).then(
           p => p.done
             ? resolve(p)
@@ -479,51 +479,56 @@ function waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLik
 function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
   const source = this;
   let consumers = 0;
-  let current = deferred<IteratorResult<T>>();
-  let ai: AsyncIterator<T, any, undefined>;
+  let current: DeferredPromise<IteratorResult<T, any>>;
+  let ai: AsyncIterator<T, any, undefined> | undefined = undefined;
+
+  // The source has produced a new result
+  function update(it: IteratorResult<T, any>) {
+    current.resolve(it);
+    if (!it.done) {
+      current = deferred<IteratorResult<T>>();
+      ai!.next().then(update).catch(error);
+    }
+  }
+
+  // The source has errored, reject any consumers and reset the iterator
+  function error(reason: any) {
+    current.reject({ done: true, value: reason });
+  }
 
   return {
     [Symbol.asyncIterator]() {
-      // Someone wants to start consuming. Start the source if we're the first
-      if (!consumers) {
-        // The source has produced a new result
-        function update(it: IteratorResult<T, any>) {
-          current.resolve(it);
-          if (!it.done) {
-            current = deferred<IteratorResult<T>>();
-            ai.next().then(update).catch(error);
-          }
-        }
-
-        // The source has errored, reject any consumers and reset the iterator
-        function error(reason: any) {
-          current.reject({ done: true, value: reason });
-        }
-
-        ai = source[Symbol.asyncIterator]()
-        ai.next().then(update).catch(error);
-      }
       consumers += 1;
       return this;
     },
 
     next() {
+      if (!ai) {
+        ai = source[Symbol.asyncIterator]()
+        current = deferred<IteratorResult<T>>();
+        ai.next().then(update).catch(error);
+      }
       return current;
     },
+
     throw(ex: any) {
       // The consumer wants us to exit with an exception. Tell the source if we're the final one
+      if (consumers < 1)
+        throw new Error("AsyncIterator protocol error");
       consumers -= 1;
       if (consumers)
         return Promise.resolve({ done: true, value: ex });
-      return Promise.resolve(ai.throw ? ai.throw(ex) : ai.return?.(ex)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }))
     },
 
     return(v?: any) {
       // The consumer told us to return, so we need to terminate the source if we're the only one
+      if (consumers < 1)
+        throw new Error("AsyncIterator protocol error");
       consumers -= 1;
       if (consumers)
         return Promise.resolve({ done: true, value: v });
-      return Promise.resolve(ai.return?.(v)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
     }
   };
 }
