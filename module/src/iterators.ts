@@ -40,10 +40,6 @@ function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(f
 
 type AsyncIterableHelpers = typeof asyncExtras;
 export const asyncExtras = {
-  // throttle: wrapAsyncHelper(throttle),
-  // debounce: wrapAsyncHelper(debounce),
-  // count: wrapAsyncHelper(count),
-  // retain: wrapAsyncHelper(retain),
   map: wrapAsyncHelper(map),
   filter: wrapAsyncHelper(filter),
   unique: wrapAsyncHelper(unique),
@@ -279,7 +275,7 @@ function box(a: unknown, pds: Record<string | symbol, PropertyDescriptor>) {
       */
       if (!(Symbol.asyncIterator in a)) {
         if (DEBUG)
-          console.warn('Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
+          console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
         return Object.defineProperties({ ...a }, pds);
       }
       return a;

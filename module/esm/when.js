@@ -30,7 +30,7 @@ function docEventHandler(ev) {
                 }
             }
             catch (ex) {
-                console.warn('docEventHandler', ex);
+                console.warn('(AI-UI)', 'docEventHandler', ex);
             }
         }
     }
@@ -166,15 +166,6 @@ function elementIsInDOM(elt) {
                 resolve();
             }
         }
-        // for (const record of records) {
-        //   if (record.addedNodes?.length) {
-        //     if (document.body.contains(elt)) {
-        //       mutation.disconnect();
-        //       resolve();
-        //       return;
-        //     }
-        //   }
-        // }
     }).observe(document.body, {
         subtree: true,
         childList: true
@@ -199,16 +190,6 @@ function allSelectorsPresent(container, missing) {
                 resolve();
             }
         }
-        // for (const record of records) {
-        //   if (record.addedNodes?.length) {
-        //     missing = missing.filter(sel => !container.querySelector(sel));
-        //     if (!missing.length) {
-        //       mutation.disconnect();
-        //       resolve();
-        //       return;
-        //     }
-        //   }
-        // }
     }).observe(container, {
         subtree: true,
         childList: true
@@ -217,7 +198,7 @@ function allSelectorsPresent(container, missing) {
     if (DEBUG) {
         const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
         const warn = setTimeout(() => {
-            console.warn(stack, missing);
+            console.warn('(AI-UI)', stack, missing);
         }, 5000);
         promise.finally(() => clearTimeout(warn));
     }

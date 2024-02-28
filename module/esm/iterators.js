@@ -24,10 +24,6 @@ function wrapAsyncHelper(fn) {
     return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
 }
 export const asyncExtras = {
-    // throttle: wrapAsyncHelper(throttle),
-    // debounce: wrapAsyncHelper(debounce),
-    // count: wrapAsyncHelper(count),
-    // retain: wrapAsyncHelper(retain),
     map: wrapAsyncHelper(map),
     filter: wrapAsyncHelper(filter),
     unique: wrapAsyncHelper(unique),
@@ -251,7 +247,7 @@ function box(a, pds) {
             */
             if (!(Symbol.asyncIterator in a)) {
                 if (DEBUG)
-                    console.warn('Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
+                    console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
                 return Object.defineProperties({ ...a }, pds);
             }
             return a;

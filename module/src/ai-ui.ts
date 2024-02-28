@@ -153,8 +153,8 @@ export const tag = <TagLoader>function <Tags extends string,
             old.forEach(e => e.parentElement?.removeChild(e));
           }
           g = n;
-        }, x => {
-          console.warn(x);
+        }, (x:any) => {
+          console.warn('(AI-UI)',x);
           appender(g[0])(DyamicElementError({error: x}));
         });
         return;
@@ -180,7 +180,7 @@ export const tag = <TagLoader>function <Tags extends string,
             n.forEach(e => e.parentNode?.removeChild(e));
           }
           else
-            console.warn("Can't report error", errorValue, t);
+            console.warn('(AI-UI)', "Can't report error", errorValue, t);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {
@@ -225,7 +225,7 @@ export const tag = <TagLoader>function <Tags extends string,
             throw new Error("Parent is null");
 
           if (parent !== container) {
-            console.warn("Container mismatch??");
+            console.warn('(AI-UI)',"Internal error - container mismatch");
           }
           for (let i = 0; i < children.length; i++)
             parent.insertBefore(children[i], before);
@@ -265,7 +265,7 @@ export const tag = <TagLoader>function <Tags extends string,
               } else {
                 if (value instanceof Node) {
                   if (DEBUG)
-                    console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                    console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -297,7 +297,7 @@ export const tag = <TagLoader>function <Tags extends string,
           Object.defineProperty(d, k, srcDesc);
         }
       } catch (ex: unknown) {
-        console.warn("deepAssign", k, s[k], ex);
+        console.warn('(AI-UI)', "deepAssign", k, s[k], ex);
         throw ex;
       }
     }
@@ -370,7 +370,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 };
                 const error = (errorValue: any) => {
                   ap.return?.(errorValue);
-                  console.warn("Dynamic attribute error", errorValue, k, d, base);
+                  console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
                   appender(base)(DyamicElementError({error: errorValue}));
                 }
                 ap.next().then(update).catch(error);
@@ -381,7 +381,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 if (value && typeof value === 'object' && !isPromiseLike(value)) {
                   if (value instanceof Node) {
                     if (DEBUG)
-                      console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                      console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                     d[k] = value;
                   } else {
                     // Note - if we're copying to ourself (or an array of different length),
@@ -413,7 +413,7 @@ export const tag = <TagLoader>function <Tags extends string,
             }
 
           } catch (ex: unknown) {
-            console.warn("assignProps", k, s[k], ex);
+            console.warn('(AI-UI)', "assignProps", k, s[k], ex);
             throw ex;
           }
         }
@@ -658,6 +658,7 @@ export let enableOnRemovedFromDOM = function () {
   }).observe(document.body, { subtree: true, childList: true });
 };
 
+const warned = new Set<string>();
 export function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>) {
   node = node || document;
   ids = ids || {};
@@ -666,8 +667,12 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
       if (elt.id) {
         if (!ids![elt.id])
           ids![elt.id] = elt;
-        //else if (DEBUG)
-        //  console.info("Shadowed multiple element IDs", elt.id/*, elt, ids![elt.id]*/)
+        else if (DEBUG) {
+          if (!warned.has(elt.id)) {
+            warned.add(elt.id)
+            console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids![elt.id]);
+          }
+        }
       }
     });
   }
