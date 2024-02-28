@@ -1,6 +1,6 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { PushIterator, pushIterator, iterableHelpers, asyncExtras, merge, AsyncExtraIterable } from "./iterators.js";
+import { QueueIteratableIterator, iterableHelpers, asyncExtras, merge, AsyncExtraIterable, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
 
 /*
   `when(....)` is both an AsyncIterable of the events it can generate by observation,
@@ -84,7 +84,7 @@ type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];
 
 /** when **/
 type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
-  push: PushIterator<GlobalEventHandlersEventMap[EventName]>;
+  queue: QueueIteratableIterator<GlobalEventHandlersEventMap[EventName]>;
   container: Element
   selector: string | null
 };
@@ -95,22 +95,22 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
   if (observations) {
     for (const o of observations) {
       try {
-        const { push, container, selector } = o;
+        const { queue, container, selector } = o;
         if (!document.body.contains(container)) {
           const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
           observations.delete(o);
-          push[Symbol.asyncIterator]().return?.(new Error(msg));
+          queue[Symbol.asyncIterator]().return?.(new Error(msg));
         } else {
           if (ev.target instanceof Node) {
             if (selector) {
               const nodes = container.querySelectorAll(selector);
               for (const n of nodes) {
                 if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
-                  push.push(ev)
+                  queue.push(ev)
               }
             } else {
               if ((ev.target === container || container.contains(ev.target)))
-                push.push(ev)
+                queue.push(ev)
             }
           }
         }
@@ -154,14 +154,17 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
     eventObservations.set(eventName, new Set());
   }
 
-  const push = pushIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
+  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
   const details: EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>> = {
-    push,
+    queue,
     container,
     selector: selector || null
   };
-  eventObservations.get(eventName)!.add(details);
-  return push;
+
+  containerAndSelectorsMounted(container, selector ? [selector] : undefined)
+    .then(_ => eventObservations.get(eventName)!.add(details));
+
+  return asyncHelperFunctions.multi.call(queue);
 }
 
 async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
@@ -232,10 +235,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
     const ai: AsyncIterableIterator<any> = {
       [Symbol.asyncIterator]() { return ai },
       async next() {
-        await Promise.all([
-          allSelectorsPresent(container, missing),
-          elementIsInDOM(container)
-        ])
+        await containerAndSelectorsMounted(container, missing);
 
         const merged = (iterators.length > 1)
           ? merge(...iterators)
@@ -246,11 +246,14 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
         // Now everything is ready, we simply defer all async ops to the underlying
         // merged asyncIterator
         const events = merged[Symbol.asyncIterator]();
-        ai.next = events.next.bind(events); //() => events.next();
-        ai.return = events.return?.bind(events);
-        ai.throw = events.throw?.bind(events);
+        if (events) {
+          ai.next = events.next.bind(events); //() => events.next();
+          ai.return = events.return?.bind(events);
+          ai.throw = events.throw?.bind(events);
 
-        return { done: false, value: {} };
+          return { done: false, value: {} };
+        }
+        return { done: true, value: undefined };
       }
     };
     return chainAsync(ai);
@@ -289,6 +292,15 @@ function elementIsInDOM(elt: Element): Promise<void> {
     subtree: true,
     childList: true
   }));
+}
+
+function containerAndSelectorsMounted(container: Element, selectors?: string[]) {
+  if (selectors?.length)
+    return Promise.all([
+      allSelectorsPresent(container, selectors),
+      elementIsInDOM(container)
+    ]);
+  return elementIsInDOM(container);
 }
 
 function allSelectorsPresent(container: Element, missing: string[]): Promise<void> {

@@ -25,6 +25,7 @@ export declare const asyncExtras: {
     consume: typeof consume;
     merge<T_1, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T_1>>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T_1>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T_1>>, ...A][number]>>;
 };
+export declare function queueIteratableIterator<T>(stop?: () => void): QueueIteratableIterator<T>;
 export declare function pushIterator<T>(stop?: () => void, bufferWhenNoConsumers?: boolean): PushIterator<T>;
 export declare function broadcastIterator<T>(stop?: () => void): BroadcastIterator<T>;
 export declare function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & {
@@ -39,5 +40,23 @@ type Mapper<U, R> = ((o: U) => R | PromiseLike<R>);
 type MaybePromised<T> = PromiseLike<T> | T;
 export declare const Ignore: unique symbol;
 export declare function filterMap<U, R>(source: AsyncIterable<U>, fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncIterableIterator<R>;
+declare function map<U, R>(this: AsyncIterable<U>, mapper: Mapper<U, R>): AsyncIterableIterator<R>;
+declare function filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<boolean>): AsyncIterableIterator<U>;
+declare function unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterableIterator<U>;
+declare function initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I>;
+declare function waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncIterableIterator<U>;
+declare function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T>;
+declare function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U>;
 declare function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void>;
+export declare const asyncHelperFunctions: {
+    map: typeof map;
+    filter: typeof filter;
+    unique: typeof unique;
+    waitFor: typeof waitFor;
+    multi: typeof multi;
+    broadcast: typeof broadcast;
+    initially: typeof initially;
+    consume: typeof consume;
+    merge: <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
+};
 export {};

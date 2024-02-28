@@ -1,17 +1,17 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { pushIterator, iterableHelpers, asyncExtras, merge } from "./iterators.js";
+import { iterableHelpers, asyncExtras, merge, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
 const eventObservations = new Map();
 function docEventHandler(ev) {
     const observations = eventObservations.get(ev.type);
     if (observations) {
         for (const o of observations) {
             try {
-                const { push, container, selector } = o;
+                const { queue, container, selector } = o;
                 if (!document.body.contains(container)) {
                     const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
-                    push[Symbol.asyncIterator]().return?.(new Error(msg));
+                    queue[Symbol.asyncIterator]().return?.(new Error(msg));
                 }
                 else {
                     if (ev.target instanceof Node) {
@@ -19,12 +19,12 @@ function docEventHandler(ev) {
                             const nodes = container.querySelectorAll(selector);
                             for (const n of nodes) {
                                 if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
-                                    push.push(ev);
+                                    queue.push(ev);
                             }
                         }
                         else {
                             if ((ev.target === container || container.contains(ev.target)))
-                                push.push(ev);
+                                queue.push(ev);
                         }
                     }
                 }
@@ -63,14 +63,15 @@ function whenEvent(container, what) {
         });
         eventObservations.set(eventName, new Set());
     }
-    const push = pushIterator(() => eventObservations.get(eventName)?.delete(details));
+    const queue = queueIteratableIterator(() => eventObservations.get(eventName)?.delete(details));
     const details = {
-        push,
+        queue,
         container,
         selector: selector || null
     };
-    eventObservations.get(eventName).add(details);
-    return push;
+    containerAndSelectorsMounted(container, selector ? [selector] : undefined)
+        .then(_ => eventObservations.get(eventName).add(details));
+    return asyncHelperFunctions.multi.call(queue);
 }
 async function* neverGonnaHappen() {
     await new Promise(() => { });
@@ -128,10 +129,7 @@ export function when(container, ...sources) {
         const ai = {
             [Symbol.asyncIterator]() { return ai; },
             async next() {
-                await Promise.all([
-                    allSelectorsPresent(container, missing),
-                    elementIsInDOM(container)
-                ]);
+                await containerAndSelectorsMounted(container, missing);
                 const merged = (iterators.length > 1)
                     ? merge(...iterators)
                     : iterators.length === 1
@@ -140,10 +138,13 @@ export function when(container, ...sources) {
                 // Now everything is ready, we simply defer all async ops to the underlying
                 // merged asyncIterator
                 const events = merged[Symbol.asyncIterator]();
-                ai.next = events.next.bind(events); //() => events.next();
-                ai.return = events.return?.bind(events);
-                ai.throw = events.throw?.bind(events);
-                return { done: false, value: {} };
+                if (events) {
+                    ai.next = events.next.bind(events); //() => events.next();
+                    ai.return = events.return?.bind(events);
+                    ai.throw = events.throw?.bind(events);
+                    return { done: false, value: {} };
+                }
+                return { done: true, value: undefined };
             }
         };
         return chainAsync(ai);
@@ -178,6 +179,14 @@ function elementIsInDOM(elt) {
         subtree: true,
         childList: true
     }));
+}
+function containerAndSelectorsMounted(container, selectors) {
+    if (selectors?.length)
+        return Promise.all([
+            allSelectorsPresent(container, selectors),
+            elementIsInDOM(container)
+        ]);
+    return elementIsInDOM(container);
 }
 function allSelectorsPresent(container, missing) {
     if (!missing.length) {

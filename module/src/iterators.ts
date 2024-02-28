@@ -57,7 +57,7 @@ export const asyncExtras = {
   }
 };
 
-function queueIteratableIterator<T>(stop = () => { }): QueueIteratableIterator<T> {
+export function queueIteratableIterator<T>(stop = () => { }): QueueIteratableIterator<T> {
   let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
   let _items = [] as T[] | null;
 
@@ -542,4 +542,4 @@ async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | 
   await last;
 }
 
-const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
+export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };

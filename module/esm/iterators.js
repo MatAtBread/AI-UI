@@ -40,7 +40,7 @@ export const asyncExtras = {
         return merge(this, ...m);
     }
 };
-function queueIteratableIterator(stop = () => { }) {
+export function queueIteratableIterator(stop = () => { }) {
     let _pending = [];
     let _items = [];
     const q = {
@@ -470,4 +470,4 @@ async function consume(f) {
         last = f?.(u);
     await last;
 }
-const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
+export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
