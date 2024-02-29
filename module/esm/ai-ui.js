@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable } from './iterators.js';
+import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
 import { DEBUG } from './debug.js';
 /* Export useful stuff for users of the bundled code */
@@ -67,7 +67,13 @@ export const tag = function (_1, _2, _3) {
     Object.defineProperty(tagPrototypes, 'attributes', {
         ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
         set(a) {
-            assignProps(this, a);
+            if (isAsyncIter(a)) {
+                const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
+                const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn("(AI-UI)", ex));
+                step();
+            }
+            else
+                assignProps(this, a);
         }
     });
     if (prototypes)
