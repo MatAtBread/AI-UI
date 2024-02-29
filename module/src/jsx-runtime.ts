@@ -10,7 +10,7 @@ type PoJSXFactory =  <
 >(tagName: T, attrs: A, ...children: Ch)
   => T extends keyof HTMLElementTagNameMap
     ? HTMLElementTagNameMap[T]
-    : Ch
+    : T
 
 export const PoJSX: PoJSXFactory = <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T,...children: ChildTags[]) =>
 tagName === PoJSX
@@ -20,6 +20,7 @@ tagName === PoJSX
       : tagName)! (attrs,...children);
 
 /* Support for React 17's _jsx(tag,attrs) */
+/*
 function sterilise<T extends { children?: any}>(attrs:T): Omit<T,'children'> {
    const childless = {...attrs};
    delete childless.children;
@@ -34,8 +35,9 @@ export const jsx = <T extends { children?: any}>(tagName: keyof HTMLElementTagNa
 export const jsxs = jsx;
 export const Fragment = jsx;
 
+*/
 declare global {
   const PoJSX: PoJSXFactory;
-  var React: PoJSXFactory; // Doesn't really exist, just declated to suppress a VSCode/tsc warning
+//  var React: PoJSXFactory; // Doesn't really exist, just declated to suppress a VSCode/tsc warning
 }
 (globalThis as any).PoJSX = PoJSX;

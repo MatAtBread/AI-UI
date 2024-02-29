@@ -1,19 +1,33 @@
-// <reference path="../../../module/src/ai-ui.ts"/>
 import '../../../module/esm/jsx-runtime.js';
-// export interface JSXElement extends Node {
-//     type: "JSXElement";
-//     children: Array<JSXElement>;
-// }
+import { tag } from '../../../module/esm/ai-ui.js'
 
-//declare namespace JSX {
-    interface IntrinsicElements {
-      div: HTMLDivElement// React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
-    }
-  //}
-const q = <div></div>;
+const { div: Div } = tag();
+const div = Div;
+declare const React: {};
 
-export function hello() {
-    return <><div>Hello</div><div>World</div></>;
+declare namespace JSX {
+  interface IntrinsicElements {
+    foo: { thing?: number }
+  }
+}
+
+const DivX = div.extended({
+  declare:{
+    thing: 0
+  }
+});
+
+const p = <foo>Hello</foo>;
+
+const q = <div>Hello</div>;
+const r = <DivX>Hello</DivX>;
+
+document.body.append(q);
+
+/*export function hello() {
+  //return [<Div>Hello</Div>];
+  return <><Div>Hello</Div><div>World</div></>;
 }
 
 document.body.append(...hello());
+*/
