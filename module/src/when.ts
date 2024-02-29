@@ -1,6 +1,6 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { QueueIteratableIterator, iterableHelpers, asyncExtras, merge, AsyncExtraIterable, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
+import { iterableHelpers, asyncExtras, merge, AsyncExtraIterable, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
 
 /*
   `when(....)` is both an AsyncIterable of the events it can generate by observation,
@@ -180,9 +180,7 @@ async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
   a following function, or used directly as an iterable */
 function chainAsync<A extends AsyncIterable<X>, X>(src: A): MappableIterable<A> {
   function mappableAsyncIterable(mapper: Parameters<typeof asyncExtras.map>[0]) {
-    /* const mapped = */ return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
-    // mapped.consume();
-    // return mapped;
+    return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
   }
 
   return Object.assign(iterableHelpers(mappableAsyncIterable as unknown as AsyncIterable<A>), {
