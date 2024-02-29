@@ -423,13 +423,13 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
         ai.next(...args).then(
           p => p.done
             ? resolve(p)
-            : Promise.resolve(fn(p.value, prev))/*new Promise<R | typeof Ignore>(pass => pass(fn(p.value, prev)))*/.then(
+            : Promise.resolve(fn(p.value, prev)).then(
               f => f === Ignore
                 ? step(resolve, reject)
                 : resolve({ done: false, value: prev = f }),
               ex => {
                 // The filter function failed...
-                ai.throw ? ai.throw(ex) : ai.return?.(ex) // ?.then(r => r, ex => ex); // Terminate the source - for now we ignore the result of the termination
+                ai.throw ? ai.throw(ex) : ai.return?.(ex) // Terminate the source - for now we ignore the result of the termination
                 reject({ done: true, value: ex }); // Terminate the consumer
               }
             ),
@@ -482,17 +482,14 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
   let ai: AsyncIterator<T, any, undefined> | undefined = undefined;
 
   // The source has produced a new result
-  function update(it: IteratorResult<T, any>) {
-    current.resolve(it);
-    if (!it.done) {
+  function step(it?: IteratorResult<T, any>) {
+    if (it) current.resolve(it);
+    if (!it?.done) {
       current = deferred<IteratorResult<T>>();
-      ai!.next().then(update).catch(error);
+      ai!.next()
+        .then(step)
+        .catch(error => current.reject({ done: true, value: error }));
     }
-  }
-
-  // The source has errored, reject any consumers and reset the iterator
-  function error(reason: any) {
-    current.reject({ done: true, value: reason });
   }
 
   return {
@@ -503,9 +500,8 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
 
     next() {
       if (!ai) {
-        ai = source[Symbol.asyncIterator]()
-        current = deferred<IteratorResult<T>>();
-        ai.next().then(update).catch(error);
+        ai = source[Symbol.asyncIterator]();
+        step();
       }
       return current;
     },
@@ -535,14 +531,14 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
 function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
   const ai = this[Symbol.asyncIterator]();
   const b = broadcastIterator<U>(() => ai.return?.());
-  (function update() {
+  (function step() {
     ai.next().then(v => {
       if (v.done) {
         // Meh - we throw these away for now.
         // console.log(".broadcast done");
       } else {
         b.push(v.value);
-        update();
+        step();
       }
     }).catch(ex => b.close(ex));
   })();

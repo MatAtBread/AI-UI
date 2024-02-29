@@ -370,11 +370,11 @@ export function filterMap(source, fn, initialValue = Ignore) {
                     ai = source[Symbol.asyncIterator]();
                 ai.next(...args).then(p => p.done
                     ? resolve(p)
-                    : Promise.resolve(fn(p.value, prev)) /*new Promise<R | typeof Ignore>(pass => pass(fn(p.value, prev)))*/.then(f => f === Ignore
+                    : Promise.resolve(fn(p.value, prev)).then(f => f === Ignore
                         ? step(resolve, reject)
                         : resolve({ done: false, value: prev = f }), ex => {
                         // The filter function failed...
-                        ai.throw ? ai.throw(ex) : ai.return?.(ex); // ?.then(r => r, ex => ex); // Terminate the source - for now we ignore the result of the termination
+                        ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
                         reject({ done: true, value: ex }); // Terminate the consumer
                     }), ex => 
                 // The source threw. Tell the consumer
@@ -414,16 +414,15 @@ function multi() {
     let current;
     let ai = undefined;
     // The source has produced a new result
-    function update(it) {
-        current.resolve(it);
-        if (!it.done) {
+    function step(it) {
+        if (it)
+            current.resolve(it);
+        if (!it?.done) {
             current = deferred();
-            ai.next().then(update).catch(error);
+            ai.next()
+                .then(step)
+                .catch(error => current.reject({ done: true, value: error }));
         }
-    }
-    // The source has errored, reject any consumers and reset the iterator
-    function error(reason) {
-        current.reject({ done: true, value: reason });
     }
     return {
         [Symbol.asyncIterator]() {
@@ -433,8 +432,7 @@ function multi() {
         next() {
             if (!ai) {
                 ai = source[Symbol.asyncIterator]();
-                current = deferred();
-                ai.next().then(update).catch(error);
+                step();
             }
             return current;
         },
@@ -461,7 +459,7 @@ function multi() {
 function broadcast() {
     const ai = this[Symbol.asyncIterator]();
     const b = broadcastIterator(() => ai.return?.());
-    (function update() {
+    (function step() {
         ai.next().then(v => {
             if (v.done) {
                 // Meh - we throw these away for now.
@@ -469,7 +467,7 @@ function broadcast() {
             }
             else {
                 b.push(v.value);
-                update();
+                step();
             }
         }).catch(ex => b.close(ex));
     })();
