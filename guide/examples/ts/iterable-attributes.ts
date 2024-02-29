@@ -51,11 +51,14 @@ const r = Div({
   id:"MyThing", 
 //  onclick:e => console.log(e)
 },
-  "The count is: ",count()
+  "The count is: ",0//count()
 );
-r.when('click')(n => console.log("Click is",n));
 
 document.body.append(r);
+
+r.when('click')(n => console.log("Click consume",n)).consume();
+r.when('click')(n => console.log("Click when",n));
+
 
 //r.thing.consume!(n => console.log("thing is",n));
 

@@ -7,11 +7,11 @@ function docEventHandler(ev) {
     if (observations) {
         for (const o of observations) {
             try {
-                const { queue, container, selector } = o;
+                const { push, terminate, container, selector } = o;
                 if (!document.body.contains(container)) {
                     const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
-                    queue[Symbol.asyncIterator]().return?.(new Error(msg));
+                    terminate(new Error(msg));
                 }
                 else {
                     if (ev.target instanceof Node) {
@@ -19,12 +19,12 @@ function docEventHandler(ev) {
                             const nodes = container.querySelectorAll(selector);
                             for (const n of nodes) {
                                 if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
-                                    queue.push(ev);
+                                    push(ev);
                             }
                         }
                         else {
                             if ((ev.target === container || container.contains(ev.target)))
-                                queue.push(ev);
+                                push(ev);
                         }
                     }
                 }
@@ -64,14 +64,16 @@ function whenEvent(container, what) {
         eventObservations.set(eventName, new Set());
     }
     const queue = queueIteratableIterator(() => eventObservations.get(eventName)?.delete(details));
-    const details = {
-        queue,
+    const multi = asyncHelperFunctions.multi.call(queue);
+    const details /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
+        push: queue.push,
+        terminate(ex) { multi.return?.(ex); },
         container,
         selector: selector || null
     };
     containerAndSelectorsMounted(container, selector ? [selector] : undefined)
         .then(_ => eventObservations.get(eventName).add(details));
-    return asyncHelperFunctions.multi.call(queue);
+    return multi;
 }
 async function* neverGonnaHappen() {
     await new Promise(() => { });
