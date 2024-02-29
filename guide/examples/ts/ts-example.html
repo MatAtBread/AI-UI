@@ -33,7 +33,12 @@
         "lib": [ "lib.es2020.d.ts" ],
         "module": 6,
         "target": 7,
-        "inlineSourceMap": true
+        "inlineSourceMap": true,
+        "jsxFactory": "PoJSX",
+        "jsxFragmentFactory": "PoJSX",
+        "jsx": "react"
+        // "jsx": "react-jsx",
+        // "jsxImportSource": "/"
       }, tsFile);
       const script = document.createElement('script');
       script.setAttribute('type', 'module');

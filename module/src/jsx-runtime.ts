@@ -3,7 +3,16 @@ import { ChildTags, TagCreator, tag } from "./ai-ui.js"
 /* Support for React.createElement */
 const tagCreators: { [k in keyof HTMLElementTagNameMap]?: TagCreator<HTMLElementTagNameMap[k]> } = {};
 
-export const PoJSX = <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T,...children: ChildTags[]) =>
+type PoJSXFactory =  <
+  A extends {},
+  T extends (keyof HTMLElementTagNameMap | Function),
+  Ch extends ChildTags[]
+>(tagName: T, attrs: A, ...children: Ch)
+  => T extends keyof HTMLElementTagNameMap
+    ? HTMLElementTagNameMap[T]
+    : Ch
+
+export const PoJSX: PoJSXFactory = <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T,...children: ChildTags[]) =>
 tagName === PoJSX
     ? children
     : (typeof tagName === 'string'
@@ -26,7 +35,7 @@ export const jsxs = jsx;
 export const Fragment = jsx;
 
 declare global {
-  const PoJSX;
-  var React; // Doesn't really exist, just declated to suppress a VSCode/tsc warning
+  const PoJSX: PoJSXFactory;
+  var React: PoJSXFactory; // Doesn't really exist, just declated to suppress a VSCode/tsc warning
 }
 (globalThis as any).PoJSX = PoJSX;
