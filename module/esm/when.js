@@ -180,8 +180,9 @@ function containerAndSelectorsMounted(container, selectors) {
     return elementIsInDOM(container);
 }
 function allSelectorsPresent(container, missing) {
+    missing = missing.filter(sel => !container.querySelector(sel));
     if (!missing.length) {
-        return Promise.resolve();
+        return Promise.resolve(); // Nothing is missing
     }
     const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
         if (records.some(r => r.addedNodes?.length)) {

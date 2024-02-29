@@ -295,8 +295,9 @@ function containerAndSelectorsMounted(container: Element, selectors?: string[]) 
 }
 
 function allSelectorsPresent(container: Element, missing: string[]): Promise<void> {
+  missing = missing.filter(sel => !container.querySelector(sel))
   if (!missing.length) {
-    return Promise.resolve();
+    return Promise.resolve(); // Nothing is missing
   }
 
   const promise = new Promise<void>(resolve => new MutationObserver((records, mutation) => {

@@ -3,9 +3,9 @@ import { tag, Iterators } from '../../../module/esm/ai-ui.js'
 const { div } = tag();
 
 const Div = div.extended({
-  iterable: {
-    thing: 0
-  },
+  // iterable: {
+  //   thing: 0
+  // },
   constructed() {
     // Works OK
     // this.attributes = this.thing.map!(n => ({
@@ -25,12 +25,12 @@ const Div = div.extended({
     // };
 
     // Works OK
-    this.attributes = {
-      style: {
-        opacity: this.thing.map!(n => (n / 10).toString()),
-        fontSize: this.thing.map!(n => (n / 10 + 0.5) + "em")
-      }
-    };
+    // this.attributes = {
+    //   style: {
+    //     opacity: this.thing.map!(n => (n / 10).toString()),
+    //     fontSize: this.thing.map!(n => (n / 10 + 0.5) + "em")
+    //   }
+    // };
 
     // Works OK
     // this.attributes = {
@@ -47,7 +47,7 @@ const Div = div.extended({
 const count = Iterators.generatorHelpers(async function*() { for (let i = 0; i < 10; i++) { yield i; await new Promise(r => setTimeout(r, 500)) } });
 
 const r = Div({ 
-  thing: count().map(n => n+1), 
+  // thing: count().map(n => n+1), 
   id:"MyThing", 
 //  onclick:e => console.log(e)
 },
@@ -66,7 +66,7 @@ document.body.append(r);
 //       console.log("Also ",x);
 //     }
 //   }
-  for await (const e of r.when('click')) {
-    console.log("for click",e)
-  }
+  // for await (const e of r.when('click')) {
+  //   console.log("for click",e)
+  // }
 })();

@@ -66,7 +66,7 @@ type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
 
 type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
   get attributes(): NamedNodeMap;
-  set attributes(v: Partial<PossiblyAsync<Base>>);
+  set attributes(v: DeepPartial<PossiblyAsync<Base>>);
 }
 
 type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
