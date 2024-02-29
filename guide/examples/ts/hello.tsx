@@ -1,33 +1,47 @@
 import '../../../module/esm/jsx-runtime.js';
 import { tag } from '../../../module/esm/ai-ui.js'
+import type * as Tags from '../../../module/esm/tags.js'
 
-const { div: Div } = tag();
-const div = Div;
-declare const React: {};
+const { div } = tag();//{} as React.JSX.Element);
 
-declare namespace JSX {
-  interface IntrinsicElements {
-    foo: { thing?: number }
+declare var React: unknown;
+declare namespace React {
+  namespace JSX {
+    /*type IntrinsicElements = {
+      foo: { thing?: number }
+    } & {
+      [k in keyof HTMLElementTagNameMap]: Partial<HTMLElementTagNameMap[k]>
+    };*/
+    // interface Element extends Partial<ReturnType<Tags.TagCreator<HTMLElement>>> {
+    // }
   }
-}
+};
 
-const DivX = div.extended({
-  declare:{
+//declare var React;
+
+const Div = div.extended({
+  iterable: {
     thing: 0
+  },
+  constructed() {
+    this.attributes = this.thing.map!(n => {
+      return {
+        style: {
+          opacity: n / 10
+        }
+      }
+    })
   }
 });
 
-const p = <foo>Hello</foo>;
+//const p = <foo>Hello</foo>;
+//const q = <div>Hello</div>;
+async function* count() { for (let i = 0; i < 10; i++) { yield i; await new Promise(r => setTimeout(r, 500)) } }
 
-const q = <div>Hello</div>;
-const r = <DivX>Hello</DivX>;
+const r = <div>
+  <Div thing={count()} id="MyThing" onclick={e => console.log(e)}>
+    The count is: {count()}
+  </Div>
+</div>;
 
-document.body.append(q);
-
-/*export function hello() {
-  //return [<Div>Hello</Div>];
-  return <><Div>Hello</Div><div>World</div></>;
-}
-
-document.body.append(...hello());
-*/
+document.body.append(r);
