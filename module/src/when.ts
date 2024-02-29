@@ -176,7 +176,9 @@ async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
   a following function, or used directly as an iterable */
 function chainAsync<A extends AsyncIterable<X>, X>(src: A): MappableIterable<A> {
   function mappableAsyncIterable(mapper: Parameters<typeof asyncExtras.map>[0]) {
-    return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
+    /* const mapped = */ return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
+    // mapped.consume();
+    // return mapped;
   }
 
   return Object.assign(iterableHelpers(mappableAsyncIterable as unknown as AsyncIterable<A>), {

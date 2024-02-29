@@ -81,7 +81,9 @@ async function* neverGonnaHappen() {
   a following function, or used directly as an iterable */
 function chainAsync(src) {
     function mappableAsyncIterable(mapper) {
-        return asyncExtras.map.call(src, mapper);
+        /* const mapped = */ return asyncExtras.map.call(src, mapper);
+        // mapped.consume();
+        // return mapped;
     }
     return Object.assign(iterableHelpers(mappableAsyncIterable), {
         [Symbol.asyncIterator]: () => src[Symbol.asyncIterator]()
