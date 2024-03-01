@@ -1,25 +1,10 @@
-import '../../../module/esm/jsx-runtime.js';
+import { JSX } from '../../../module/esm/jsx-runtime.ts';
 import { tag } from '../../../module/esm/ai-ui.js'
-import type * as Tags from '../../../module/esm/tags.js'
 
-const { div } = tag();//{} as React.JSX.Element);
+declare const React;
+const { div: _div } = tag();
 
-declare var React: unknown;
-declare namespace React {
-  namespace JSX {
-    /*type IntrinsicElements = {
-      foo: { thing?: number }
-    } & {
-      [k in keyof HTMLElementTagNameMap]: Partial<HTMLElementTagNameMap[k]>
-    };*/
-    // interface Element extends Partial<ReturnType<Tags.TagCreator<HTMLElement>>> {
-    // }
-  }
-};
-
-//declare var React;
-
-const Div = div.extended({
+const Div = _div.extended({
   iterable: {
     thing: 0
   },
@@ -34,14 +19,15 @@ const Div = div.extended({
   }
 });
 
-//const p = <foo>Hello</foo>;
-//const q = <div>Hello</div>;
+const q = [<Div>Hello</Div>,<div>xyz</div>];
+
+console.log(q);
 async function* count() { for (let i = 0; i < 10; i++) { yield i; await new Promise(r => setTimeout(r, 500)) } }
 
-const r = <div>
-  <Div thing={count()} id="MyThing" onclick={e => console.log(e)}>
+const r = 
+  <Div thing={count()} id="MyThing" onclick={e => console.log("onclick",e)}>
     The count is: {count()}
-  </Div>
-</div>;
+  </Div>;
 
+r.when('click')(e => console.log("when",e)).consume();
 document.body.append(r);
