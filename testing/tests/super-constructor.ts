@@ -180,4 +180,3 @@ await sleep(4);
 console.log(document.body.innerHTML);
 running = false;
 await sleep(2);
-debugger;

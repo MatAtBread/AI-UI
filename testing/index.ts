@@ -73,6 +73,7 @@ const files = process.argv.slice(2).filter(exclusions);
 const options = process.argv.slice(2).filter(file => file.startsWith('-'));
 const update = (options.includes('--update') || options.includes('-U'));
 const logRun = (options.includes('--log') || options.includes('-l'));
+const noTimeout = (options.includes('--no-timeout') || options.includes('-T'));
 
 function sleep<T>(n: number, t: T): Promise<T> {
   return new Promise<T>((resolve,reject) => setTimeout(()=>(t instanceof Error ? reject(t) : resolve(t)), n * 1000));
@@ -109,7 +110,7 @@ async function captureLogs(file: string) {
       }
     }
   });
-  await Promise.race([done,sleep(30, new Error(`Timeout running ${file}`))])
+  await Promise.race([done,noTimeout ? new Promise(()=>{}) : sleep(30, new Error(`Timeout running ${file}`))])
   return logs;
 }
 
@@ -126,7 +127,7 @@ async function compareResults(file: string, updateResults: boolean) {
   const results = await captureLogs(file);
   if (updateResults || !existsSync(resultFile)) {
     console.log("Updating ", resultFile.magenta);
-    writeFileSync(resultFile, "[\n  " + results.map(r => JSON.stringify(r)).join(",\n  ") + "\n]");
+    writeFileSync(resultFile, "[\n  " + results.map(r => JSON.stringify(r ?? null)).join(",\n  ") + "\n]");
   }
 
   const expected = JSON.parse(readFileSync(resultFile).toString(),
@@ -143,35 +144,38 @@ async function compareResults(file: string, updateResults: boolean) {
     const expect = expected[i];
     const result = results[i];
     if (expect.length !== result.length) {
-      throw new CompareError(`Line ${i + 1}: expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
+//      throw new CompareError(`Line ${i + 1}: expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
+      throw new CompareError(`Line ${i + 1}: expected ${expect.length} fields, results ${result.length} fields`, file);
     }
     for (let j = 0; j < result.length; j++) {
       const x = expect[j];
       const r = result[j];
-      if (x.regex && x.regex instanceof RegExp
+      if (x?.regex && x.regex instanceof RegExp
         ? !x.regex.test(r.toString())
-        : !deepEqual(x, r)
+        : !deepEqual(x ?? null, r ?? null) // ...because undefined & null look the same in JSON
       )
-        throw new CompareError(`Line ${i + 1} field ${j + 1}: expected ${x.regex ? x.regex : x}, result ${r}`, file);
+        throw new CompareError(`Line ${i + 1} field ${j + 1}\nexpected:\n${(x?.regex ? x.regex : x)?.toString().yellow}\nresult:\n${r?.toString().cyan}`, file);
     }
   }
 }
 
 (async () => {
   let failed = 0;
+  let passed = 0;
   for (const file of files.length ? files : readdirSync(path.join(__dirname, 'tests')).filter(exclusions)) {
     try {
       console.log("run  ".blue, file);
       console.log("\x1B[2A");
       await compareResults(path.join(__dirname, 'tests', file), update);
       console.log("pass ".green, file);
+      passed += 1;
     } catch (ex) {
       failed += 1;
       console.log("FAIL".bgRed + " ", file.red, ex?.toString().red)
     }
   }
+  console.log(passed + failed,"tests:", passed, "passes".green, failed, "failures".red);
   if (failed) {
-    console.log(failed, "failures".red);
     process.exit(1);
   } else {
     process.exit(0);
