@@ -114,7 +114,7 @@ for await (const x of counter3.filter(num => num % 2 === 0)) {
 function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U>
 ```
 
-Filter the results of an async iterable to remove duplicate values. The optional specifed function can be used to test for equality. By default, the test is the JavaScript loose equality operator "==".
+Filter the results of an async iterable to remove duplicate values. The optional specifed function can be used to test for equality. By default, the test is the JavaScript strict equality operator "===".
 
 ```javascript
 for await (const x of counter3.filter(num => num % 2 === 0)) {
@@ -133,13 +133,6 @@ for await (const x of counter3.initially('hello')) {
   console.log(x); // 'hello',0,1,2,3,4,5,6,7,8,9
 }
 ```
-
-## throttle
-```typescript
-function throttle<U>(this: AsyncIterable<U>, milliseconds: number): AsyncIterable<U>
-```
-
-Filters out yielded values which occur within `milliseconds` or the previously yielded value
 
 ## waitFor
 ```typescript

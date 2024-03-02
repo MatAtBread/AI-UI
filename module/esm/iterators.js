@@ -27,11 +27,7 @@ export const asyncExtras = {
     map: wrapAsyncHelper(map),
     filter: wrapAsyncHelper(filter),
     unique: wrapAsyncHelper(unique),
-    throttle: wrapAsyncHelper(throttle),
-    debounce: wrapAsyncHelper(debounce),
     waitFor: wrapAsyncHelper(waitFor),
-    count: wrapAsyncHelper(count),
-    retain: wrapAsyncHelper(retain),
     multi: wrapAsyncHelper(multi),
     broadcast: wrapAsyncHelper(broadcast),
     initially: wrapAsyncHelper(initially),
@@ -40,7 +36,7 @@ export const asyncExtras = {
         return merge(this, ...m);
     }
 };
-function queueIteratableIterator(stop = () => { }) {
+export function queueIteratableIterator(stop = () => { }) {
     let _pending = [];
     let _items = [];
     const q = {
@@ -190,7 +186,7 @@ export function defineIterableProperty(obj, name, v) {
     let initIterator = () => {
         initIterator = () => b;
         // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
-        //const bi = pushIterator<V>(); 
+        //const bi = pushIterator<V>();
         //const b = bi.multi()[Symbol.asyncIterator]();
         const bi = broadcastIterator();
         const b = bi[Symbol.asyncIterator]();
@@ -251,7 +247,7 @@ function box(a, pds) {
             */
             if (!(Symbol.asyncIterator in a)) {
                 if (DEBUG)
-                    console.warn('Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
+                    console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
                 return Object.defineProperties({ ...a }, pds);
             }
             return a;
@@ -268,14 +264,26 @@ function box(a, pds) {
     throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
 }
 export const merge = (...ai) => {
-    const it = ai.map(i => Symbol.asyncIterator in i ? i[Symbol.asyncIterator]() : i);
-    const promises = it.map((i, idx) => i.next().then(result => ({ idx, result })));
+    const it = new Array(ai.length);
+    const promises = new Array(ai.length);
+    let init = () => {
+        init = () => { };
+        for (let n = 0; n < ai.length; n++) {
+            const a = ai[n];
+            promises[n] = (it[n] = Symbol.asyncIterator in a
+                ? a[Symbol.asyncIterator]()
+                : a)
+                .next()
+                .then(result => ({ idx: n, result }));
+        }
+    };
     const results = [];
     const forever = new Promise(() => { });
     let count = promises.length;
     const merged = {
         [Symbol.asyncIterator]() { return merged; },
         next() {
+            init();
             return count
                 ? Promise.race(promises).then(({ idx, result }) => {
                     if (result.done) {
@@ -288,20 +296,21 @@ export const merge = (...ai) => {
                     }
                     else {
                         // `ex` is the underlying async iteration exception
-                        promises[idx] = it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: ex }));
+                        promises[idx] = it[idx]
+                            ? it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: { done: true, value: ex } }))
+                            : Promise.resolve({ idx, result: { done: true, value: undefined } });
                         return result;
                     }
                 }).catch(ex => {
                     return merged.throw?.(ex) ?? Promise.reject({ done: true, value: new Error("Iterator merge exception") });
                 })
-                : Promise.reject({ done: true, value: new Error("Iterator merge complete") });
+                : Promise.resolve({ done: true, value: results });
         },
-        async return() {
-            const ex = new Error("Merge terminated");
+        async return(r) {
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    results[i] = await it[i].return?.({ done: true, value: ex }).then(v => v.value, ex => ex);
+                    results[i] = await it[i]?.return?.({ done: true, value: r }).then(v => v.value, ex => ex);
                 }
             }
             return { done: true, value: results };
@@ -310,7 +319,7 @@ export const merge = (...ai) => {
             for (let i = 0; i < it.length; i++) {
                 if (promises[i] !== forever) {
                     promises[i] = forever;
-                    results[i] = await it[i].throw?.(ex).then(v => v.value, ex => ex);
+                    results[i] = await it[i]?.throw?.(ex).then(v => v.value, ex => ex);
                 }
             }
             // Because we've passed the exception on to all the sources, we're now done
@@ -322,7 +331,6 @@ export const merge = (...ai) => {
 };
 /*
   Extensions to the AsyncIterable:
-  calling `bind(ai)` adds "standard" methods to the specified AsyncIterable
 */
 function isExtraIterable(i) {
     return isAsyncIterable(i)
@@ -342,205 +350,120 @@ export function generatorHelpers(g) {
         return iterableHelpers(g(...args));
     };
 }
-/* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
-async function* map(...mapper) {
-    const ai = this[Symbol.asyncIterator]();
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            for (const m of mapper)
-                yield m(p.value);
-        }
-    }
-    catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-}
-async function* filter(fn) {
-    const ai = this[Symbol.asyncIterator]();
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            if (await fn(p.value)) {
-                yield p.value;
-            }
-        }
-    }
-    catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-}
-const noUniqueValue = Symbol('noUniqueValue');
-async function* unique(fn) {
-    const ai = this[Symbol.asyncIterator]();
-    let prev = noUniqueValue;
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            if (fn && prev !== noUniqueValue ? await fn(p.value, prev) : p.value != prev) {
-                yield p.value;
-            }
-            prev = p.value;
-        }
-    }
-    catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-}
-async function* initially(initValue) {
-    yield initValue;
-    for await (const u of this)
-        yield u;
-}
-async function* throttle(milliseconds) {
-    const ai = this[Symbol.asyncIterator]();
-    let paused = 0;
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            const now = Date.now();
-            if (paused < now) {
-                paused = now + milliseconds;
-                yield p.value;
-            }
-        }
-    }
-    catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-}
-const forever = new Promise(() => { });
-// NB: DEBOUNCE IS CURRENTLY BROKEN
-async function* debounce(milliseconds) {
-    const ai = this[Symbol.asyncIterator]();
-    let timer = forever;
-    let last = -1;
-    try {
-        while (true) {
-            const p = await Promise.race([ai.next(), timer]);
-            if ('done' in p && p.done)
-                return ai.return?.(p.value);
-            if ('debounced' in p && p.debounced) {
-                if (p.debounced === last)
-                    yield p.value;
-            }
-            else {
-                // We have a new value from the src
-                clearTimeout(last);
-                timer = new Promise(resolve => {
-                    last = setTimeout(() => {
-                        resolve({ debounced: last, value: p.value });
-                    }, milliseconds);
-                });
-            }
-        }
-    }
-    catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-}
-async function* waitFor(cb) {
-    const ai = this[Symbol.asyncIterator]();
-    try {
-        while (true) {
-            const p = await ai.next();
-            if (p.done) {
-                return ai.return?.(p.value);
-            }
-            await new Promise(resolve => cb(resolve));
-            yield p.value;
-        }
-    }
-    catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-}
-async function* count(field) {
-    const ai = this[Symbol.asyncIterator]();
-    let count = 0;
-    try {
-        for await (const value of this) {
-            const counted = {
-                ...value,
-                [field]: count++
-            };
-            yield counted;
-        }
-        ai.return?.();
-    }
-    catch (ex) {
-        return ai.throw ? ai.throw(ex) : ai.return?.();
-    }
-}
-function retain() {
-    const ai = this[Symbol.asyncIterator]();
-    let prev;
+/* A general filter & mapper that can handle exceptions & returns */
+export const Ignore = Symbol("Ignore");
+export function filterMap(source, fn, initialValue = Ignore) {
+    let ai;
+    let prev = Ignore;
     return {
-        [Symbol.asyncIterator]() { return this; },
-        next() {
-            const n = ai.next();
-            n.then(p => prev = p);
-            return n;
+        [Symbol.asyncIterator]() {
+            return this;
         },
-        return(value) {
-            return ai.return?.(value) ?? Promise.resolve({ done: true, value });
+        next(...args) {
+            if (initialValue !== Ignore) {
+                const init = Promise.resolve(initialValue).then(value => ({ done: false, value }));
+                initialValue = Ignore;
+                return init;
+            }
+            return new Promise(function step(resolve, reject) {
+                if (!ai)
+                    ai = source[Symbol.asyncIterator]();
+                ai.next(...args).then(p => p.done
+                    ? resolve(p)
+                    : Promise.resolve(fn(p.value, prev)).then(f => f === Ignore
+                        ? step(resolve, reject)
+                        : resolve({ done: false, value: prev = f }), ex => {
+                        // The filter function failed...
+                        ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
+                        reject({ done: true, value: ex }); // Terminate the consumer
+                    }), ex => 
+                // The source threw. Tell the consumer
+                reject({ done: true, value: ex })).catch(ex => {
+                    // The callback threw 
+                    ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
+                    reject({ done: true, value: ex });
+                });
+            });
         },
-        throw(...args) {
-            return ai.throw?.(args) ?? Promise.resolve({ done: true, value: args[0] });
+        throw(ex) {
+            // The consumer wants us to exit with an exception. Tell the source
+            return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }));
         },
-        get value() {
-            return prev.value;
-        },
-        get done() {
-            return Boolean(prev.done);
+        return(v) {
+            // The consumer told us to return, so we need to terminate the source
+            return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
         }
     };
 }
+function map(mapper) {
+    return filterMap(this, mapper);
+}
+function filter(fn) {
+    return filterMap(this, async (o) => (await fn(o) ? o : Ignore));
+}
+function unique(fn) {
+    return fn
+        ? filterMap(this, async (o, p) => (p === Ignore || await fn(o, p)) ? o : Ignore)
+        : filterMap(this, (o, p) => o === p ? Ignore : o);
+}
+function initially(initValue) {
+    return filterMap(this, o => o, initValue);
+}
+function waitFor(cb) {
+    return filterMap(this, o => new Promise(resolve => { cb(() => resolve(o)); return o; }));
+}
 function multi() {
-    const ai = this[Symbol.asyncIterator]();
-    let current = deferred();
+    const source = this;
+    let consumers = 0;
+    let current;
+    let ai = undefined;
     // The source has produced a new result
-    function update(it) {
-        current.resolve(it);
-        if (!it.done) {
+    function step(it) {
+        if (it)
+            current.resolve(it);
+        if (!it?.done) {
             current = deferred();
-            ai.next().then(update).catch(error);
+            ai.next()
+                .then(step)
+                .catch(error => current.reject({ done: true, value: error }));
         }
     }
-    // The source has errored
-    function error(reason) {
-        current.reject({ done: true, value: reason });
-    }
-    ai.next().then(update).catch(error);
     return {
-        [Symbol.asyncIterator]() { return this; },
+        [Symbol.asyncIterator]() {
+            consumers += 1;
+            return this;
+        },
         next() {
+            if (!ai) {
+                ai = source[Symbol.asyncIterator]();
+                step();
+            }
             return current;
         },
-        return(value) {
-            return ai.return?.(value) ?? Promise.resolve({ done: true, value });
+        throw(ex) {
+            // The consumer wants us to exit with an exception. Tell the source if we're the final one
+            if (consumers < 1)
+                throw new Error("AsyncIterator protocol error");
+            consumers -= 1;
+            if (consumers)
+                return Promise.resolve({ done: true, value: ex });
+            return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }));
         },
-        throw(...args) {
-            return ai.throw?.(args) ?? Promise.resolve({ done: true, value: args[0] });
-        },
+        return(v) {
+            // The consumer told us to return, so we need to terminate the source if we're the only one
+            if (consumers < 1)
+                throw new Error("AsyncIterator protocol error");
+            consumers -= 1;
+            if (consumers)
+                return Promise.resolve({ done: true, value: v });
+            return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
+        }
     };
 }
 function broadcast() {
     const ai = this[Symbol.asyncIterator]();
     const b = broadcastIterator(() => ai.return?.());
-    (function update() {
+    (function step() {
         ai.next().then(v => {
             if (v.done) {
                 // Meh - we throw these away for now.
@@ -548,7 +471,7 @@ function broadcast() {
             }
             else {
                 b.push(v.value);
-                update();
+                step();
             }
         }).catch(ex => b.close(ex));
     })();
@@ -564,4 +487,4 @@ async function consume(f) {
         last = f?.(u);
     await last;
 }
-const asyncHelperFunctions = { map, filter, unique, throttle, debounce, waitFor, count, retain, multi, broadcast, initially, consume, merge };
+export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };

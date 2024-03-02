@@ -1,17 +1,17 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { pushIterator, iterableHelpers, asyncExtras, merge } from "./iterators.js";
+import { iterableHelpers, asyncExtras, merge, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
 const eventObservations = new Map();
 function docEventHandler(ev) {
     const observations = eventObservations.get(ev.type);
     if (observations) {
         for (const o of observations) {
             try {
-                const { push, container, selector } = o;
+                const { push, terminate, container, selector } = o;
                 if (!document.body.contains(container)) {
                     const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
-                    push[Symbol.asyncIterator]().return?.(new Error(msg));
+                    terminate(new Error(msg));
                 }
                 else {
                     if (ev.target instanceof Node) {
@@ -19,18 +19,18 @@ function docEventHandler(ev) {
                             const nodes = container.querySelectorAll(selector);
                             for (const n of nodes) {
                                 if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
-                                    push.push(ev);
+                                    push(ev);
                             }
                         }
                         else {
                             if ((ev.target === container || container.contains(ev.target)))
-                                push.push(ev);
+                                push(ev);
                         }
                     }
                 }
             }
             catch (ex) {
-                console.warn('docEventHandler', ex);
+                console.warn('(AI-UI)', 'docEventHandler', ex);
             }
         }
     }
@@ -63,14 +63,17 @@ function whenEvent(container, what) {
         });
         eventObservations.set(eventName, new Set());
     }
-    const push = pushIterator(() => eventObservations.get(eventName)?.delete(details));
-    const details = {
-        push,
+    const queue = queueIteratableIterator(() => eventObservations.get(eventName)?.delete(details));
+    const multi = asyncHelperFunctions.multi.call(queue);
+    const details /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
+        push: queue.push,
+        terminate(ex) { multi.return?.(ex); },
         container,
         selector: selector || null
     };
-    eventObservations.get(eventName).add(details);
-    return push;
+    containerAndSelectorsMounted(container, selector ? [selector] : undefined)
+        .then(_ => eventObservations.get(eventName).add(details));
+    return multi;
 }
 async function* neverGonnaHappen() {
     await new Promise(() => { });
@@ -128,10 +131,7 @@ export function when(container, ...sources) {
         const ai = {
             [Symbol.asyncIterator]() { return ai; },
             async next() {
-                await Promise.all([
-                    allSelectorsPresent(container, missing),
-                    elementIsInDOM(container)
-                ]);
+                await containerAndSelectorsMounted(container, missing);
                 const merged = (iterators.length > 1)
                     ? merge(...iterators)
                     : iterators.length === 1
@@ -140,10 +140,13 @@ export function when(container, ...sources) {
                 // Now everything is ready, we simply defer all async ops to the underlying
                 // merged asyncIterator
                 const events = merged[Symbol.asyncIterator]();
-                ai.next = events.next.bind(events); //() => events.next();
-                ai.return = events.return?.bind(events);
-                ai.throw = events.throw?.bind(events);
-                return { done: false, value: {} };
+                if (events) {
+                    ai.next = events.next.bind(events); //() => events.next();
+                    ai.return = events.return?.bind(events);
+                    ai.throw = events.throw?.bind(events);
+                    return { done: false, value: {} };
+                }
+                return { done: true, value: undefined };
             }
         };
         return chainAsync(ai);
@@ -159,13 +162,10 @@ function elementIsInDOM(elt) {
     if (document.body.contains(elt))
         return Promise.resolve();
     return new Promise(resolve => new MutationObserver((records, mutation) => {
-        for (const record of records) {
-            if (record.addedNodes?.length) {
-                if (document.body.contains(elt)) {
-                    mutation.disconnect();
-                    resolve();
-                    return;
-                }
+        if (records.some(r => r.addedNodes?.length)) {
+            if (document.body.contains(elt)) {
+                mutation.disconnect();
+                resolve();
             }
         }
     }).observe(document.body, {
@@ -173,19 +173,24 @@ function elementIsInDOM(elt) {
         childList: true
     }));
 }
+function containerAndSelectorsMounted(container, selectors) {
+    if (selectors?.length)
+        return Promise.all([
+            allSelectorsPresent(container, selectors),
+            elementIsInDOM(container)
+        ]);
+    return elementIsInDOM(container);
+}
 function allSelectorsPresent(container, missing) {
+    missing = missing.filter(sel => !container.querySelector(sel));
     if (!missing.length) {
-        return Promise.resolve();
+        return Promise.resolve(); // Nothing is missing
     }
     const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
-        for (const record of records) {
-            if (record.addedNodes?.length) {
-                missing = missing.filter(sel => !container.querySelector(sel));
-                if (!missing.length) {
-                    mutation.disconnect();
-                    resolve();
-                    return;
-                }
+        if (records.some(r => r.addedNodes?.length)) {
+            if (missing.every(sel => container.querySelector(sel))) {
+                mutation.disconnect();
+                resolve();
             }
         }
     }).observe(container, {
@@ -196,7 +201,7 @@ function allSelectorsPresent(container, missing) {
     if (DEBUG) {
         const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
         const warn = setTimeout(() => {
-            console.warn(stack, missing);
+            console.warn('(AI-UI)', stack, missing);
         }, 5000);
         promise.finally(() => clearTimeout(warn));
     }

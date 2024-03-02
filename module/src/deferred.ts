@@ -17,7 +17,7 @@ export function deferred<T>(): DeferredPromise<T> {
   promise.reject = reject;
   if (DEBUG) {
     const initLocation = new Error().stack;
-    promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? console.log("Deferred", ex, initLocation) : undefined);
+    promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? console.log('(AI-UI)', "Deferred", ex, initLocation) : undefined);
   }
   return promise;
 }

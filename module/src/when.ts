@@ -1,6 +1,6 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { PushIterator, pushIterator, iterableHelpers, asyncExtras, merge, AsyncExtraIterable } from "./iterators.js";
+import { iterableHelpers, asyncExtras, merge, AsyncExtraIterable, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
 
 /*
   `when(....)` is both an AsyncIterable of the events it can generate by observation,
@@ -84,7 +84,8 @@ type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];
 
 /** when **/
 type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
-  push: PushIterator<GlobalEventHandlersEventMap[EventName]>;
+  push: (ev: GlobalEventHandlersEventMap[EventName])=>void;
+  terminate: (ex: Error)=>void;
   container: Element
   selector: string | null
 };
@@ -95,27 +96,27 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
   if (observations) {
     for (const o of observations) {
       try {
-        const { push, container, selector } = o;
+        const { push, terminate, container, selector } = o;
         if (!document.body.contains(container)) {
           const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
           observations.delete(o);
-          push[Symbol.asyncIterator]().return?.(new Error(msg));
+          terminate(new Error(msg));
         } else {
           if (ev.target instanceof Node) {
             if (selector) {
               const nodes = container.querySelectorAll(selector);
               for (const n of nodes) {
                 if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
-                  push.push(ev)
+                  push(ev)
               }
             } else {
               if ((ev.target === container || container.contains(ev.target)))
-                push.push(ev)
+                push(ev)
             }
           }
         }
       } catch (ex) {
-        console.warn('docEventHandler', ex);
+        console.warn('(AI-UI)', 'docEventHandler', ex);
       }
     }
   }
@@ -154,14 +155,20 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
     eventObservations.set(eventName, new Set());
   }
 
-  const push = pushIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
-  const details: EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>> = {
-    push,
+  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
+  const multi = asyncHelperFunctions.multi.call(queue);
+
+  const details: EventObservation<keyof GlobalEventHandlersEventMap> /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
+    push: queue.push,
+    terminate(ex: Error) { multi.return?.(ex)},
     container,
     selector: selector || null
   };
-  eventObservations.get(eventName)!.add(details);
-  return push;
+
+  containerAndSelectorsMounted(container, selector ? [selector] : undefined)
+    .then(_ => eventObservations.get(eventName)!.add(details));
+
+  return multi ;
 }
 
 async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
@@ -232,10 +239,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
     const ai: AsyncIterableIterator<any> = {
       [Symbol.asyncIterator]() { return ai },
       async next() {
-        await Promise.all([
-          allSelectorsPresent(container, missing),
-          elementIsInDOM(container)
-        ])
+        await containerAndSelectorsMounted(container, missing);
 
         const merged = (iterators.length > 1)
           ? merge(...iterators)
@@ -246,11 +250,14 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
         // Now everything is ready, we simply defer all async ops to the underlying
         // merged asyncIterator
         const events = merged[Symbol.asyncIterator]();
-        ai.next = events.next.bind(events); //() => events.next();
-        ai.return = events.return?.bind(events);
-        ai.throw = events.throw?.bind(events);
+        if (events) {
+          ai.next = events.next.bind(events); //() => events.next();
+          ai.return = events.return?.bind(events);
+          ai.throw = events.throw?.bind(events);
 
-        return { done: false, value: {} };
+          return { done: false, value: {} };
+        }
+        return { done: true, value: undefined };
       }
     };
     return chainAsync(ai);
@@ -270,13 +277,10 @@ function elementIsInDOM(elt: Element): Promise<void> {
     return Promise.resolve();
 
   return new Promise<void>(resolve => new MutationObserver((records, mutation) => {
-    for (const record of records) {
-      if (record.addedNodes?.length) {
-        if (document.body.contains(elt)) {
-          mutation.disconnect();
-          resolve();
-          return;
-        }
+    if (records.some(r => r.addedNodes?.length)) {
+      if (document.body.contains(elt)) {
+        mutation.disconnect();
+        resolve();
       }
     }
   }).observe(document.body, {
@@ -285,20 +289,26 @@ function elementIsInDOM(elt: Element): Promise<void> {
   }));
 }
 
+function containerAndSelectorsMounted(container: Element, selectors?: string[]) {
+  if (selectors?.length)
+    return Promise.all([
+      allSelectorsPresent(container, selectors),
+      elementIsInDOM(container)
+    ]);
+  return elementIsInDOM(container);
+}
+
 function allSelectorsPresent(container: Element, missing: string[]): Promise<void> {
+  missing = missing.filter(sel => !container.querySelector(sel))
   if (!missing.length) {
-    return Promise.resolve();
+    return Promise.resolve(); // Nothing is missing
   }
 
   const promise = new Promise<void>(resolve => new MutationObserver((records, mutation) => {
-    for (const record of records) {
-      if (record.addedNodes?.length) {
-        missing = missing.filter(sel => !container.querySelector(sel));
-        if (!missing.length) {
-          mutation.disconnect();
-          resolve();
-          return;
-        }
+    if (records.some(r => r.addedNodes?.length)) {
+      if (missing.every(sel => container.querySelector(sel))) {
+        mutation.disconnect();
+        resolve();
       }
     }
   }).observe(container, {
@@ -310,7 +320,7 @@ function allSelectorsPresent(container: Element, missing: string[]): Promise<voi
   if (DEBUG) {
     const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
     const warn = setTimeout(() => {
-      console.warn(stack, missing);
+      console.warn('(AI-UI)', stack, missing);
     }, 5000);
 
     promise.finally(() => clearTimeout(warn))

@@ -2,17 +2,16 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"type": "typescript",
-			"tsconfig": "module/tsconfig.json",
-			"option": "watch",
-			"problemMatcher": [
-				"$tsc-watch"
-			],
+			"type": "npm",
+			"script": "watch",
+			"path": "module",
 			"group": {
 				"kind": "build",
 				"isDefault": true
 			},
-			"label": "tsc: watch - module/tsconfig.json"
+			"problemMatcher": [],
+			"label": "npm: watch - module",
+			"detail": "bash watch.sh"
 		}
 	]
 }

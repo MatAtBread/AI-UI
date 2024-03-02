@@ -22,7 +22,7 @@ type TypedEventHandlers<T> = {
 type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers) ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> : T;
 type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
     get attributes(): NamedNodeMap;
-    set attributes(v: Partial<PossiblyAsync<Base>>);
+    set attributes(v: DeepPartial<PossiblyAsync<Base>>);
 };
 export type Flatten<O> = [
     {

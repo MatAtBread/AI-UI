@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable } from './iterators.js';
+import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
 import { DEBUG } from './debug.js';
 /* Export useful stuff for users of the bundled code */
@@ -67,7 +67,13 @@ export const tag = function (_1, _2, _3) {
     Object.defineProperty(tagPrototypes, 'attributes', {
         ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
         set(a) {
-            assignProps(this, a);
+            if (isAsyncIter(a)) {
+                const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
+                const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn("(AI-UI)", ex));
+                step();
+            }
+            else
+                assignProps(this, a);
         }
     });
     if (prototypes)
@@ -88,8 +94,8 @@ export const tag = function (_1, _2, _3) {
                         old.forEach(e => e.parentElement?.removeChild(e));
                     }
                     g = n;
-                }, x => {
-                    console.warn(x);
+                }, (x) => {
+                    console.warn('(AI-UI)', x);
                     appender(g[0])(DyamicElementError({ error: x }));
                 });
                 return;
@@ -112,7 +118,7 @@ export const tag = function (_1, _2, _3) {
                         n.forEach(e => e.parentNode?.removeChild(e));
                     }
                     else
-                        console.warn("Can't report error", errorValue, t);
+                        console.warn('(AI-UI)', "Can't report error", errorValue, t);
                 };
                 const update = (es) => {
                     if (!es.done) {
@@ -155,7 +161,7 @@ export const tag = function (_1, _2, _3) {
                     if (!parent)
                         throw new Error("Parent is null");
                     if (parent !== container) {
-                        console.warn("Container mismatch??");
+                        console.warn('(AI-UI)', "Internal error - container mismatch");
                     }
                     for (let i = 0; i < children.length; i++)
                         parent.insertBefore(children[i], before);
@@ -193,7 +199,7 @@ export const tag = function (_1, _2, _3) {
                             else {
                                 if (value instanceof Node) {
                                     if (DEBUG)
-                                        console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                        console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                                     d[k] = value;
                                 }
                                 else {
@@ -231,7 +237,7 @@ export const tag = function (_1, _2, _3) {
                 }
             }
             catch (ex) {
-                console.warn("deepAssign", k, s[k], ex);
+                console.warn('(AI-UI)', "deepAssign", k, s[k], ex);
                 throw ex;
             }
         }
@@ -305,7 +311,7 @@ export const tag = function (_1, _2, _3) {
                                 };
                                 const error = (errorValue) => {
                                     ap.return?.(errorValue);
-                                    console.warn("Dynamic attribute error", errorValue, k, d, base);
+                                    console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
                                     appender(base)(DyamicElementError({ error: errorValue }));
                                 };
                                 ap.next().then(update).catch(error);
@@ -315,7 +321,7 @@ export const tag = function (_1, _2, _3) {
                                 if (value && typeof value === 'object' && !isPromiseLike(value)) {
                                     if (value instanceof Node) {
                                         if (DEBUG)
-                                            console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                            console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                                         d[k] = value;
                                     }
                                     else {
@@ -352,7 +358,7 @@ export const tag = function (_1, _2, _3) {
                         }
                     }
                     catch (ex) {
-                        console.warn("assignProps", k, s[k], ex);
+                        console.warn('(AI-UI)', "assignProps", k, s[k], ex);
                         throw ex;
                     }
                 }
@@ -380,9 +386,6 @@ export const tag = function (_1, _2, _3) {
                 document.head.appendChild(poStyleElt);
             }
         }
-        // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
-        // Here's where we actually create the tag, by accumulating all the base attributes and
-        // (finally) assigning those specified by the instantiation
         const extendTagFn = (attrs, ...children) => {
             const noAttrs = isChildTag(attrs);
             const newCallStack = [];
@@ -554,6 +557,7 @@ export let enableOnRemovedFromDOM = function () {
         });
     }).observe(document.body, { subtree: true, childList: true });
 };
+const warned = new Set();
 export function getElementIdMap(node, ids) {
     node = node || document;
     ids = ids || {};
@@ -562,7 +566,12 @@ export function getElementIdMap(node, ids) {
             if (elt.id) {
                 if (!ids[elt.id])
                     ids[elt.id] = elt;
-                //else console.warn("Shadowed element ID",elt.id,elt,ids[elt.id])
+                else if (DEBUG) {
+                    if (!warned.has(elt.id)) {
+                        warned.add(elt.id);
+                        console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
+                    }
+                }
             }
         });
     }
