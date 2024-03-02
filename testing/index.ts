@@ -1,4 +1,4 @@
-/* AI-UI TEST HARNESS 
+/* AI-UI TEST HARNESS
 
 Simulates DOM via JSDOM. Preloads AI-UI for testing.
 
@@ -28,6 +28,7 @@ import { readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
 import path from 'path';
 
 const { JSDOM } = require("../module/node_modules/jsdom");
+const deepEqual = require('../module/node_modules/fast-deep-equal/es6');
 
 // Load, transpile and run all the locally defined tests
 
@@ -45,7 +46,7 @@ function transpile(tsFile: string) {
     }
   });
 
-  return jsCode.outputText.replace('"use strict";','');
+  return jsCode.outputText.replace('"use strict";', '');
 }
 
 // Globals to simulate DOM
@@ -69,17 +70,17 @@ async function captureLogs(file: string) {
     tag: AI.tag,
     when: AI.when,
 
-    require(module: string){
+    require(module: string) {
       if (module === '../../module/src/ai-ui')
         return AI;
       return require(module);
     },
-    Test:{
+    Test: {
       sleep: async function sleep<T>(n: number): Promise<T> {
-        return new Promise<T>(resolve => setTimeout(resolve, n *1000));
+        return new Promise<T>(resolve => setTimeout(resolve, n * 1000));
       },
-      count: async function *count(n :number = 10) {
-        for (let i=0; i<n; i++)
+      count: async function* count(n: number = 10) {
+        for (let i = 0; i < n; i++)
           yield i;
       }
     },
@@ -95,21 +96,25 @@ async function captureLogs(file: string) {
 class CompareError extends Error {
   file: string;
   constructor(msg: string, file: string) {
-    super();
-    this.message = msg;
+    super(msg);
     this.file = file;
   }
 }
 
 async function compareResults(file: string, updateResults: boolean) {
-  const resultFile = file.replace(/\.ts$/,'.expected');
+  const resultFile = file.replace(/\.ts$/, '.expected.json');
   const results = await captureLogs(file);
   if (updateResults || !existsSync(resultFile)) {
-    console.log("Updating ",resultFile.magenta);
-    writeFileSync(resultFile, "[\n  "+results.map(r => JSON.stringify(r)).join(",\n  ")+"\n]");
+    console.log("Updating ", resultFile.magenta);
+    writeFileSync(resultFile, "[\n  " + results.map(r => JSON.stringify(r)).join(",\n  ") + "\n]");
   }
 
-  const expected = JSON.parse(readFileSync(resultFile).toString());
+  const expected = JSON.parse(readFileSync(resultFile).toString(),
+    function(key: string, value: any){
+      return (key === 'regex') ? new RegExp(value) : value;
+    }
+  );
+
   // check results against this run
   if (results.length !== expected.length)
     throw new CompareError(`Expected ${expected.length} lines, results ${results.length} lines`, file);
@@ -118,33 +123,37 @@ async function compareResults(file: string, updateResults: boolean) {
     const expect = expected[i];
     const result = results[i];
     if (expect.length !== result.length) {
-      throw new CompareError(`Line ${i+1}: expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
+      throw new CompareError(`Line ${i + 1}: expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
     }
     for (let j = 0; j < result.length; j++) {
-      const x = JSON.parse(expect[j]);
-      const r = JSON.parse(result[j]);
-      if (x !== r)
-        throw new CompareError(`Line ${i+1} field ${j+1}: expected ${JSON.stringify(x)}, result ${JSON.stringify(r)}`, file);
+      const x = expect[j];
+      const r = result[j];
+      if (x.regex && x.regex instanceof RegExp
+        ? !x.regex.test(r.toString())
+        : !deepEqual(x, r)
+      )
+        throw new CompareError(`Line ${i + 1} field ${j + 1}: expected ${x.regex ? x.regex : x}, result ${r}`, file);
     }
   }
 }
 
-const files = readdirSync(path.join(__dirname,'tests')).filter(file => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts'));
-const options = process.argv.filter(file => file.startsWith('-'));
-(async ()=>{
+const exclusions = (file: string) => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts');
+const files = process.argv.slice(2).filter(exclusions);
+const options = process.argv.slice(2).filter(file => file.startsWith('-'));
+(async () => {
   let failed = 0;
   const update = (options.includes('--update') || options.includes('--U'));
-  for (const file of files) {
+  for (const file of files.length ? files : readdirSync(path.join(__dirname, 'tests')).filter(exclusions)) {
     try {
       await compareResults(path.join(__dirname, 'tests', file), update);
       console.log("pass\t".green, file)
     } catch (ex) {
       failed += 1;
-      console.log("FAIL\t".red, file, ex?.toString().red)
+      console.log("FAIL\t".bgRed, file.red, ex?.toString().red)
     }
   }
   if (failed) {
-    console.log(failed,"failures".red);
+    console.log(failed, "failures".red);
     process.exit(1);
   }
 })();
