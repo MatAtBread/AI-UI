@@ -162,8 +162,8 @@ async function compareResults(file: string, updateResults: boolean) {
   for (const file of files.length ? files : readdirSync(path.join(__dirname, 'tests')).filter(exclusions)) {
     try {
       console.log("run  ".blue, file);
-      await compareResults(path.join(__dirname, 'tests', file), update);
       console.log("\x1B[2A");
+      await compareResults(path.join(__dirname, 'tests', file), update);
       console.log("pass ".green, file);
     } catch (ex) {
       failed += 1;
