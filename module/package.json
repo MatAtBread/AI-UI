@@ -43,7 +43,7 @@
     "build-web": "webpack && webpack --config webpack.cjs.js",
     "build-web-dev": "webpack --config webpack.dev.js && webpack --config webpack.cjs-dev.js",
     "clean": "rm -rf dist/* esm/*",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && npm test",
     "test": "tsc -p ../type_tests/tsconfig.json && ts-node ../testing/index.ts"
   },
   "types": "./esm/ai-ui.d.ts",

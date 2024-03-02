@@ -93,14 +93,10 @@ async function captureLogs(file: string) {
 }
 
 class CompareError extends Error {
-  expected: string[];
-  result: string[];
   file: string;
-  constructor(msg: string, file: string, expected: string[], result: string[]) {
+  constructor(msg: string, file: string) {
     super(msg);
     this.file = file;
-    this.expected = expected;
-    this.result = result;
   }
 }
 
@@ -115,35 +111,39 @@ async function compareResults(file: string, updateResults: boolean) {
   const expected = JSON.parse(readFileSync(resultFile).toString());
   // check results against this run
   if (results.length !== expected.length)
-    throw new CompareError("Expected length !== results length", file, expected[0], results[0]);
+    throw new CompareError(`Expected ${expected.length} lines, results ${results.length} lines`, file);
 
   for (let i = 0; i < results.length; i++) {
-    checkLogResult(expected[i],results[i]);
-  }
-
-  function checkLogResult(expected: string[], result: string[]) {
-    if (expected.length !== result.length) {
-      throw new CompareError("Expected length !== results length", file, expected, result);
+    const expect = expected[i];
+    const result = results[i];
+    if (expect.length !== result.length) {
+      throw new CompareError(`Expected ${expected.length} fields: (${expected}), results ${results.length}: (${results}) fields`, file);
     }
     for (let i = 0; i < result.length; i++) {
-      const x = JSON.parse(expected[i]);
+      const x = JSON.parse(expect[i]);
       const r = JSON.parse(result[i]);
       if (x !== r)
-        throw new CompareError("Expected length !== results length", file, x, r);
+        throw new CompareError(`Expected ${JSON.stringify(x)}, result ${JSON.stringify(r)}`, file);
     }
-  }  
+  }
 }
 
 const files = readdirSync(path.join(__dirname,'tests')).filter(file => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts'));
 const options = process.argv.filter(file => file.startsWith('-'));
 (async ()=>{
+  let failed = 0;
   const update = (options.includes('--update') || options.includes('--U'));
   for (const file of files) {
     try {
       await compareResults(path.join(__dirname, 'tests', file), update);
       console.log("pass\t".green, file)
     } catch (ex) {
+      failed += 1;
       console.log("FAIL\t".red, file, ex?.toString().red)
     }
+  }
+  if (failed) {
+    console.log(failed,"failures".red);
+    process.exit(1);
   }
 })();
