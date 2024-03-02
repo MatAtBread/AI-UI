@@ -95,7 +95,8 @@ async function captureLogs(file: string) {
 class CompareError extends Error {
   file: string;
   constructor(msg: string, file: string) {
-    super(msg);
+    super();
+    this.message = msg;
     this.file = file;
   }
 }
@@ -117,13 +118,13 @@ async function compareResults(file: string, updateResults: boolean) {
     const expect = expected[i];
     const result = results[i];
     if (expect.length !== result.length) {
-      throw new CompareError(`Expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
+      throw new CompareError(`Line ${i+1}: expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
     }
-    for (let i = 0; i < result.length; i++) {
-      const x = JSON.parse(expect[i]);
-      const r = JSON.parse(result[i]);
+    for (let j = 0; j < result.length; j++) {
+      const x = JSON.parse(expect[j]);
+      const r = JSON.parse(result[j]);
       if (x !== r)
-        throw new CompareError(`Expected ${JSON.stringify(x)}, result ${JSON.stringify(r)}`, file);
+        throw new CompareError(`Line ${i+1} field ${j+1}: expected ${JSON.stringify(x)}, result ${JSON.stringify(r)}`, file);
     }
   }
 }
