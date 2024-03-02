@@ -18,7 +18,12 @@ Tests should use console.log(...) to report progress. The first time the test ha
 run with the --update or -U options), these are captured and stored in the *.expected files. Subsequent
 runs will compare the output with the same file.
 
-TODO: Permit manual editing of the .expected files to enable regexp wildcards.
+The .expected.json can be modified *by hand* and the entries (which represent the output of each `console.log` call
+in the test script) can be changed from a string to a object of the form:
+
+  { "regex": "expr" }
+
+...and the test result output will be tested against the regex as opposed to strict equality.
 
 */
 
@@ -146,10 +151,10 @@ const options = process.argv.slice(2).filter(file => file.startsWith('-'));
   for (const file of files.length ? files : readdirSync(path.join(__dirname, 'tests')).filter(exclusions)) {
     try {
       await compareResults(path.join(__dirname, 'tests', file), update);
-      console.log("pass\t".green, file)
+      console.log("pass ".green, file)
     } catch (ex) {
       failed += 1;
-      console.log("FAIL\t".bgRed, file.red, ex?.toString().red)
+      console.log("FAIL".bgRed + " ", file.red, ex?.toString().red)
     }
   }
   if (failed) {
