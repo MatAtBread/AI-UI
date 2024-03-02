@@ -5,7 +5,11 @@
   },
   "description": "A tiny, genuinely functional, UI framework for building dynamic HTML pages",
   "devDependencies": {
+    "@types/node": "^20.11.24",
+    "colors": "^1.4.0",
+    "jsdom": "^24.0.0",
     "ts-loader": "^9.5.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
@@ -40,7 +44,7 @@
     "build-web-dev": "webpack --config webpack.dev.js && webpack --config webpack.cjs-dev.js",
     "clean": "rm -rf dist/* esm/*",
     "prepublishOnly": "npm run build",
-    "test": "tsc -p ../type_tests/tsconfig.json"
+    "test": "tsc -p ../type_tests/tsconfig.json && ts-node ../tests/index.ts"
   },
   "types": "./esm/ai-ui.d.ts",
   "version": "0.10.12"

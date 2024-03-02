@@ -1,0 +1,122 @@
+export {};
+import ts from '../module/node_modules/typescript';
+import '../module/node_modules/colors';
+import { readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
+import path from 'path';
+
+const { JSDOM } = require("../module/node_modules/jsdom");
+
+// Load, transpile and run all the locally defined tests
+
+function transpile(tsFile: string) {
+  const tsCode = readFileSync(tsFile).toString();
+
+  const jsCode = ts.transpileModule(tsCode, {
+    compilerOptions: {
+      "module": 1,
+      "skipLibCheck": true,
+      "lib": ["lib.es2020.d.ts"],
+      "target": 7,
+      "inlineSourceMap": false
+    }
+  });
+
+  return jsCode.outputText.replace('"use strict";','');
+}
+
+// Globals to simulate DOM
+const window = new JSDOM().window;
+Object.assign(globalThis, {
+  document: window.document,
+  Element: window.Element
+});
+
+const AI = require('../module/dist/ai-ui.cjs.js')// as { Iterators: Iterators };
+
+async function captureLogs(file: string) {
+  const fnCode = transpile(file);
+  const fn = eval("(async function({console,Test,require,Iterators,tag,when}) {\n" + fnCode + "\n})");
+  const logs: string[][] = [];
+  await fn({
+    Iterators: AI.Iterators,
+    tag: AI.tag,
+    when: AI.when,
+
+    require(module: string){
+      if (module === '../module')
+        return AI;
+      return require(module);
+    },
+    Test:{
+      sleep: async function sleep<T>(n: number): Promise<T> {
+        return new Promise<T>(resolve => setTimeout(resolve, n *1000));
+      },
+      count: async function *count(n :number = 10) {
+        for (let i=0; i<n; i++)
+          yield i;
+      }
+    },
+    console: {
+      log(...args: any[]) {
+        logs.push(args.map(a => JSON.stringify(a)));
+      }
+    }
+  })
+  return logs;
+}
+
+class CompareError extends Error {
+  expected: string[];
+  result: string[];
+  file: string;
+  constructor(msg: string, file: string, expected: string[], result: string[]) {
+    super(msg);
+    this.file = file;
+    this.expected = expected;
+    this.result = result;
+  }
+}
+
+async function compareResults(file: string, updateResults: boolean) {
+  const resultFile = file.replace(/\.ts$/,'.expected');
+  const results = await captureLogs(file);
+  if (updateResults || !existsSync(resultFile)) {
+    console.log("Updating ",resultFile.magenta);
+    writeFileSync(resultFile, "[\n  "+results.map(r => JSON.stringify(r)).join(",\n  ")+"\n]");
+  }
+
+  const expected = JSON.parse(readFileSync(resultFile).toString());
+  // check results against this run
+  if (results.length !== expected.length)
+    throw new CompareError("Expected length !== results length", file, expected[0], results[0]);
+
+  for (let i = 0; i < results.length; i++) {
+    checkLogResult(expected[i],results[i]);
+  }
+
+  function checkLogResult(expected: string[], result: string[]) {
+    if (expected.length !== result.length) {
+      throw new CompareError("Expected length !== results length", file, expected, result);
+    }
+    for (let i = 0; i < result.length; i++) {
+      const x = JSON.parse(expected[i]);
+      const r = JSON.parse(result[i]);
+      if (x !== r)
+        throw new CompareError("Expected length !== results length", file, x, r);
+    }
+  }  
+}
+
+const files = readdirSync(__dirname).filter(file => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts'));
+const options = process.argv.filter(file => file.startsWith('-'));
+(async ()=>{
+  const update = (options.includes('--update') || options.includes('--U'));
+  for (const file of files) {
+    try {
+      await compareResults(path.join(__dirname, file), update);
+      console.log("pass\t".green, file)
+    } catch (ex) {
+      console.log("FAIL\t".red, file, ex?.toString().red)
+    }
+  }
+})();
