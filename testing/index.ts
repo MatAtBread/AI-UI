@@ -62,15 +62,28 @@ Object.assign(globalThis, {
   Node: window.Node,
   NodeList: window.NodeList,
   HTMLCollection: window.HTMLCollection,
+  Event: window.Event,
+  MutationObserver: window.MutationObserver,
 });
 
-const AI = require('../module/dist/ai-ui.cjs.js')// as { Iterators: Iterators };
+const AI = require('../module/dist/ai-ui.cjs.js');
+
+const exclusions = (file: string) => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts');
+const files = process.argv.slice(2).filter(exclusions);
+const options = process.argv.slice(2).filter(file => file.startsWith('-'));
+const update = (options.includes('--update') || options.includes('-U'));
+const logRun = (options.includes('--log') || options.includes('-l'));
+
+function sleep<T>(n: number, t: T): Promise<T> {
+  return new Promise<T>((resolve,reject) => setTimeout(()=>(t instanceof Error ? reject(t) : resolve(t)), n * 1000));
+}
 
 async function captureLogs(file: string) {
   const fnCode = transpile(file);
   const fn = eval("(async function({console,Test,require,Iterators,tag,when}) {\n" + fnCode + "\n})");
   const logs: string[][] = [];
-  await fn({
+  let line = 1;
+  const done = fn({
     Iterators: AI.Iterators,
     tag: AI.tag,
     when: AI.when,
@@ -81,9 +94,7 @@ async function captureLogs(file: string) {
       return require(module);
     },
     Test: {
-      sleep: async function sleep<T>(n: number): Promise<T> {
-        return new Promise<T>(resolve => setTimeout(resolve, n * 1000));
-      },
+      sleep,
       count: async function* count(n: number = 10) {
         for (let i = 0; i < n; i++)
           yield i;
@@ -91,10 +102,14 @@ async function captureLogs(file: string) {
     },
     console: {
       log(...args: any[]) {
+        if (logRun) {
+          console.log((String(line++)+")").padEnd(5).grey,...args);
+        }
         logs.push(args.map(a => JSON.stringify(a)));
       }
     }
-  })
+  });
+  await Promise.race([done,sleep(30, new Error(`Timeout running ${file}`))])
   return logs;
 }
 
@@ -142,16 +157,14 @@ async function compareResults(file: string, updateResults: boolean) {
   }
 }
 
-const exclusions = (file: string) => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts');
-const files = process.argv.slice(2).filter(exclusions);
-const options = process.argv.slice(2).filter(file => file.startsWith('-'));
 (async () => {
   let failed = 0;
-  const update = (options.includes('--update') || options.includes('--U'));
   for (const file of files.length ? files : readdirSync(path.join(__dirname, 'tests')).filter(exclusions)) {
     try {
+      console.log("run  ".blue, file);
       await compareResults(path.join(__dirname, 'tests', file), update);
-      console.log("pass ".green, file)
+      console.log("\x1B[2A");
+      console.log("pass ".green, file);
     } catch (ex) {
       failed += 1;
       console.log("FAIL".bgRed + " ", file.red, ex?.toString().red)
@@ -160,5 +173,7 @@ const options = process.argv.slice(2).filter(file => file.startsWith('-'));
   if (failed) {
     console.log(failed, "failures".red);
     process.exit(1);
+  } else {
+    process.exit(0);
   }
 })();
