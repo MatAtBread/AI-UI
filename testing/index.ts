@@ -117,7 +117,7 @@ async function compareResults(file: string, updateResults: boolean) {
     const expect = expected[i];
     const result = results[i];
     if (expect.length !== result.length) {
-      throw new CompareError(`Expected ${expected.length} fields: (${expected}), results ${results.length}: (${results}) fields`, file);
+      throw new CompareError(`Expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
     }
     for (let i = 0; i < result.length; i++) {
       const x = JSON.parse(expect[i]);
