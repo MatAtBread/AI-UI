@@ -29,7 +29,7 @@ in the test script) can be changed from a string to a object of the form:
 
 import ts from '../module/node_modules/typescript';
 import '../module/node_modules/colors';
-import { readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, readdirSync, lstatSync } from 'fs';
 import path from 'path';
 
 const { JSDOM } = require("../module/node_modules/jsdom");
@@ -69,7 +69,6 @@ function transpile(tsFile: string) {
 const dateRegex = '^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z)$';
 
 const exclusions = (file: string) => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts');
-const files = process.argv.slice(2).filter(exclusions);
 const options = process.argv.slice(2).filter(file => file.startsWith('-'));
 const update = (options.includes('--update') || options.includes('-U'));
 const logRun = (options.includes('--log') || options.includes('-l'));
@@ -173,7 +172,7 @@ async function compareResults(file: string, updateResults: boolean) {
 
   const expected = JSON.parse(readFileSync(resultFile).toString(),
     function (key: string, value: any) {
-      return typeof value === 'string' ? new RegExp(value) : value;
+      return typeof value === 'string' ? new RegExp(value,"s") : value;
     }
   );
 
@@ -194,7 +193,7 @@ async function compareResults(file: string, updateResults: boolean) {
       if (!fuzzyRegExEq(x, r)) {
         const sx = stringify(x);
         const sr = stringify(r);
-        throw new CompareError(`Line ${i + 1} field ${j + 1}\nexpected:\n${sx.yellow}\nresult:\n${diff(sr,sx)}`, file);
+        throw new CompareError(`Line ${i + 1} field ${j + 1}\nexpected:\n${sx.yellow}\nresult:\n${sr.cyan}`, file);
       }
     }
   }
@@ -256,14 +255,20 @@ function isNotNullish<T>(a: T | null | undefined): a is T {
   return a !== null && a !== undefined;
 }
 
+const files = new Set(process.argv.slice(2).filter(exclusions));
+let dirs = process.argv.slice(2).filter(p => !p.startsWith('-') && existsSync(p) && lstatSync(p).isDirectory());
+if (dirs.length + files.size === 0) dirs = ['../testing/tests'];
+const foundFiles = dirs.map(dir => readdirSync(path.join(__dirname, dir)).map(file => path.join(__dirname, dir, file))).flat().filter(exclusions);
+foundFiles.forEach(file => files.add(file));
+
 (async () => {
   let failed: string[] = [];
   let passed = 0;
-  for (const file of files.length ? files : readdirSync(path.join(__dirname, 'tests')).filter(exclusions)) {
+  for (const file of files) {
     try {
       console.log(" run ".blue, file);
       console.log("\x1B[2A");
-      await compareResults(path.join(__dirname, 'tests', file), update);
+      await compareResults(file, update);
       console.log("pass ".green, file);
       passed += 1;
     } catch (ex) {
@@ -279,14 +284,3 @@ function isNotNullish<T>(a: T | null | undefined): a is T {
     process.exit(0);
   }
 })();
-
-function diff(r: string, x: string) {
-  x = x.replace(/[\/]/g,'');
-  const max = Math.max(r.length, x.length);
-  let start = 0;
-  let end = max-1;
-  while (r[start] === x[start] && start < max) start++;
-  while (r[end] === x[end] && end >= 0) end--;
-  return r.slice(0,start).cyan + r.slice(start,end).bgCyan + r.slice(end).cyan;
-}
-
