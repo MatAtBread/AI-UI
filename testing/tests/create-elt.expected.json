@@ -1,4 +1,4 @@
 [
-  ["\"<div></div>\""],
-  ["\"<div id=\\\"test-id\\\"><div>text123</div></div>\""]
+  [1,"<div></div>"],
+  [2,"<div id=\"test-id\"><div>text123</div></div>"]
 ]

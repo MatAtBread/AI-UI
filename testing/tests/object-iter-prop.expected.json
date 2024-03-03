@@ -1,7 +1,13 @@
 [
-  ["{\"n\":0,\"s\":\"zero\"}"],
-  ["\"s is\"","\"Hello\""],
-  ["\"s is\"","123"],
-  ["\"s is\"","\"bye\""],
-  ["\"s is\"","456"]
+  [1,{"n":0,"s":"\\?"}],
+  [2,"s is","Hello",{"n":0,"s":"Hello"}],
+  [3,"both are","Hello and 0"],
+  [4,"n is",123,{"n":123,"s":"Hello"}],
+  [5,"both are","Hello and 123"],
+  [6,"s is","bye",{"n":456,"s":"bye"}],
+  [7,"n is",456,{"n":456,"s":"bye"}],
+  [8,"both are","bye and 456"],
+  [9,"both are","bye and 456"],
+  [10,"await",{"n":456,"s":"bye"}],
+  [11,"done",{"n":456,"s":"bye"}]
 ]

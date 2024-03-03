@@ -33,7 +33,19 @@ import { readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
 import path from 'path';
 
 const { JSDOM } = require("../module/node_modules/jsdom");
-const deepEqual = require('../module/node_modules/fast-deep-equal/es6');
+// Globals to simulate DOM
+const window = new JSDOM().window;
+Object.assign(globalThis, {
+  document: window.document,
+  Element: window.Element,
+  Node: window.Node,
+  NodeList: window.NodeList,
+  HTMLCollection: window.HTMLCollection,
+  Event: window.Event,
+  MutationObserver: window.MutationObserver,
+});
+
+const AI = require('../module/dist/ai-ui.cjs.js');
 
 // Load, transpile and run all the locally defined tests
 
@@ -54,19 +66,7 @@ function transpile(tsFile: string) {
   return jsCode.outputText.replace('"use strict";', '');
 }
 
-// Globals to simulate DOM
-const window = new JSDOM().window;
-Object.assign(globalThis, {
-  document: window.document,
-  Element: window.Element,
-  Node: window.Node,
-  NodeList: window.NodeList,
-  HTMLCollection: window.HTMLCollection,
-  Event: window.Event,
-  MutationObserver: window.MutationObserver,
-});
-
-const AI = require('../module/dist/ai-ui.cjs.js');
+const dateRegex = '^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z)$';
 
 const exclusions = (file: string) => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts');
 const files = process.argv.slice(2).filter(exclusions);
@@ -76,19 +76,45 @@ const logRun = (options.includes('--log') || options.includes('-l'));
 const noTimeout = (options.includes('--no-timeout') || options.includes('-T'));
 
 function sleep<T>(n: number, t: T): Promise<T> {
-  return new Promise<T>((resolve,reject) => setTimeout(()=>(t instanceof Error ? reject(t) : resolve(t)), n * 1000));
+  return new Promise<T>((resolve, reject) => setTimeout(() => (t instanceof Error ? reject(t) : resolve(t)), n * 1000));
+}
+
+function unbox(a: any):any {
+  if (a && typeof a === 'object') {
+    if (a instanceof Date) {
+      a.toJSON = function(){ return dateRegex };
+      return a;
+    }
+    if (Array.isArray(a)) {
+      return a.map(a => unbox(a));
+    }
+    return Object.fromEntries(Object.entries(a).map(([k,v]) => [
+      k, 
+      (v && typeof v === 'object' && 'toJSON' in v)
+        ? (Symbol.asyncIterator in v && 'toJSON' in v) ? unbox((v as any).toJSON()) : unbox(v) 
+        : v
+    ]));
+  }
+  return isNotNullish(a) ? a : null;//a?.[Symbol.toPrimitive]() ?? null;
 }
 
 async function captureLogs(file: string) {
   const fnCode = transpile(file);
-  const fn = eval("(async function({console,Test,require,Iterators,tag,when}) {\n" + fnCode + "\n})");
-  const logs: string[][] = [];
+  const logs: unknown[][] = [];
   let line = 1;
-  const done = fn({
-    Iterators: AI.Iterators,
-    tag: AI.tag,
-    when: AI.when,
-
+  function log(...args: unknown[]) {
+    // Unbox iterables
+    args = unbox(args);
+    logs.push([line,...args]);
+    if (logRun) {
+      console.log((String(line++) + ")").padEnd(5).grey, ...args);
+    } else {
+      console.log("|/-\\|/-\\"[line++%8]);
+      console.log("\x1B[2A");    
+    }
+  }
+  const env = {
+    ...AI,
     require(module: string) {
       if (module === '../../module/src/ai-ui')
         return AI;
@@ -102,15 +128,13 @@ async function captureLogs(file: string) {
       }
     },
     console: {
-      log(...args: any[]) {
-        if (logRun) {
-          console.log((String(line++)+")").padEnd(5).grey,...args);
-        }
-        logs.push(args.map(a => JSON.stringify(a)));
-      }
+      log
     }
-  });
-  await Promise.race([done,noTimeout ? new Promise(()=>{}) : sleep(30, new Error(`Timeout running ${file}`))])
+  };
+  await Promise.race([
+    eval(`(async function({${Object.keys(env)}}) {\n${fnCode}\n})`)(env), 
+    noTimeout ? new Promise(() => { }) : sleep(30, new Error(`Timeout running ${file}`))
+  ]);
   return logs;
 }
 
@@ -122,62 +146,147 @@ class CompareError extends Error {
   }
 }
 
+function exactRegExpPattern(inputString: string) {
+  // Escape any special characters in the input string
+  return inputString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function stringify(v: any) {
+  return JSON.stringify(v, function (key: string, value: any) {
+    if (value instanceof RegExp || value === dateRegex) {
+      return value.toString();
+    }
+    if (typeof value === 'string') {
+      return exactRegExpPattern(value);
+    }
+    return value ?? null;
+  })
+}
+
 async function compareResults(file: string, updateResults: boolean) {
   const resultFile = file.replace(/\.ts$/, '.expected.json');
-  const results = await captureLogs(file);
+  const lines = await captureLogs(file);
   if (updateResults || !existsSync(resultFile)) {
     console.log("Updating ", resultFile.magenta);
-    writeFileSync(resultFile, "[\n  " + results.map(r => JSON.stringify(r ?? null)).join(",\n  ") + "\n]");
+    writeFileSync(resultFile, "[\n  " + lines.map(stringify).join(",\n  ") + "\n]");
   }
 
   const expected = JSON.parse(readFileSync(resultFile).toString(),
-    function(key: string, value: any){
-      return (key === 'regex') ? new RegExp(value) : value;
+    function (key: string, value: any) {
+      return typeof value === 'string' ? new RegExp(value) : value;
     }
   );
 
   // check results against this run
-  if (results.length !== expected.length)
-    throw new CompareError(`Expected ${expected.length} lines, results ${results.length} lines`, file);
+  if (lines.length !== expected.length)
+    throw new CompareError(`Expected ${expected.length} lines, results ${lines.length} lines`, file);
 
-  for (let i = 0; i < results.length; i++) {
+  for (let i = 0; i < lines.length; i++) {
     const expect = expected[i];
-    const result = results[i];
+    const result = lines[i];
     if (expect.length !== result.length) {
-//      throw new CompareError(`Line ${i + 1}: expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
+      //      throw new CompareError(`Line ${i + 1}: expected ${expect.length} fields (${expected}), results ${result.length} (${results}) fields`, file);
       throw new CompareError(`Line ${i + 1}: expected ${expect.length} fields, results ${result.length} fields`, file);
     }
     for (let j = 0; j < result.length; j++) {
       const x = expect[j];
       const r = result[j];
-      if (x?.regex && x.regex instanceof RegExp
-        ? !x.regex.test(r.toString())
-        : !deepEqual(x ?? null, r ?? null) // ...because undefined & null look the same in JSON
-      )
-        throw new CompareError(`Line ${i + 1} field ${j + 1}\nexpected:\n${(x?.regex ? x.regex : x)?.toString().yellow}\nresult:\n${r?.toString().cyan}`, file);
+      if (!fuzzyRegExEq(x, r)) {
+        const sx = stringify(x);
+        const sr = stringify(r);
+        throw new CompareError(`Line ${i + 1} field ${j + 1}\nexpected:\n${sx.yellow}\nresult:\n${diff(sr,sx)}`, file);
+      }
     }
   }
 }
 
+function fuzzyRegExEq(a: any, b: any) {
+  // Unbox iterable properties
+  a = a ?? null;
+  b = b ?? null;
+  if (a === b) return true;
+  
+  if (a instanceof Date)
+    a = a.toISOString();
+  if (b instanceof Date)
+    b = b.toISOString();
+
+  if (a === b) return true;
+
+  if (a instanceof RegExp)
+    return isNotNullish(b) && a.test(b.toString());
+  if (b instanceof RegExp)
+    return isNotNullish(a) && b.test(a.toString());
+
+  if (a && b && typeof a == 'object' && typeof b == 'object') {
+    if (a.constructor !== b.constructor) return false;
+
+    let length, i, keys;
+    if (Array.isArray(a)) {
+      length = a.length;
+      if (length != b.length) return false;
+      for (i = length; i-- !== 0;)
+        if (!fuzzyRegExEq(a[i], b[i])) return false;
+      return true;
+    }
+
+    // if (a.valueOf !== Object.prototype.valueOf) return a.valueOf() === b.valueOf();
+    // if (a.toString !== Object.prototype.toString) return a.toString() === b.toString();
+
+    keys = Object.keys(a);
+    length = keys.length;
+    if (length !== Object.keys(b).length) return false;
+
+    for (i = length; i-- !== 0;)
+      if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
+
+    for (i = length; i-- !== 0;) {
+      let key = keys[i];
+      if (!fuzzyRegExEq(a[key], b[key])) return false;
+    }
+
+    return true;
+  }
+
+  // true if both NaN, false otherwise
+  return a !== a && b !== b;
+}
+
+function isNotNullish<T>(a: T | null | undefined): a is T {
+  return a !== null && a !== undefined;
+}
+
 (async () => {
-  let failed = 0;
+  let failed: string[] = [];
   let passed = 0;
   for (const file of files.length ? files : readdirSync(path.join(__dirname, 'tests')).filter(exclusions)) {
     try {
-      console.log("run  ".blue, file);
+      console.log(" run ".blue, file);
       console.log("\x1B[2A");
       await compareResults(path.join(__dirname, 'tests', file), update);
       console.log("pass ".green, file);
       passed += 1;
     } catch (ex) {
-      failed += 1;
+      failed.push(file);
       console.log("FAIL".bgRed + " ", file.red, ex?.toString().red)
     }
   }
-  console.log(passed + failed,"tests:", passed, "passes".green, failed, "failures".red);
-  if (failed) {
+  if (failed.length) {
+    console.log(passed + failed.length, "tests:", passed, "passes".green, failed.length, "failures".red, '\n  '+failed.map(name => name.red).join('\n  '));
     process.exit(1);
   } else {
+    console.log(passed + failed.length, "tests:", passed, "passes".green);
     process.exit(0);
   }
 })();
+
+function diff(r: string, x: string) {
+  x = x.replace(/[\/]/g,'');
+  const max = Math.max(r.length, x.length);
+  let start = 0;
+  let end = max-1;
+  while (r[start] === x[start] && start < max) start++;
+  while (r[end] === x[end] && end >= 0) end--;
+  return r.slice(0,start).cyan + r.slice(start,end).bgCyan + r.slice(end).cyan;
+}
+

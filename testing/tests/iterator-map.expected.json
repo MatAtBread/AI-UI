@@ -1,12 +1,12 @@
 [
-  ["\"Mapped\"","0"],
-  ["\"Mapped\"","2"],
-  ["\"Mapped\"","4"],
-  ["\"Mapped\"","6"],
-  ["\"Mapped\"","8"],
-  ["\"Mapped\"","10"],
-  ["\"Mapped\"","12"],
-  ["\"Mapped\"","14"],
-  ["\"Mapped\"","16"],
-  ["\"Mapped\"","18"]
+  [1,"Mapped",0],
+  [2,"Mapped",2],
+  [3,"Mapped",4],
+  [4,"Mapped",6],
+  [5,"Mapped",8],
+  [6,"Mapped",10],
+  [7,"Mapped",12],
+  [8,"Mapped",14],
+  [9,"Mapped",16],
+  [10,"Mapped",18]
 ]
