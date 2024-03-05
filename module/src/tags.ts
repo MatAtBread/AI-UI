@@ -60,7 +60,7 @@ type TypedEventHandlers<T> = {
   : GlobalEventHandlers[K];
 };
 
-type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
+export type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
   ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T>
   : T;
 
@@ -285,7 +285,7 @@ interface ExtendedTag {
   >;
 }
 
-export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
+export type TagCreatorArgs<A> = [] | [A | null] | [A | null, ...ChildTags[]] | ChildTags[];
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */

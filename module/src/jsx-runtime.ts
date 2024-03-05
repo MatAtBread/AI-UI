@@ -1,25 +1,44 @@
 import { ChildTags, TagCreator, tag } from "./ai-ui.js"
+import { ReTypedEventHandlers } from "./tags.js";
+
+type JSXTagIdentier = TagCreator<any,any> | keyof HTMLElementTagNameMap | PoJSXFactory | JSXFactory /* for fragments */;
 
 /* Support for React.createElement */
-/*
-const tagCreators: { [k in keyof HTMLElementTagNameMap]?: TagCreator<HTMLElementTagNameMap[k]> } = {};
-
 type PoJSXFactory =  <
   A extends {},
-  T extends (keyof HTMLElementTagNameMap | Function),
+  T extends JSXTagIdentier,
   Ch extends ChildTags[]
->(tagName: T, attrs: A, ...children: Ch)
+>(tagName: T, attrs: A | null, ...children: Ch)
   => T extends keyof HTMLElementTagNameMap
-    ? HTMLElementTagNameMap[T]
-    : T
+    ? ReTypedEventHandlers<HTMLElementTagNameMap[T]> // & PoExtraMethods
+    : T extends TagCreator<any,any>
+      ? ReturnType<T>
+      : Ch;
 
-export const PoJSX: PoJSXFactory = <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T,...children: ChildTags[]) =>
-tagName === PoJSX
-    ? children
-    : (typeof tagName === 'string'
-      ? (tagName in tagCreators ? tagCreators : Object.assign(tagCreators,tag([tagName])))[tagName]
-      : tagName)! (attrs,...children);
-*/
+const stdTags = tag();
+
+function isFragment(t: JSXTagIdentier): t is (PoJSXFactory | JSXFactory) {
+  return t === jsx || t === PoJSX;
+}
+function isTagName(t: JSXTagIdentier): t is keyof HTMLElementTagNameMap {
+  return typeof t === 'string';
+}
+function isTagCreator(t: JSXTagIdentier): t is TagCreator<any,any> {
+  return typeof t === 'function' && !isFragment(t);
+}
+
+export const PoJSX: PoJSXFactory = (tagName, attrs, ...children) => {
+  if (isFragment(tagName)) return children;
+  if (isTagName(tagName)) {
+    const tagFn = stdTags[tagName];
+    // @ts-ignore
+    return tagFn(attrs, children);
+  }
+  if (isTagCreator(tagName))
+    return tagName(attrs, children);
+  throw new Error("Illegal tagName in PoJSX");
+}
+
 /* Support for React 17's _jsx(tag,attrs) */
 function sterilise<T extends { children?: any}>(attrs:T): Omit<T,'children'> {
    const childless = {...attrs};
@@ -27,26 +46,36 @@ function sterilise<T extends { children?: any}>(attrs:T): Omit<T,'children'> {
    return childless;
 }
 
-export const jsx: <K extends keyof HTMLElementTagNameMap | TagCreator<any> | typeof jsx, T extends { children?: ChildNode }>(tagName: K, attrs: T) 
-  => (K extends keyof HTMLElementTagNameMap 
-    ? HTMLElementTagNameMap[K] 
-    : K extends TagCreator<any> 
-    ? ReturnType<K> 
-    : never
-  ) = (tagName, attrs) =>
-  tagName === jsx
-    ? attrs.children
-    : (typeof tagName === 'string' ? (tag()[tagName as keyof HTMLElementTagNameMap]) : (tagName as TagCreator<any>))(sterilise(attrs), attrs.children)
+type JSXFactory = <K extends JSXTagIdentier, T extends { children?: Ch }, Ch extends ChildNode[]>(tagName: K, attrs: T) =>
+  T extends keyof HTMLElementTagNameMap
+    ? HTMLElementTagNameMap[T]
+    : T extends TagCreator<any,any>
+      ? T
+      : Ch;
+
+export const jsx: JSXFactory = (tagName, attrs) => {
+  if (isFragment(tagName)) return attrs.children;
+  if (isTagName(tagName)) {
+    const tagFn = stdTags[tagName];
+    // @ts-ignore
+    return tagFn(sterilise(attrs), attrs.children);
+  }
+  if (isTagCreator(tagName))
+    return tagName(sterilise(attrs), attrs.children);
+  throw new Error("Illegal tagName in PoJSX");
+};
 
 export const jsxs = jsx;
 export const Fragment = jsx;
 
-export namespace JSX {
-  export interface Element extends HTMLElement { when: Function }
-  export type IntrinsicElements = {
-    [k in keyof HTMLElementTagNameMap]: Partial<HTMLElementTagNameMap[k]>
-  };
-
+declare global {
+  export namespace JSX {
+    export type Element = ReturnType<TagCreator<any, any>>;
+    export type IntrinsicElements = {
+      [k in keyof HTMLElementTagNameMap]: Partial<HTMLElementTagNameMap[k]>
+    };
+  }
+}
   /*
   export function createElement(
     type: any,
@@ -56,7 +85,8 @@ export namespace JSX {
     return jsx(type,{...props,children}) as HTMLElement;
   }
   type Element = HTMLElement;
-  */
+  * /
   // interface Element extends Partial<ReturnType<Tags.TagCreator<HTMLElement>>> {
   // }
 }
+*/

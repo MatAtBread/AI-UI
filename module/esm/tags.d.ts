@@ -19,7 +19,7 @@ type IDS<I> = {
 type TypedEventHandlers<T> = {
     [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? null | ((this: T, event: E) => R) : GlobalEventHandlers[K];
 };
-type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers) ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> : T;
+export type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers) ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> : T;
 type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
     get attributes(): NamedNodeMap;
     set attributes(v: DeepPartial<PossiblyAsync<Base>>);
@@ -99,7 +99,7 @@ interface ExtendedTag {
         [k: string]: OptionalIterablePropertyValue;
     } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>): CheckPropertyClashes<BaseCreator, P, O, D, IP, TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>>>;
 }
-export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
+export type TagCreatorArgs<A> = [] | [A | null] | [A | null, ...ChildTags[]] | ChildTags[];
 type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
 export type TagCreator<Base extends RootObj, Super extends (never | TagCreator<any, any>) = never, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;

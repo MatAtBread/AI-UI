@@ -1,32 +1,57 @@
 import { tag } from "./ai-ui.js";
-/* Support for React.createElement */
-/*
-const tagCreators: { [k in keyof HTMLElementTagNameMap]?: TagCreator<HTMLElementTagNameMap[k]> } = {};
-
-type PoJSXFactory =  <
-  A extends {},
-  T extends (keyof HTMLElementTagNameMap | Function),
-  Ch extends ChildTags[]
->(tagName: T, attrs: A, ...children: Ch)
-  => T extends keyof HTMLElementTagNameMap
-    ? HTMLElementTagNameMap[T]
-    : T
-
-export const PoJSX: PoJSXFactory = <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T,...children: ChildTags[]) =>
-tagName === PoJSX
-    ? children
-    : (typeof tagName === 'string'
-      ? (tagName in tagCreators ? tagCreators : Object.assign(tagCreators,tag([tagName])))[tagName]
-      : tagName)! (attrs,...children);
-*/
+const stdTags = tag();
+function isFragment(t) {
+    return t === jsx || t === PoJSX;
+}
+function isTagName(t) {
+    return typeof t === 'string';
+}
+function isTagCreator(t) {
+    return typeof t === 'function' && !isFragment(t);
+}
+export const PoJSX = (tagName, attrs, ...children) => {
+    if (isFragment(tagName))
+        return children;
+    if (isTagName(tagName)) {
+        const tagFn = stdTags[tagName];
+        // @ts-ignore
+        return tagFn(attrs, children);
+    }
+    if (isTagCreator(tagName))
+        return tagName(attrs, children);
+    throw new Error("Illegal tagName in PoJSX");
+};
 /* Support for React 17's _jsx(tag,attrs) */
 function sterilise(attrs) {
     const childless = { ...attrs };
     delete childless.children;
     return childless;
 }
-export const jsx = (tagName, attrs) => tagName === jsx
-    ? attrs.children
-    : (typeof tagName === 'string' ? (tag()[tagName]) : tagName)(sterilise(attrs), attrs.children);
+export const jsx = (tagName, attrs) => {
+    if (isFragment(tagName))
+        return attrs.children;
+    if (isTagName(tagName)) {
+        const tagFn = stdTags[tagName];
+        // @ts-ignore
+        return tagFn(sterilise(attrs), attrs.children);
+    }
+    if (isTagCreator(tagName))
+        return tagName(sterilise(attrs), attrs.children);
+    throw new Error("Illegal tagName in PoJSX");
+};
 export const jsxs = jsx;
 export const Fragment = jsx;
+/*
+export function createElement(
+  type: any,
+  props?: any,
+  ...children: any[]
+) {
+  return jsx(type,{...props,children}) as HTMLElement;
+}
+type Element = HTMLElement;
+* /
+// interface Element extends Partial<ReturnType<Tags.TagCreator<HTMLElement>>> {
+// }
+}
+*/
