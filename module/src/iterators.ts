@@ -437,7 +437,11 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
           ex =>
             // The source threw. Tell the consumer
             reject({ done: true, value: ex })
-        )
+        ).catch(ex => {
+          // The callback threw 
+          ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
+          reject({ done: true, value: ex })
+        })
       })
     },
 
