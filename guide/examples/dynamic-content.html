@@ -1,14 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <script src="https://unpkg.com/@matatbread/ai-ui/dist/ai-ui.js"></script>
+  <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="../../module/dist/ai-ui.js"></script>
 </head>
 
 <body>
 </body>
 <script>
   /* Specify what base tags you reference in your UI */
-  const { h2, div, button, span } = AIUI.tag(['h2', 'div', 'button', 'span']);
+  const { h2, div } = AIUI.tag();
 
-  /* Define a _new_ tag type, called `App`, based on the standard "<div>" tag, that is composed of an h2 and div elements. It will generate markup like:
+  /* Define a _new_ tag type, called `App`, based on the standard "<div>" tag, 
+    that is composed of an h2 and div elements. It will generate markup like:
   
   <div>
       <h2>Hello World</h2>
@@ -21,19 +26,21 @@
     constructed() {
       /* When constructed, this "div" tag contains some other tags: */
       return [
-        h2("Hello World"),
-        div(clock())
+        h2("Hello World"),  // h2(...) is "tag function". I generates an "h2" DOM element with the specified children
+        div(clock())        // div(...) is also "tag function". I generates an "div" DOM element with the specified children
       ]
     }
   });
 
   /* Add add it to the document so the user can see it! */
-  document.body.appendChild(App({
+  document.body.appendChild(
+    App({   // App(...) is also a "tag function", which generates a "div" containing the DOM tree return by constructed()
     style:{
       color: 'blue'
     }
   },
-  'Your first web page'));
+  'Your first web page')
+  );
 
   /* A simple async "sleep" function */
   function sleep(seconds) {

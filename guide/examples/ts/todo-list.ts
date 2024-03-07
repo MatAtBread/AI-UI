@@ -1,5 +1,4 @@
 import { tag } from '../../../module/esm/ai-ui.js'
-import { Ignore } from '../../../module/esm/iterators.js';
 
 const { h2, div, button, input } = tag();
 
@@ -52,14 +51,14 @@ const AddItem = div.extended({
         display: 'inline-block',
         width: "50%"
       }
-    }, 
-    input({ 
-      id: 'description', 
-      placeholder: "Enter a new task...",
-      style:{
-        width: "100%"
-      }
-    })),
+    },
+      input({
+        id: 'description',
+        placeholder: "Enter a new task...",
+        style: {
+          width: "100%"
+        }
+      })),
     button({
       disabled: this.when('input:#description')(_ => !Boolean(this.ids.description.value)).initially(true),
       onclick: (e) => {
@@ -93,21 +92,23 @@ const App = div.extended({
   }
 });
 
-const AppInstance = div.extended(({ add, todo }: {
-  add: ReturnType<typeof AddItem>,
-  todo: ReturnType<typeof div>
-}) => ({
-  constructed: () => [
-    h2("To Do List"),
-    add = AddItem(),
-    todo = div(
-      add.item.map!(newItem => [
-        todo.children,
-        ToDoItem(newItem)
-      ])
-    )
-  ]
-}));
+const AppInstance = div.extended({
+  constructed() {
+    let add: ReturnType<typeof AddItem>;
+    let todo: ReturnType<typeof div>;
+
+    return [
+      h2("To Do List"),
+      add = AddItem(),
+      todo = div(
+        add.item.map!(newItem => [
+          todo.children,
+          ToDoItem(newItem)
+        ])
+      )
+    ]
+  }
+});
 
 /* Create and add an "App" element to the document so the user can see it! */
 document.body.appendChild(AppInstance());

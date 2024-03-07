@@ -11,5 +11,5 @@
     "lib": ["DOM","DOM.Iterable","ES2020"],
     "typeRoots": []
   },
-  "include": [ "src/ai-ui.ts"]
+  "include": [ "src/*.ts"]
 }

@@ -19,7 +19,7 @@ TagFunctionName.extended(spec:{
   override?: object;
   declare?: object;
   iterable?: object;
-  constructed?: ()=> undefined | ChildTags;
+  constructed?: () => void | undefined | ChildTags;
   ids?: { [id: string]: TagCreator; };
   styles?: string;
 })
@@ -46,7 +46,7 @@ The `constructed()` method allows you to create children, or modify any children
 The `ids` object associates child DOM Element IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children. It's not used at run-time, but simply provides type information to the IDE.
 
 ## [styles](./styles.md) 
-The `styles` string will create specific CSS style rules for your tag. This is especiallu useful when your styles are hierarchical or rqeuire pseudo selectors which can't be easily specified in a normal CSSStyleDeclaration.
+The `styles` string will create specific CSS style rules for your tag. This is especially useful when your styles are hierarchical or rqeuire pseudo selectors which can't be easily specified in a normal CSSStyleDeclaration.
 
 # Usage
 
@@ -63,7 +63,7 @@ TagFunctionName.extended((privateInstanceData: MyPrivateInstanceType) => {
   override?: object;
   declare?: object;
   iterable?: object;
-  constructed?: ()=>undefined | ChildTags;
+  constructed?: () => void | undefined | ChildTags;
   ids?: { [id: string]: TagCreator; };
   styles?: string;
 })
@@ -84,7 +84,7 @@ ____
 
 | < Prev | ^ |  Next > |
 |:-------|:-:|--------:|
-| [Iterators](./iterators.md) | [Index](./index.md) | [`constructed()`](./constructed.md) |
+| [Iterators](./iterators-usage.md) | [Index](./index.md) | [`constructed()`](./constructed.md) |
 
 
 

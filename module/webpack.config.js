@@ -19,7 +19,8 @@ module.exports = {
          './iterators.js': './iterators',
          './when.js': './when',
          './debug.js': './debug',
-         './jsx-runtime.js': './jsx-runtime'
+         './jsx-runtime.js': './jsx-runtime',
+         './augment-iterators.js': './augment-iterators',
       }
    },
    module: {

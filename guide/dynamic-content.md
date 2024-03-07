@@ -1,18 +1,6 @@
 # Dynamic Content
 
-In the previous example, we created a new tag type called "App":
-
-```javascript
-  const App = div.extended({
-    constructed() {
-      /* When constructed, this "div" tag contains some other tags: */
-      return [
-        h2("Hello World"),
-        div("Dunno")
-      ]
-    }
-  });
-```
+In the previous example, we created a new tag type called "App".
 
 A design goal of AI-UI is to make declarative HTML dynamic, without creating a spaghetti network of events, dependencies or deep references into the DOM, and do it using standard Javascript constructs.
 
@@ -50,7 +38,6 @@ async function *clock() {
   });
 ```
 [Example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-content.html)
-
 
 When the async generator yields, it will update the content in place in the DOM. In this case, that means telling us the time every second.
 

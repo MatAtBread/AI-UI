@@ -36,7 +36,7 @@ type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
 export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never);
 export declare function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G): (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never);
-type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => R | PromiseLike<R>);
+type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => R | PromiseLike<R | typeof Ignore>);
 type MaybePromised<T> = PromiseLike<T> | T;
 export declare const Ignore: unique symbol;
 export declare function filterMap<U, R>(source: AsyncIterable<U>, fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncIterableIterator<R>;
