@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
 import { DEBUG } from './debug.js';
 /* Export useful stuff for users of the bundled code */
@@ -81,7 +81,7 @@ export const tag = function (_1, _2, _3) {
     function nodes(...c) {
         const appended = [];
         (function children(c) {
-            if (c === undefined || c === null)
+            if (c === undefined || c === null || c === Ignore)
                 return;
             if (isPromiseLike(c)) {
                 let g = [DomPromiseContainer()];
@@ -111,26 +111,30 @@ export const tag = function (_1, _2, _3) {
                 appended.push(dpm);
                 let t = [dpm];
                 const error = (errorValue) => {
-                    ap.return?.(errorValue);
-                    const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
-                    if (n[0].parentNode) {
+                    const n = t.filter(n => Boolean(n?.parentNode));
+                    if (n.length) {
                         t = appender(n[0].parentNode, n[0])(DyamicElementError({ error: errorValue }));
-                        n.forEach(e => e.parentNode?.removeChild(e));
+                        n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
                     }
                     else
                         console.warn('(AI-UI)', "Can't report error", errorValue, t);
                 };
                 const update = (es) => {
                     if (!es.done) {
-                        const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
-                        if (!n.length || !n[0].parentNode) {
-                            // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                            error(new Error("Element(s) no longer exist in document" + insertionStack));
-                            return;
+                        try {
+                            const n = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
+                            if (!n.length) {
+                                // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                                throw new Error("Element(s) no longer exist in document" + insertionStack);
+                            }
+                            t = appender(n[0].parentNode, n[0])(unbox(es.value) ?? DomPromiseContainer());
+                            n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
+                            ap.next().then(update).catch(error);
                         }
-                        t = appender(n[0].parentNode, n[0])(unbox(es.value) ?? DomPromiseContainer());
-                        n.forEach(e => e.parentNode?.removeChild(e));
-                        ap.next().then(update).catch(error);
+                        catch (ex) {
+                            // Something went wrong. Terminate the iterator source
+                            ap.return?.(ex);
+                        }
                     }
                 };
                 ap.next().then(update).catch(error);
@@ -365,14 +369,13 @@ export const tag = function (_1, _2, _3) {
             })(base, props);
         }
     }
-    /*
-    Extend a component class with create a new component class factory:
-        const NewDiv = Div.extended({ overrides })
-            ...or...
-        const NewDic = Div.extended((instance:{ arbitrary-type }) => ({ overrides }))
-           ...later...
-        const eltNewDiv = NewDiv({attrs},...children)
-    */
+    function tagHasInstance(e) {
+        for (let etf = this; etf; etf = etf.super) {
+            if (e.constructor === etf)
+                return true;
+        }
+        return false;
+    }
     function extended(_overrides) {
         const overrides = (typeof _overrides !== 'function')
             ? (instance) => _overrides
@@ -386,6 +389,9 @@ export const tag = function (_1, _2, _3) {
                 document.head.appendChild(poStyleElt);
             }
         }
+        // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
+        // Here's where we actually create the tag, by accumulating all the base attributes and
+        // (finally) assigning those specified by the instantiation
         const extendTagFn = (attrs, ...children) => {
             const noAttrs = isChildTag(attrs);
             const newCallStack = [];
@@ -427,6 +433,11 @@ export const tag = function (_1, _2, _3) {
                 const keys = [...Object.keys(staticExtensions.declare || {}) /*, ...Object.keys(staticExtensions.prototype || {})*/];
                 return `${extendTag.name}: {${keys.join(', ')}}\n \u21AA ${this.valueOf()}`;
             }
+        });
+        Object.defineProperty(extendTag, Symbol.hasInstance, {
+            value: tagHasInstance,
+            writable: true,
+            configurable: true
         });
         const fullProto = {};
         (function walkProto(creator) {
