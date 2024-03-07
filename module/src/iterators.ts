@@ -394,7 +394,7 @@ export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A ext
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
-type Mapper<U, R> = ((o: U) => R | PromiseLike<R>);
+type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => R | PromiseLike<R>);
 type MaybePromised<T> = PromiseLike<T> | T;
 
 /* A general filter & mapper that can handle exceptions & returns */

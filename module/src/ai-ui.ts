@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Instance, Overrides, TagCreator } from './tags.js'
 import { DEBUG } from './debug.js';
@@ -147,7 +147,7 @@ export const tag = <TagLoader>function <Tags extends string,
   function nodes(...c: ChildTags[]) {
     const appended: (Node | ReturnType<typeof DomPromiseContainer>)[] = [];
     (function children(c: ChildTags) {
-      if (c === undefined || c === null)
+      if (c === undefined || c === null || c === Ignore)
         return;
       if (isPromiseLike(c)) {
         let g: Node[] = [DomPromiseContainer()];
@@ -180,11 +180,10 @@ export const tag = <TagLoader>function <Tags extends string,
         let t: ReturnType<ReturnType<typeof appender>> = [dpm];
 
         const error = (errorValue: any) => {
-          ap.return?.(errorValue);
-          const n = (Array.isArray(t) ? t : [t]).filter(n => Boolean(n));
-          if (n[0].parentNode) {
-            t = appender(n[0].parentNode, n[0])(DyamicElementError({error: errorValue}));
-            n.forEach(e => e.parentNode?.removeChild(e));
+          const n = t.filter(n => Boolean(n?.parentNode));
+          if (n.length) {
+            t = appender(n[0].parentNode!, n[0])(DyamicElementError({error: errorValue}));
+            n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
           }
           else
             console.warn('(AI-UI)', "Can't report error", errorValue, t);
@@ -192,16 +191,20 @@ export const tag = <TagLoader>function <Tags extends string,
 
         const update = (es: IteratorResult<ChildTags>) => {
           if (!es.done) {
-            const n = (Array.isArray(t) ? t : [t]).filter(e => e.ownerDocument?.body.contains(e));
-            if (!n.length || !n[0].parentNode) {
-              // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-              error(new Error("Element(s) no longer exist in document" + insertionStack));
-              return;
+            try {
+              const n = t.filter(e =>  e?.parentNode && e.ownerDocument?.body.contains(e));
+              if (!n.length) {
+                // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                throw new Error("Element(s) no longer exist in document" + insertionStack);
+              }
+  
+              t = appender(n[0].parentNode!, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
+              n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
+              ap.next().then(update).catch(error);  
+            } catch (ex) {
+              // Something went wrong. Terminate the iterator source
+              ap.return?.(ex);
             }
-
-            t = appender(n[0].parentNode, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
-            n.forEach(e => e.parentNode?.removeChild(e));
-            ap.next().then(update).catch(error);
           }
         };
         ap.next().then(update).catch(error);
@@ -437,6 +440,27 @@ export const tag = <TagLoader>function <Tags extends string,
       const eltNewDiv = NewDiv({attrs},...children)
   */
 
+  type ExtendTagFunction = (attrs:{
+    debugger?: any;
+    document?: Document;
+    [callStackSymbol]?: Overrides[];
+  } | ChildTags, ...children: ChildTags[]) => Element
+
+  type ExtendTagFunctionInstance = ExtendTagFunction & {
+    super: TagCreator<Element>;
+    overrides: (instance: Instance) => Overrides;
+    valueOf: () => string;
+    extended: (this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) => ExtendTagFunctionInstance;
+  };
+
+  function tagHasInstance(this: ExtendTagFunctionInstance, e: any) { 
+    for (let etf: ExtendTagFunctionInstance | TagCreator<any> = this; etf; etf = etf.super) {
+      if (e.constructor === etf)
+        return true;
+    }
+    return false;
+  }
+  
   function extended(this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) {
     const overrides = (typeof _overrides !== 'function')
       ? (instance: Instance) => _overrides
@@ -455,12 +479,6 @@ export const tag = <TagLoader>function <Tags extends string,
     // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
     // Here's where we actually create the tag, by accumulating all the base attributes and
     // (finally) assigning those specified by the instantiation
-    type ExtendTagFunction = (attrs:{
-      debugger?: any;
-      document?: Document;
-      [callStackSymbol]?: Overrides[];
-    } | ChildTags, ...children: ChildTags[]) => Element
-
     const extendTagFn: ExtendTagFunction = (attrs, ...children) => {
       const noAttrs = isChildTag(attrs) ;
       const newCallStack: Overrides[] = [];
@@ -495,7 +513,7 @@ export const tag = <TagLoader>function <Tags extends string,
       return e;
     }
 
-    const extendTag = Object.assign(extendTagFn, {
+    const extendTag: ExtendTagFunctionInstance = Object.assign(extendTagFn, {
       super: this,
       overrides,
       extended,
@@ -504,6 +522,11 @@ export const tag = <TagLoader>function <Tags extends string,
         return `${extendTag.name}: {${keys.join(', ')}}\n \u21AA ${this.valueOf()}`
       }
     });
+    Object.defineProperty(extendTag, Symbol.hasInstance, {
+      value: tagHasInstance,
+      writable: true,
+      configurable: true
+    })
 
     const fullProto = {};
     (function walkProto(creator: TagCreator<Element>) {

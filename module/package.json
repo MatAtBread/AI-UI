@@ -48,5 +48,5 @@
     "tests": "ts-node ../testing/index.ts"
   },
   "types": "./esm/ai-ui.d.ts",
-  "version": "0.10.12"
+  "version": "0.10.13"
 }

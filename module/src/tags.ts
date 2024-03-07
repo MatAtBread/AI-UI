@@ -1,10 +1,11 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 
-import { AsyncExtraIterable, AsyncProvider } from "./iterators";
+import { AsyncExtraIterable, AsyncProvider, Ignore } from "./iterators";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
   | undefined // A value that won't generate an element
+  | typeof Ignore // A value that won't generate an element
   // NB: we can't check the contained type at runtime, so we have to be liberal
   // and wait for the de-containment to fail if it turns out to not be a `ChildTags`
   | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> // Things that will resolve to any of the above
@@ -304,4 +305,6 @@ export type TagCreator<Base extends RootObj,
   overrides?: (<A extends Instance>(a: A) => Overrides); /* null for base tags */
   /* It has a name (set to a class or definition location), which is helpful when debugging */
   readonly name: string;
+  /* Can test if an element was created by this function or a base tag function */
+  [Symbol.hasInstance](elt: any): boolean;
 } & Statics;

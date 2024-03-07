@@ -1,5 +1,5 @@
-import { AsyncExtraIterable, AsyncProvider } from "./iterators";
-export type ChildTags = Node | number | string | boolean | undefined | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
+import { AsyncExtraIterable, AsyncProvider, Ignore } from "./iterators";
+export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 export type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncProvider<X> : AsyncProvider<Partial<X>> | {
     [K in keyof X]?: PossiblyAsync<X[K]>;
 } : X | AsyncProvider<X> | undefined;
@@ -106,5 +106,6 @@ export type TagCreator<Base extends RootObj, Super extends (never | TagCreator<a
     super: Super;
     overrides?: (<A extends Instance>(a: A) => Overrides);
     readonly name: string;
+    [Symbol.hasInstance](elt: any): boolean;
 } & Statics;
 export {};
