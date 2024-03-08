@@ -193,7 +193,7 @@ Finally, due to a limitation of Typescript, although iterable properties are _al
 To avoid this issue in Typescript, follow the helper with a [`!`](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#non-null-assertion-operator-postfix-) to tell Typescript that the helper really is present, since it always is:
 ```typescript
 this.numIter.map!(n => -n).consume(n => console.log(n))
-// Here.........^
+// Here.........↑
 ```
 
 
