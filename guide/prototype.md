@@ -150,9 +150,16 @@ if (elt.boolIter == true)   // ✅ Equality operator coerces boolIter to a primi
 if (elt.boolIter)           // ❌ Always true - objects are always true. Use `== true` or `!= false`
 if (!elt.boolIter)          // ❌ Always false - objects are always true, and !true is falsy
 if (elt.boolIter.valueOf()) // ✅ Explicitly retrieves the primitive value of the iterable
+
+// Type coercion only occurs if one of the operands is itself a primitive
+if (elt1.boolIter == elt2.boolIter)                       // ❌ Always false - the objects are different, even if they hol;d the same value. NOTE: this will be true if elt1 and elt2 represent the same element!
+if (elt1.boolIter === elt2.boolIter)                      // ❌ Always false - same as above
+if (elt1.boolIter.valueOf() == elt2.boolIter)             // ✅ Works - LHS is a primitive
+if (elt1.boolIter == elt2.boolIter.valueOf())             // ✅ Works - RHS is a primitive
+if (elt1.boolIter.valueOf() === elt2.boolIter.valueOf())  // ✅ Works - Both are primitive, no coercion required
 ```
 
-The way iterables are implemented, you can always call `.valueOf()` to get the underlying value the iterable represents, as in the last example above.
+The way iterables are implemented, you can always call `.valueOf()` to get the underlying value the iterable represents, as in the example above.
 
 Similarly, if the `iterable` declares an object rather than a primtive, it is _always_ spread into a new object before being turned into an async iterable, so the source object doesn't hold inappropriate references to the iterable that might prevent garbage collection.
 
@@ -162,6 +169,7 @@ const p = { x: 10, y: 20};
 elt.center = p;
 if (elt.center === p) // Never true: p has been spread into elt.center, not referenced.
 ```
+Even the `.valueOf()` technique won't work here, unless you have implemented your own valuation routine. You might find the MDN article on [Type coercion](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#type_coercion) helpful in understanding JavaScript coerces types.
 
 Currently, for implementation reasons, iterables can't be arrays. If you really want an iterable to be an array type, place the array inside an object:
 ```typescript
@@ -185,6 +193,7 @@ Finally, due to a limitation of Typescript, although iterable properties are _al
 To avoid this issue in Typescript, follow the helper with a [`!`](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#non-null-assertion-operator-postfix-) to tell Typescript that the helper really is present, since it always is:
 ```typescript
 this.numIter.map!(n => -n).consume(n => console.log(n))
+// Here.........^
 ```
 
 

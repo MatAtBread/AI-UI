@@ -58,7 +58,7 @@ The `constructed()` method allows you to create children, or modify any children
 The `ids` object associates child element DOM IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children. It's not used at run-time, but simply provides type information to the IDE.
 
 ## [styles](./styles.md)
-The `styles` string will create specific CSS style rules for your tag. This is especially useful when your styles are hierarchical or rqeuire pseudo selectors which can't be easily specified in a normal CSSStyleDeclaration.
+The `styles` string will create specific CSS style rules for your tag. This is especially useful when your styles are hierarchical or require pseudo selectors which can't be easily specified in a normal CSSStyleDeclaration.
 
 # Usage
 

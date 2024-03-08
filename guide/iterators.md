@@ -135,7 +135,7 @@ for await (const x of counter3.filter(num => num % 2 === 0)) {
 ```
 ## unique
 ```typescript
-function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U>
+function unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U>
 ```
 
 Filter the results of an async iterable to remove duplicate values. The optional specifed function can be used to test for equality. By default, the test is the JavaScript strict equality operator "===". To compare objects, arrays or other compound objects, you can provide your own comparison function
