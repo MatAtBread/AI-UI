@@ -1,0 +1,162 @@
+# Adding methods & attributes with `declare`, `override` & `iterable`
+
+## override
+
+Remeber how you can create a DOM element?
+
+```javascript
+const d = div({ id: 'foo' }); // Create a div element, with the specified ID
+const e = input({ type: 'password', style: { color: 'green' }}); // Create a password input field with green text
+```
+Note how at each level, every field is optional: you don't have to supply all attributes, or all members of a structured attribute like `style`. You are specifying which values within the attributes should be _overridden_. All other attributes will have their default value.
+
+As well as doing this when an element is created, you can specify your own extended tags that have different defaults:
+
+```javascript
+const RedBox = div.extended({
+  override:{
+    style:{
+      backgroundColor: 'red'
+    }
+  }
+});
+....
+// creates a div with id='foo', and large red text "Bar"
+const r = RedBox({ id: 'foo', style: { fontSize: '150%' }}, "Bar");
+```
+Overrides can themselves be overriden when the element is actually created (by specifying the attribute in the first parameter), or in a further extension:
+```javascript
+const ClickAndKill = RedBox.extended({
+  override:{
+    // Override the default click event handler
+    onclick() { this.remove() }
+  }
+});
+
+// Create an element (with large red text), the destroys itself when you click it and append it to the document body.
+document.body.append(ClickAndKill("click me"));
+```
+
+`overrides` must be of the correct type. Typescript will generate a warning if you try to assign, for example, a number to string attribute. Note that most DOM attributes are strings, even if they are numeric in nature, for example `style.opacity` is a string. In these cases, use the standard JavaScript casts like `String(0.5)` or `num.toString()`.
+
+## declare
+
+`declare` is just like override, except it's for defining new properties that don't exist in the base tag you're extending. You'll get a Typescript error if you try to declate an attribute that already exists in the base tag.
+
+```typescript
+const NamedBox = div.extended({
+  declare:{
+    getCenter() {
+      const r = this.getBoundingClientRect();
+      return { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2}
+    },
+    // If you need to specify a wider type than the default value, you can do it here
+    friendlyName: null as string | null
+  }
+});
+
+const n = NamedBox("The quick brown fox...");
+document.body.append(n);
+console.log(n.getCenter());
+```
+
+You can declare any type of attribute - getters, setters, functions, objects, primitive can all declared and will be set on the element when it's created (unless overridden by the initial optional attributes passed to the tag function).
+
+## iterable
+
+Iterable properties are like declarations, above, but have the additional feature of being `async iterables`. They are very useful and very powerful, and can be used to make your extended tags behave like standard DOM tags with almost no effort.
+
+```javascript
+const BetterButton = button.extended({
+  iterable:{
+    inactive: true
+  },
+  override:{
+    onclick() { this.inactive = true },
+    onmouseout() { this.inactive = false }
+  }
+  // More about this later
+  constructed() {
+    // Set the attributes of this element
+    this.attributes = {
+      style:{
+        color: this.inactive.map!(f => f ? 'grey' : 'red')
+      },
+      disabled: this.inactive
+    };
+    // The above is actually the same as - the code style is a matter of personal preference.
+    this.inactive.consume(f => {
+      this.style.color = f ? 'grey' : 'red';
+      this.disabled = f;
+    });
+  }
+});
+```
+
+Iterable properties are both normal properties that you can assign and read (eg `console.log(elt.inactive)` and `elt.inactive = x > 10` are valid statements), **AND** async iterators that can be mapped, filtered, merged, etc. They are also, like all attributes, accessible from outside the tag definition:
+
+```javascript
+document.body.append(BetterButton({id: 'bar'}, "Foo"));
+document.getElementById('bar').inactive.consume(f => console.log("Button inactive",f));
+document.body.append(div("Activity status", document.getElementByID('bar').inactive));
+```
+
+### Caveats
+Iterable properties are implemented by wrapping primitives in their respective "boxed" objects - the same as you'd get from `new Number(123)` or `new Boolean(true)`. This means that while you can do simple things like: `console.log(elt.numIter + 3, elt.numIter > 10);`, you need to be cautious with falsy/truthy expressions and equality tests.
+
+In Javascript, objects are _always_ truthy (except for `null`), so
+```javascript
+new Number(123) === 123   // false, the Object representing 123 isn't strictly equal to 123
+new Number(123) == 123    // true, the Object representing 123 will be converted to a number and is then equal to 123
+```
+This also means that:
+```javascript
+if (elt.numIter === 0)  // Never true, an object is never 0
+if (elt.numIter == 0)   // True if the iterable actually holds zero
+if (elt.numIter)        // Always true - objects are always true
+if (!elt.numIter)       // Never true - objects are always true
+```
+
+The way iterables are implemented, you can always call `.valueOf()` to get the underlying value the iterable represents.
+
+Similarly, if the `iterable` declares an object rather than a primtive, it is _always_ spread into a new object before being turned into an async iterable, so the source object doesn't hold inappropriate references to the iterable that might prevent garbage collection.
+
+THis means that:
+```javascript
+const p = { x: 10, y: 20};
+elt.center = p;
+if (elt.center === p) // Never true: p has been spread into elt.center, not referenced.
+```
+
+Currently, for implementation reasons, iterables can't be arrays. If you really want an iterable to be an array type, place the array inside an object:
+```typescript
+const Chart = div.extended({
+  iterable:{
+    // data: [] as number[]  // WRONG: doesn't work
+    data:{
+      values: [] as number[]; // Correct
+    }
+  }
+});
+
+const ch = Chart();
+ch.data = { values: [10,4,7,2] }; // Causes the chart to redraw since it's consuming this.data
+
+const ch2 = Chart({ data: { values: [9.11.4.7] }}); // Creates a chart with default data for the iterable
+```
+
+Finally, due to a limitation of Typescript, although iterable properties are always created with helpers, so you can `map`, `filter` and `merge` (they are built `multi`, so you never need to do this), they appear in the type declaratoons as optional. Without this, Typescript will conplain that expressions like `elt.numIter = 10` aren't valid, as `elt.numIter` would require a defintion of `map`, `[Symbol.asyncIterator]`, etc.
+
+To avoid this issue in Typescript, follow the helper with a `!` to tell Typescript that the helper really is present:
+```typescript
+this.numIter.map!(n => -n).consume(n => console.log(n))
+```
+
+
+____
+
+| < Prev | ^ |  Next > |
+|:-------|:-:|--------:|
+| [Iterators](./extended.md) | [Index](./index.md) | [`constructed()`](./constructed.md) |
+
+

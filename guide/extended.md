@@ -4,8 +4,8 @@ You may remember from the definition of a *tag function* from [Your first web pa
 
 ```typescript
 TagFunctionName(
-  attributes?: AttributesOfThisTag, 
-  ...children:(string | number | boolean | Node | Element | NodeList | HTMLCollection 
+  attributes?: AttributesOfThisTag,
+  ...children:(string | number | boolean | Node | Element | NodeList | HTMLCollection
   /* Or an array of any combination of the former */)[]
 ): Element
 ```
@@ -22,30 +22,30 @@ TagFunctionName.extended(spec:{
   constructed?: () => void | undefined | ChildTags;
   ids?: { [id: string]: TagCreator; };
   styles?: string;
-})
+}): Element
 ```
 > _Note: there is some simplification here, as the type `TagCreator` actually requires type parameters, and does some type mapping to ensure `this` is correct within members, but the essential definitions are shown above_
 
-In the following sections, we'll meet each of these in detail:
+In the following sections, we'll meet each of these optional fields in detail:
 
-## [override](./prototype.md) 
+## [override](./prototype.md)
 The `override` object allows you to set values for existing attributes in the base tag from which the current is being extended. It's a simple way to say that "I want a new tag like an existing tag, but with some properties (style, src, onclick, etc...) set to a different default value".
 
-## [declare](./prototype.md) 
-The `declare` object allows you to declare new attributes and methods on your new tag. The AI-UI type won't let you re-declare a property, If you want to give an existing property a new value, you should `override` it instead.
+## [declare](./prototype.md)
+The `declare` object allows you to declare new attributes and methods on your new tag. The AI-UI type won't let you re-declare a property. If you want to give an existing property a new value, you should `override` it instead.
 
-## [iterable](./prototype.md) 
-The `iterable` object allows you to *iterable attributes* on your new tag. These are both primitive attributes _and_ async iterators that automatically yield values when they are assigned to, so (for example) the snippet `div("Hello ", this.userName)` will automatically update the DOM when something executes `myElement.userName = "Joe";`. Iterable attributes can primitives or objects, but not functions or symbols, and there some JavaScript caveats around their usage.
+## [iterable](./prototype.md)
+The `iterable` object allows you to *iterable attributes* on your new tag. These are both attributes _and_ async iterators that automatically yield values when they are assigned to. So (for example) the snippet `div("Hello ", this.userName)` will automatically update the DOM when something executes `myElement.userName = "Joe";`. Iterable attributes can be primitives or objects, but not functions or symbols, and there some JavaScript caveats around their usage.
 
-## [constructed()](./constructed.md) 
+## [constructed()](./constructed.md)
 The `constructed()` method allows you to create children, or modify any children passed by the tag function call, and carry out specific operations related to your new tag depending on the attributes passed when it is created, before it is placed into the DOM.
 
 > _Note: Due to [this limitation in TypeScript](https://github.com/microsoft/TypeScript/issues/47599) you should declare the `constructed()` method **after** the others to ensure all the prototypical member types are captured. This actually depends on the exact nature of your prototypes, such as whether they contains functions that aren't context free._
 
-## [ids](./ids.md) 
+## [ids](./ids.md)
 The `ids` object associates child DOM Element IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children. It's not used at run-time, but simply provides type information to the IDE.
 
-## [styles](./styles.md) 
+## [styles](./styles.md)
 The `styles` string will create specific CSS style rules for your tag. This is especially useful when your styles are hierarchical or rqeuire pseudo selectors which can't be easily specified in a normal CSSStyleDeclaration.
 
 # Usage
@@ -84,7 +84,7 @@ ____
 
 | < Prev | ^ |  Next > |
 |:-------|:-:|--------:|
-| [Iterators](./iterators-usage.md) | [Index](./index.md) | [`constructed()`](./constructed.md) |
+| [Iterators](./iterators-usage.md) | [Index](./index.md) | [Extending attributes](./prototype.md) |
 
 
 

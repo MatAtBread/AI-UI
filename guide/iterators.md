@@ -14,13 +14,15 @@ As of March 2024, none of these types have standardised prototypes, as they are 
 AI-UI has a set of helpers you can use with async iterators - obvious things like map & filter.
 
 To use these with third-party async iterators, or the return of a standard async generator, you have a choice of three mechanisms:
-* You can import the `augment-iterators.js` module from within AI-UI: `import * as Iterators '../../../module/esm/augment-iterators.js';` (if you don't reference the `Iterators` value, you can use `import '../../../module/esm/augment-iterators.js';`). This will make all the iterables returned by async generators have the additional functions below.
+* You can import the `augment-iterators.js` module from within AI-UI: `import * as Iterators 'ai-ui/augment-iterators.js';` (if you don't reference the `Iterators` value, you can use `import 'ai-ui/augment-iterators.js';`). This will make all the iterables returned by async generators have the additional functions below.
 * Use the `iterableHelpers` to add the helpers to an AsyncIterator, or
 * Use `generatorHelpers` function, if you want to add helpers to a generator (that returns iterables).
 
 The first is easiest to use, but pollutes the global `async function *` prototype, which is considered bad practice by some. If you use this method, you only need to do so once in your code and it will augment all async generators anywhere in your codebase.
 
 ```javascript
+import 'https://www.unpkg.com/@matatbread/ai-ui/esm/augment-iterators.js';
+
 async function *count(limit) {
   for (let i=0; i<limit; i++)
     yield i;
@@ -58,7 +60,8 @@ We can either add functionality to the generator with `generatorHelpers`, or to 
 ```javascript
 // Create a version of "count" whose returned iterators have helpers attached
 const helpedCount1 = generatorHelpers(count);
-const counter1 = helpedCount(10);
+// Now create an async iterable that has the helpers available.
+const counter1 = helpedCount1(10);
 
 // or just:
 const helpedCount2 = generatorHelpers(async function *(limit) {
@@ -129,7 +132,13 @@ for await (const x of counter3.filter(num => num % 2 === 0)) {
 function* unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterable<U>
 ```
 
-Filter the results of an async iterable to remove duplicate values. The optional specifed function can be used to test for equality. By default, the test is the JavaScript strict equality operator "===".
+Filter the results of an async iterable to remove duplicate values. The optional specifed function can be used to test for equality. By default, the test is the JavaScript strict equality operator "===". To compare objects, arrays or other compound objects, you can provide your own comparison function
+
+```javascript
+for await (const x of counter3.map(n => Math.floor(n / 2)).unique()) {
+  console.log(x); // 0,1,2,3,4
+}
+```
 
 
 ## initially
@@ -152,6 +161,7 @@ Waits for a callback before yielding values as they arrive. For example, to yiel
 ```javascript
 for await (const x of counter3.waitFor(done => window.requestAnimationFrame(done))) {
   // We've been scheduled to run during an animation frame period
+  console.log(x); // 0,1,2,3,4,5,6,7,8,9 each one logged during an animation frame
 }
 ```
 
@@ -160,7 +170,7 @@ for await (const x of counter3.waitFor(done => window.requestAnimationFrame(done
 function consume<U>(this: AsyncIterable<U>, f?: ((u: U) => void | PromiseLike<void>) | undefined): Promise<void>
 ```
 
-Passes each yielded value to the specified function and returns on when the final iteration has been processed by the callback. The specified function can itself be synchronous or async (returning a Promise).
+Passes each yielded value to the specified function and returns on when the final iteration has been processed by the callback. The specified function can itself be synchronous or async (returning a Promise). The result, if used, resolves when the final callback has completed.
 
 > _IMPORTANT: async iterators are *lazy*. No values will be generated until a consumer requests a value. `consume` is one such function_. If you were to try:
 >
@@ -174,8 +184,7 @@ Passes each yielded value to the specified function and returns on when the fina
 >counter3.consume(n => console.log(n));
 >```
 >
->If you are passing your async iterators to AI-UI, or a `for await` loop, you typically don't need `consume`, as these will ask for values from the iterator when they need them. `consume` is
->most useful where you have a standalone statement where the return value of `map`, `filter`, etc., would otherwise be un-referenced and garbage collected.
+>If you are passing your async iterators to AI-UI, or a `for await` loop, you typically don't need `consume`, as these will ask for values from the iterator when they need them. `consume` is most useful where you have a standalone statement where the return value of `map`, `filter`, etc. (ie the async iterable), would otherwise be un-referenced and garbage collected.
 
 
 ## multi
@@ -186,15 +195,22 @@ function multi<U>(this: AsyncIterable<U>): AsyncIterable<U>
 Accept the source iterator, yielding a common value to all current consumers. There is no buffering or queueing - if a consumer takes a long time to handle a value, it might miss some consumed by any other consumers, but will resume receiving values as soon as it calls next(). It is very similar to `broadcast`, except that `broadcast` queues any intermediate values. `multi` is significantly more efficient and is suitable for providing things like mousemove and scroll events, where a slow, asynchronous consumer does not want to process every value in turn, but simply wants to keep up to date when the value changes.
 
 Note: by default, AsyncIterators, if given more than one consumer, will yield sequential values to each consumer*. Use `multi` or `broadcast` if you need all consumers to receive a value.
-> (* actually, this is entirely dependent on how the async iterator is implemented. It is the default behaviour of an `async function*`).
+> (* actually, this is entirely dependent on how the async iterator is implemented. It is the default behaviour of an `async function*`, but an iterator is free to produce results in whatever manner it pleases to multiple consumers).
 
 ```javascript
 const b = counter3.multi();
 
-// Outputs A0,B0,A1,B1.... note: if the functions in `consume` were asynchronous and slow, not every value will go to the slowest consumer under certain circumstances, but all values will
+// Outputs A0,B0,A1,B1.... note: if the functions in `consume` were asynchronous and slow, not every value will go to the slowest consumer under certain circumstances, but all values will be consumed by at least one of the consumers.
 
 b.consume(n => console.log("A",n));
 b.consume(n => console.log("B",n));
+
+// For comparison, with the `.multi()`
+const c = counter3;
+c.consume(n => console.log("A",n)); // A0, A2, A4, A6, A8
+c.consume(n => console.log("B",n)); // A1, A3, A5, A7, A9
+// These are evenly distributed by an `async function *` becuase the consumers are synchronous and complete at the same speed
+
 ```
 
 ## broadcast
