@@ -1,10 +1,12 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { when } from './when.js';
+import { UniqueID } from './tags.js';
 import { DEBUG } from './debug.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
+let idCount = 0;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
     "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",
@@ -178,8 +180,12 @@ export const tag = function (_1, _2, _3) {
         };
     }
     if (!nameSpace) {
-        tag.appender = appender; // Legacy RTA support
-        tag.nodes = nodes; // Preferred interface
+        Object.assign(tag, {
+            appender, // Legacy RTA support
+            nodes, // Preferred interface instead of `appender`
+            UniqueID,
+            augmentGlobalAsyncGenerators
+        });
     }
     /** Routine to *define* properties on a dest object from a src object **/
     function deepDefine(d, s) {
@@ -380,7 +386,8 @@ export const tag = function (_1, _2, _3) {
         const overrides = (typeof _overrides !== 'function')
             ? (instance) => _overrides
             : _overrides;
-        const staticInstance = {};
+        const uniqueTagID = 'ai-ui-' + Date.now().toString(36) + (idCount++).toString(36) + Math.random().toString(36).slice(2);
+        const staticInstance = { [UniqueID]: uniqueTagID };
         let staticExtensions = overrides(staticInstance);
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
@@ -398,7 +405,7 @@ export const tag = function (_1, _2, _3) {
             const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack };
             const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
             e.constructor = extendTag;
-            const ped = {};
+            const ped = { [UniqueID]: uniqueTagID };
             const tagDefinition = overrides(ped);
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
@@ -555,6 +562,20 @@ const DyamicElementError = AsyncDOMContainer.extended({
         return this.error.toString();
     }
 });
+export function augmentGlobalAsyncGenerators() {
+    let g = (async function* () { })();
+    while (g) {
+        const desc = Object.getOwnPropertyDescriptor(g, Symbol.asyncIterator);
+        if (desc) {
+            iterableHelpers(g);
+            break;
+        }
+        g = Object.getPrototypeOf(g);
+    }
+    if (DEBUG && !g) {
+        console.log("Failed to augment the prototype of `(async function*())()`");
+    }
+}
 export let enableOnRemovedFromDOM = function () {
     enableOnRemovedFromDOM = function () { }; // Only create the observer once
     new MutationObserver(function (mutations) {

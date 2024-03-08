@@ -18,6 +18,7 @@ module.exports = {
          './deferred.js': './deferred',
          './iterators.js': './iterators',
          './when.js': './when',
+         './tags.js': './tags',
          './debug.js': './debug',
          './jsx-runtime.js': './jsx-runtime',
          './augment-iterators.js': './augment-iterators',

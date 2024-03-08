@@ -1,7 +1,7 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { ChildTags, Instance, Overrides, TagCreator } from './tags.js'
+import { ChildTags, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
 import { DEBUG } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
@@ -24,6 +24,8 @@ interface TagLoader {
   /** @deprecated - Legacy function similar to Element.append/before/after */
   appender(container: Node, before?: Node): (c: ChildTags) => (Node | (/*P &*/ (Element & PoElementMethods)))[];
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
+  UniqueID: typeof UniqueID;
+  augmentGlobalAsyncGenerators(): void;
 
   /*
    Signatures for the tag loader. All params are optional in any combination,
@@ -47,6 +49,7 @@ interface TagLoader {
   <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>;
 }
 
+let idCount = 0;
 const standandTags = [
   "a","abbr","address","area","article","aside","audio","b","base","bdi","bdo","blockquote","body","br","button",
   "canvas","caption","cite","code","col","colgroup","data","datalist","dd","del","details","dfn","dialog","div",
@@ -130,7 +133,7 @@ export const tag = <TagLoader>function <Tags extends string,
   Object.defineProperty(tagPrototypes, 'attributes', {
     ...Object.getOwnPropertyDescriptor(Element.prototype,'attributes'),
     set(a: object) {
-      if (isAsyncIter(a)) { 
+      if (isAsyncIter(a)) {
         const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
         const step = ()=> ai.next().then(
           ({ done, value }) => { assignProps(this, value); done || step() },
@@ -197,10 +200,10 @@ export const tag = <TagLoader>function <Tags extends string,
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
                 throw new Error("Element(s) no longer exist in document" + insertionStack);
               }
-  
+
               t = appender(n[0].parentNode!, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
               n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
-              ap.next().then(update).catch(error);  
+              ap.next().then(update).catch(error);
             } catch (ex) {
               // Something went wrong. Terminate the iterator source
               ap.return?.(ex);
@@ -248,8 +251,12 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   }
   if (!nameSpace) {
-    tag.appender = appender;  // Legacy RTA support
-    tag.nodes = nodes;        // Preferred interface
+    Object.assign(tag,{
+      appender, // Legacy RTA support
+      nodes,    // Preferred interface instead of `appender`
+      UniqueID,
+      augmentGlobalAsyncGenerators
+    });
   }
 
 
@@ -453,20 +460,21 @@ export const tag = <TagLoader>function <Tags extends string,
     extended: (this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) => ExtendTagFunctionInstance;
   };
 
-  function tagHasInstance(this: ExtendTagFunctionInstance, e: any) { 
+  function tagHasInstance(this: ExtendTagFunctionInstance, e: any) {
     for (let etf: ExtendTagFunctionInstance | TagCreator<any> = this; etf; etf = etf.super) {
       if (e.constructor === etf)
         return true;
     }
     return false;
   }
-  
+
   function extended(this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) {
     const overrides = (typeof _overrides !== 'function')
       ? (instance: Instance) => _overrides
       : _overrides
 
-    const staticInstance = {} as Instance;
+    const uniqueTagID = 'ai-ui-'+Date.now().toString(36)+(idCount++).toString(36)+Math.random().toString(36).slice(2);
+    const staticInstance: Instance = { [UniqueID]: uniqueTagID };
     let staticExtensions: Overrides = overrides(staticInstance);
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
@@ -485,7 +493,7 @@ export const tag = <TagLoader>function <Tags extends string,
       const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack  };
       const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
       e.constructor = extendTag;
-      const ped = {} as Instance;
+      const ped: Instance = { [UniqueID]: uniqueTagID };
       const tagDefinition = overrides(ped);
       combinedAttrs[callStackSymbol].push(tagDefinition);
       deepDefine(e, tagDefinition.prototype);
@@ -670,6 +678,21 @@ const DyamicElementError = AsyncDOMContainer.extended({
     return this.error.toString();
   }
 });
+
+export function augmentGlobalAsyncGenerators() {
+  let g = (async function *(){})();
+  while (g) {
+    const desc = Object.getOwnPropertyDescriptor(g, Symbol.asyncIterator);
+    if (desc) {
+      iterableHelpers(g);
+      break;
+    }
+    g = Object.getPrototypeOf(g);
+  }
+  if (DEBUG && !g) {
+    console.log("Failed to augment the prototype of `(async function*())()`");
+  }
+}
 
 export let enableOnRemovedFromDOM = function () {
   enableOnRemovedFromDOM = function () { }; // Only create the observer once

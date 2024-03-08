@@ -1,2 +1,2 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
-export {};
+export const UniqueID = Symbol("Unique ID");

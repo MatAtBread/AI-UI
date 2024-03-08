@@ -12,6 +12,11 @@ TagFunctionName(
 
 `AIUI.tag(...)` returns *base tag functions* that create plain old DOM elements via [document.createElement](https://developer.mozilla.org/en-US/docs/Web/API/Document/createElement). These all accept optional attributes for the DOM element, and an optional list of children (nodes, elements, primitives, collections, promises, async iterables...).
 
+> Key Info about tag functions:
+- All tag functions - base tag functions and extended tag functions - create a _single DOM element_.
+- All tag functions can have an optional initial object that specifies values for the attributes supported by that tag type.
+- All tag functions can have a list of values (primitives, Elements, undefined | Ignore & arrays, Promises or async iterables that produce these) that will be appended as children to the returned DOM Element
+
 In additional, all tag functions have an `extended` member:
 
 ```typescript
@@ -19,12 +24,19 @@ TagFunctionName.extended(spec:{
   override?: object;
   declare?: object;
   iterable?: object;
-  constructed?: () => void | undefined | ChildTags;
+  constructed?: () => void | undefined | ChildTags | Promise<void | undefined | ChildTags>;
   ids?: { [id: string]: TagCreator; };
   styles?: string;
-}): Element
+}): NewTagFunctionName // tag function that creates the new tag type
 ```
-> _Note: there is some simplification here, as the type `TagCreator` actually requires type parameters, and does some type mapping to ensure `this` is correct within members, but the essential definitions are shown above_
+> _Note: there is some simplification here, as the type actually requires type parameters, and does some type mapping to ensure `this` is correct within members, but the essential definitions are shown above_
+
+Extending existing tags is all about _inheritance_ and _composition_.
+
+* [`declare`, `override` & `iterable`](./prototype.md) are for _inheritance_. They provide a way to say a new tag function is just like an existing one, with some different or new attributes and methods.
+* [`constructed()`](./constructed.md) is mainly about _composition_. It provides a way to say a new tag contains other tags, and also to introduce behaviours to control the tag and it's children.
+
+These two techniques often work well together.
 
 In the following sections, we'll meet each of these optional fields in detail:
 
@@ -43,7 +55,7 @@ The `constructed()` method allows you to create children, or modify any children
 > _Note: Due to [this limitation in TypeScript](https://github.com/microsoft/TypeScript/issues/47599) you should declare the `constructed()` method **after** the others to ensure all the prototypical member types are captured. This actually depends on the exact nature of your prototypes, such as whether they contains functions that aren't context free._
 
 ## [ids](./ids.md)
-The `ids` object associates child DOM Element IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children. It's not used at run-time, but simply provides type information to the IDE.
+The `ids` object associates child element DOM IDs within your tag with specific tag types, so that a type-aware IDE such as VSCode can correctly prompt you when referencing the children that make up a tag composed of children. It's not used at run-time, but simply provides type information to the IDE.
 
 ## [styles](./styles.md)
 The `styles` string will create specific CSS style rules for your tag. This is especially useful when your styles are hierarchical or rqeuire pseudo selectors which can't be easily specified in a normal CSSStyleDeclaration.

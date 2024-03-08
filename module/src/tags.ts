@@ -1,6 +1,6 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 
-import { AsyncExtraIterable, AsyncProvider, Ignore } from "./iterators";
+import type { AsyncExtraIterable, AsyncProvider, Ignore } from "./iterators.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
@@ -22,7 +22,8 @@ export type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent un
 
 type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
-export type Instance<T extends {} = Record<string, unknown>> = T;
+export const UniqueID = Symbol("Unique ID");
+export type Instance<T extends { [UniqueID]: string } = { [UniqueID]: string } & Record<string, unknown>> = T;
 
 type RootObj = object;
 

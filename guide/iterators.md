@@ -14,13 +14,14 @@ As of March 2024, none of these types have standardised prototypes, as they are 
 AI-UI has a set of helpers you can use with async iterators - obvious things like map & filter.
 
 To use these with third-party async iterators, or the return of a standard async generator, you have a choice of three mechanisms:
-* You can import the `augment-iterators.js` module from within AI-UI: `import * as Iterators 'ai-ui/augment-iterators.js';` (if you don't reference the `Iterators` value, you can use `import 'ai-ui/augment-iterators.js';`). This will make all the iterables returned by async generators have the additional functions below.
+* Augment the global `async function *` prototype, which is considered bad practice by some. This will make all the iterables returned by async generators have the additional functions below.
 * Use the `iterableHelpers` to add the helpers to an AsyncIterator, or
 * Use `generatorHelpers` function, if you want to add helpers to a generator (that returns iterables).
 
-The first is easiest to use, but pollutes the global `async function *` prototype, which is considered bad practice by some. If you use this method, you only need to do so once in your code and it will augment all async generators anywhere in your codebase.
+The first is easiest to use. If you use this method, you only need to do so once in your code and it will augment all async generators anywhere in your codebase.
 
-```javascript
+```typescript
+// Augments the global prototype and declares global types
 import 'https://www.unpkg.com/@matatbread/ai-ui/esm/augment-iterators.js';
 
 async function *count(limit) {
@@ -30,6 +31,11 @@ async function *count(limit) {
 
 for await (const x of count(4)) console.log(x); // Logs 0,1,2,3
 for await (const x of count(4).map(n => n * 2)) console.log(x); // Logs 0,2,4,6
+```
+From JavaScript, you can explicitly call the function, since there are no types to modify:
+```javascript
+// tag from however you load it: import, require, or as the global AIUI in a script.
+tag.augmentGlobalAsyncGenerators();
 ```
 
 The final two require that you import the functions that add the helpers:
