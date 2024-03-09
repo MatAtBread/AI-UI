@@ -10,8 +10,8 @@ Using AI-UI in your web apps
 * [Extended: Create new tags](./extended.md)
 * [Extended 1: Adding methods & attributes with `declare`, `override` & `iterable`](./prototype.md)
 * [Extended 2: Composition with `constructed()`](./constructed.md)
-* [Extended 3: Type-safe elements using `ids`](./ids.md) _coming soon_
-* [Extended 4: Defining element `styles`](./styles.md) _coming soon_
+* [Extended 3: Type-safe elements: `ids`](./ids.md)
+* [Extended 4: Styling extended elements: `styles`](./styles.md)
 * [Extended 5: Private element data, getters & setters](./instance.md) _coming soon_
 * [Link elements dynamically: `when`](./when.md) _coming soon_
 * [Other properties of tag functions](./super-overrides-hasInstance-name-statics.md)
