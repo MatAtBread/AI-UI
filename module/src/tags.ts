@@ -1,6 +1,6 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 
-import type { AsyncExtraIterable, AsyncProvider, Ignore } from "./iterators.js";
+import type { AsyncExtraIterable, AsyncProvider, Ignore, Iterability } from "./iterators.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
@@ -115,7 +115,6 @@ type MergeBaseTypes<T, Base> = {
   See https://github.com/microsoft/TypeScript/issues/43826
 */
 
-type IterableProperties<IP> = {
   /* We choose the following type description to avoid the issues above. Because the AsyncExtraIterable
     is Partial it can be omitted from assignments:
       this.prop = value;  // Valid, as long as valus has the same type as the prop
@@ -125,11 +124,21 @@ type IterableProperties<IP> = {
 
     This relies on a hack to `wrapAsyncHelper` in iterators.ts when *accepts* a Partial<AsyncIterator>
     but casts it to a AsyncIterator before use.
+
+    The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
+    By default, the currently implementation does a one-level deep mapping, so an iterable property 'obj' is itself
+    iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
+    iterable, but it's membetrs are just POJS values.
   */
-  [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
+
+type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
+  [K in keyof Omit<IP,typeof Iterability>]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
+} : {
+  [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & Partial<AsyncExtraIterable<IP[K]>>
 }
 
-type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never }; // Basically anything, _except_ an array
+// Basically anything, _except_ an array, as they clash with map, filter
+type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never };
 type OptionalIterablePropertyValue = IterablePropertyValue | undefined | null;
 
 type NeverEmpty<O extends RootObj> = {} extends O ? never : O;

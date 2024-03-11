@@ -174,11 +174,7 @@ export function broadcastIterator(stop = () => { }) {
     });
     return b;
 }
-/* Define a "iterable property" on `obj`.
-   This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
-   yields when the property is set.
-   This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
-*/
+export const Iterability = Symbol("Iterability");
 export function defineIterableProperty(obj, name, v) {
     // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
     // access the iterator methods to prevent leaks where an iterable is created, but
@@ -192,24 +188,34 @@ export function defineIterableProperty(obj, name, v) {
         const b = bi[Symbol.asyncIterator]();
         extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
         push = bi.push;
-        Object.keys(asyncHelperFunctions).map(k => extras[k] = { value: b[k], enumerable: false, writable: false });
+        Object.keys(asyncHelperFunctions).forEach(k => extras[k] = {
+            // @ts-ignore - Fix
+            value: b[k],
+            enumerable: false,
+            writable: false
+        });
         Object.defineProperties(a, extras);
         return b;
     };
     // Create stubs that lazily create the AsyncExtraIterable interface when invoked
-    const lazyAsyncMethod = (method) => function (...args) {
-        initIterator();
-        return a[method].call(this, ...args);
-    };
+    function lazyAsyncMethod(method) {
+        return function (...args) {
+            initIterator();
+            // @ts-ignore - Fix
+            return a[method].call(this, ...args);
+        };
+    }
     const extras = {
         [Symbol.asyncIterator]: {
-            enumerable: false, writable: true,
+            enumerable: false,
+            writable: true,
             value: initIterator
         }
     };
-    Object.keys(asyncHelperFunctions).map(k => extras[k] = {
+    Object.keys(asyncHelperFunctions).forEach((k) => extras[k] = {
         enumerable: false,
         writable: true,
+        // @ts-ignore - Fix
         value: lazyAsyncMethod(k)
     });
     // Lazily initialize `push`
@@ -217,51 +223,95 @@ export function defineIterableProperty(obj, name, v) {
         initIterator(); // Updates `push` to reference the multi-queue
         return push(v);
     };
+    if (typeof v === 'object' && v && Iterability in v) {
+        extras[Iterability] = Object.getOwnPropertyDescriptor(v, Iterability);
+    }
+    let boxedObject = Ignore;
     let a = box(v, extras);
     Object.defineProperty(obj, name, {
         get() { return a; },
         set(v) {
-            a = box(v, extras);
+            if (v !== a)
+                a = box(v, extras);
             push(v?.valueOf());
         },
         enumerable: true
     });
     return obj;
-}
-function box(a, pds) {
-    if (a === null || a === undefined) {
-        return Object.create(null, {
-            ...pds,
-            valueOf: { value() { return a; } },
-            toJSON: { value() { return a; } }
-        });
-    }
-    switch (typeof a) {
-        case 'object':
-            /* TODO: This is problematic as the object might have clashing keys.
-              The alternatives are:
-              - Don't add the pds, then the object remains unmolested, but can't be used with .map, .filter, etc
-              - examine the object and decide whether to insert the prototype (breaks built in objects, works with PoJS)
-              - don't allow objects as iterable properties, which avoids the `deep tree` problem
-              - something else
-            */
-            if (!(Symbol.asyncIterator in a)) {
-                if (DEBUG)
-                    console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
-                return Object.defineProperties({ ...a }, pds);
-            }
-            return a;
-        case 'bigint':
-        case 'boolean':
-        case 'number':
-        case 'string':
-            // Boxes types, including BigInt
-            return Object.defineProperties(Object(a), {
+    function box(a, pds) {
+        if (a === null || a === undefined) {
+            return Object.create(null, {
                 ...pds,
-                toJSON: { value() { return a.valueOf(); } }
+                valueOf: { value() { return a; } },
+                toJSON: { value() { return a; } }
             });
+        }
+        switch (typeof a) {
+            case 'object':
+                /* TODO: This is problematic as the object might have clashing keys and nested members.
+                  The current implementation:
+                  * Spreads iterable objects in to a shallow copy of the original object, and overrites clashing members like `map`
+                  *     this.iterableObj.map(o => o.field);
+                  * The iterator will yield on
+                  *     this.iterableObj = newValue;
+        
+                  * Members access is proxied, so that:
+                  *     (set) this.iterableObj.field = newValue;
+                  * ...causes the underlying object to yield by re-assignment (therefore calling the setter)
+                  * Similarly:
+                  *     (get) this.iterableObj.field
+                  * ...causes the iterator for the base object to be mapped, like
+                  *     this.iterableObject.map(o => o[field])
+                */
+                if (!(Symbol.asyncIterator in a)) {
+                    // @ts-expect-error - Ignore is the INITIAL value
+                    if (boxedObject === Ignore) {
+                        if (DEBUG)
+                            console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
+                        boxedObject = Object.defineProperties({ ...a }, pds);
+                    }
+                    else {
+                        Object.assign(boxedObject, a);
+                    }
+                    if (boxedObject[Iterability] === 'shallow') {
+                        return boxedObject;
+                    }
+                    // else proxy the result so we can track members of the iterable object
+                    return new Proxy(boxedObject, {
+                        // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
+                        set(target, p, value, receiver) {
+                            if (Reflect.set(target, p, value, receiver)) {
+                                obj[name] = obj[name]
+                                    // @ts-ignore - everything has a valueOf?
+                                    .valueOf();
+                                return true;
+                            }
+                            return false;
+                        },
+                        // Implement the logic that returns a mapped iterator for the specified field
+                        get(target, p, receiver) {
+                            if (Reflect.getOwnPropertyDescriptor(target, p)?.enumerable) {
+                                const realValue = Reflect.get(boxedObject, p, receiver);
+                                // @ts-ignore - Fix
+                                return box(realValue, Object.getOwnPropertyDescriptors(boxedObject.map(o => o[p]).unique()));
+                            }
+                            return Reflect.get(target, p, receiver);
+                        },
+                    });
+                }
+                return a;
+            case 'bigint':
+            case 'boolean':
+            case 'number':
+            case 'string':
+                // Boxes types, including BigInt
+                return Object.defineProperties(Object(a), {
+                    ...pds,
+                    toJSON: { value() { return a.valueOf(); } }
+                });
+        }
+        throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
     }
-    throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
 }
 export const merge = (...ai) => {
     const it = new Array(ai.length);
@@ -329,9 +379,6 @@ export const merge = (...ai) => {
     };
     return iterableHelpers(merged);
 };
-/*
-  Extensions to the AsyncIterable:
-*/
 function isExtraIterable(i) {
     return isAsyncIterable(i)
         && Object.keys(asyncExtras)
@@ -379,7 +426,7 @@ export function filterMap(source, fn, initialValue = Ignore) {
                     }), ex => 
                 // The source threw. Tell the consumer
                 reject({ done: true, value: ex })).catch(ex => {
-                    // The callback threw 
+                    // The callback threw
                     ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
                     reject({ done: true, value: ex });
                 });

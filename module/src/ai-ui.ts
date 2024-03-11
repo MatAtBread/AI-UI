@@ -352,8 +352,7 @@ export const tag = <TagLoader>function <Tags extends string,
                   if (!base.ownerDocument.contains(base)) {
                     /* This element has been removed from the doc. Tell the source ap
                       to stop sending us stuff */
-                    //throw new Error("Element no longer exists in document (update " + k + ")");
-                    ap.return?.(new Error("Element no longer exists in document (update " + k + ")"));
+                    ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
                     return;
                   }
 
