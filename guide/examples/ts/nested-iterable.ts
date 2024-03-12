@@ -12,16 +12,19 @@ const T = div.extended({
       n: 0,
       s: 'z',
       nest: {
-        f: true
+        f: false
       }
     } as Type
   },
+  ids:{
+    slider: input
+  },
   constructed() {
-    this.foo.nest.f.consume!(f => { this.style.backgroundColor = f == true ? 'cyan' : 'magenta' });
-    this.foo.nest.consume!(({f}) => { this.style.textAlign = f == true ? 'right' : 'left' });
+    this.foo.nest.f.consume!(f => { this.style.backgroundColor = f == true ? '#ffc' : '#cff' });
+    this.foo.nest.consume!(nest => { this.ids.slider.style.float = nest?.f == true ? 'right' : 'left' });
     return [
-      div(
-        input({ type: 'range', value: this.num.map!(n => String(100-n)) }),
+      div({ style: { lineHeight: '1.5em' }},
+        input({ id: 'slider', type: 'range', value: this.num.map!(n => String(100-n)) }),
         "num is: ", this.num, " "
       ),
       div("n is: ", this.foo.n),
@@ -29,7 +32,7 @@ const T = div.extended({
       div("s is: ", this.foo.s),
       div("foo.n is: ", this.foo.map!(o => o.n)),
       div("foo.s is: ", this.foo.map!(o => o.s)),
-      div("foo.s is: ", this.foo.map!(o => o.s)),
+      div("foo.s is: ", this.foo.map!(o => o.s))
     ]
   }
 });
@@ -60,7 +63,8 @@ document.body.append(t,
   State({ f: 's', d: 'yyy' }),
   State({ d: { s: 'def', n: 456 }}),
   State({ f: 'n', d: 888 }),
-  input({ type: 'range', oninput() { t.num = Number(this.value) } })
+  input({ type: 'range', oninput() { t.num = Number(this.value) } }),
+  input({ type: 'checkbox', onchange() { t.foo.nest = { f: this.checked }} }),
   );
 (window as any).t = t;
 

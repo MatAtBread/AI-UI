@@ -360,7 +360,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                   const pv = p?.valueOf();
                   if (typeof ov === typeof pv && ov == pv)
                     return Ignore;
-                  return o[key as keyof V]
+                  return o?.[key as keyof V]
                 }));
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
                 // @ts-ignore - Fix

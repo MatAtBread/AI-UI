@@ -310,7 +310,7 @@ export function defineIterableProperty(obj, name, v) {
                                     const pv = p?.valueOf();
                                     if (typeof ov === typeof pv && ov == pv)
                                         return Ignore;
-                                    return o[key];
+                                    return o?.[key];
                                 }));
                                 Reflect.ownKeys(props).forEach(k => props[k].enumerable = false);
                                 // @ts-ignore - Fix
