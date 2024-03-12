@@ -351,11 +351,11 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
             },
             // Implement the logic that returns a mapped iterator for the specified field
             get(target, key, receiver) {
-              /* BROKEN: fails nested properties
-              if (p === 'valueOf') return function() {
-                return a ? boxedObject
+              /* BROKEN: fails nested properties *
+              if (key === 'valueOf') return function() {
+                return target
               }
-              */
+              **/
               if (Reflect.getOwnPropertyDescriptor(target,key)?.enumerable) {
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
                 const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
