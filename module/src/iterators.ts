@@ -318,7 +318,10 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
           if (boxedObject === Ignore) {
             if (DEBUG)
               console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
-            boxedObject = Object.defineProperties({ ...(a as V) }, pds);
+            if (Array.isArray(a))
+              boxedObject = Object.defineProperties([...a] as V, pds);
+            else
+              boxedObject = Object.defineProperties({ ...(a as V) }, pds);
           } else {
             Object.assign(boxedObject, a);
           }
