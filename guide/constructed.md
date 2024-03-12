@@ -138,10 +138,12 @@ const Chart = img.extended({
       transition: 'opacity 0.5s',
       opacity: '0.2'
     },
-    onload() { this.style.opacity = '1' },
+    onload() {
+      this.style.opacity = '1';
+    }
   },
   iterable: {
-    data: null as { x: (string | number)[], y: number[] } | null
+    data: { x:[], y: [] } as { x: (string | number)[], y: number[] }
   },
   declare: {
     label: ''
@@ -168,7 +170,7 @@ const chart = Chart({ label: "Weekly sales" });
 document.body.append(chart);
 ...
 // Draw the chart from the weekly data. The `chart.data` could itself come from am async iterator
-chart.data = { 
+chart.data = {
   x:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
   y:[32,91,45,73,16,29.51]
 }

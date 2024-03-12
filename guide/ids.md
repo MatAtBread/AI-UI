@@ -86,13 +86,13 @@ Ok, so this works, but it has some nastiness:
     ];
   }
 ```
-...but you quickly get into a mess if you have dependancies between your local varibles, for example if some of the elements are created conditionally, or forward reference local variables created later in the DOM tree that haven't been initialised.
+...but you quickly get into a mess if you have dependancies between your local variables, for example if some of the elements are created conditionally, or forward reference local variables created later in the DOM tree that haven't been initialised.
 
 Basically, this technique works well for simple layouts when you just need to grab a reference, but isn't scalable and doesn't solve the problem of forward references or needing to assign an implementation to a stub method.
 
 2. Use `Instance` variables.
 
-These are discussed [here](./instance.md). Whilst this will solve the issue of having to assign an implementation to a stub method, it only helps a little in forward reference case.
+These are discussed [here](./instance.md). Whilst this will solve the issue of having to assign an implementation to a stub method, it only helps a little in the forward reference case.
 
 3. Use DOM methods to find and traverse the tree locally
 
@@ -143,6 +143,7 @@ The key features here are the `ids: { .... }` block which relates the ids to the
 
 You can declare as many ids as you need, and they will be resolved at run-time. If the element `xxx.ids.yyy` refers to is destoyed and recreated or upadted by an async operation (or anything else), it will continue to be referenced for example by "updateStockLevel" in our example. Local variables (or instance variables) can't do this - they hold a reference to a _specific_ DOM element, not a reference to a position within a DOM tree.
 
+> _TODO: add example_
 ____
 
 | < Prev | ^ |  Next > |
