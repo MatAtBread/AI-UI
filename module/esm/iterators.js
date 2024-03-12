@@ -242,8 +242,8 @@ export function defineIterableProperty(obj, name, v) {
         if (a === null || a === undefined) {
             return Object.create(null, {
                 ...pds,
-                valueOf: { value() { return a; } },
-                toJSON: { value() { return a; } }
+                valueOf: { value() { return a; }, writable: true },
+                toJSON: { value() { return a; }, writable: true }
             });
         }
         switch (typeof a) {
@@ -274,6 +274,15 @@ export function defineIterableProperty(obj, name, v) {
                         Object.assign(boxedObject, a);
                     }
                     if (boxedObject[Iterability] === 'shallow') {
+                        /*
+                        BROKEN: fails nested properties
+                        Object.defineProperty(boxedObject, 'valueOf', {
+                          value() {
+                            return boxedObject
+                          },
+                          writable: true
+                        });
+                        */
                         return boxedObject;
                     }
                     // else proxy the result so we can track members of the iterable object
@@ -281,19 +290,21 @@ export function defineIterableProperty(obj, name, v) {
                         // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
                         set(target, p, value, receiver) {
                             if (Reflect.set(target, p, value, receiver)) {
-                                obj[name] = obj[name]
-                                    // @ts-ignore - everything has a valueOf?
-                                    .valueOf();
+                                // @ts-ignore - Fix
+                                obj[name] = obj[name].valueOf();
                                 return true;
                             }
                             return false;
                         },
                         // Implement the logic that returns a mapped iterator for the specified field
                         get(target, p, receiver) {
+                            // BROKEN: if (p === 'valueOf') return function() { return /*a / breaks nested properties */boxedObject };
                             if (Reflect.getOwnPropertyDescriptor(target, p)?.enumerable) {
                                 const realValue = Reflect.get(boxedObject, p, receiver);
+                                const props = Object.getOwnPropertyDescriptors(boxedObject.map(o => o[p]));
+                                Reflect.ownKeys(props).forEach(k => props[k].enumerable = false);
                                 // @ts-ignore - Fix
-                                return box(realValue, Object.getOwnPropertyDescriptors(boxedObject.map(o => o[p]).unique()));
+                                return box(realValue, props);
                             }
                             return Reflect.get(target, p, receiver);
                         },
@@ -307,7 +318,7 @@ export function defineIterableProperty(obj, name, v) {
                 // Boxes types, including BigInt
                 return Object.defineProperties(Object(a), {
                     ...pds,
-                    toJSON: { value() { return a.valueOf(); } }
+                    toJSON: { value() { return a.valueOf(); }, writable: true }
                 });
         }
         throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');

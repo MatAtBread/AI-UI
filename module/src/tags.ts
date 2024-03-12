@@ -131,7 +131,7 @@ type MergeBaseTypes<T, Base> = {
     iterable, but it's membetrs are just POJS values.
   */
 
-type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
+export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
   [K in keyof Omit<IP,typeof Iterability>]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
 } : {
   [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & Partial<AsyncExtraIterable<IP[K]>>

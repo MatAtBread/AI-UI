@@ -1,3 +1,4 @@
+import { IterableProperties } from "./tags.js";
 export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
     push(value: T): boolean;
 };
@@ -41,9 +42,7 @@ export declare const Iterability: unique symbol;
 export type Iterability<Depth extends 'shallow' = 'shallow'> = {
     [Iterability]: Depth;
 };
-export declare function defineIterableProperty<T extends {}, N extends keyof T, V>(obj: T, name: N, v: V): T & {
-    [n in N]: V & AsyncExtraIterable<V>;
-};
+export declare function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>>;
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;

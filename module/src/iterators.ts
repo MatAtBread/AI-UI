@@ -1,5 +1,6 @@
 import { DEBUG } from "./debug.js";
 import { DeferredPromise, deferred } from "./deferred.js";
+import { IterableProperties } from "./tags.js";
 
 /* Things to suppliement the JS base AsyncIterable */
 export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
@@ -207,7 +208,7 @@ declare global {
 export const Iterability = Symbol("Iterability");
 export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
 
-export function defineIterableProperty<T extends {}, N extends keyof T, V>(obj: T, name: N, v: V): T & { [n in N]: V & AsyncExtraIterable<V> } {
+export function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
@@ -291,8 +292,8 @@ export function defineIterableProperty<T extends {}, N extends keyof T, V>(obj: 
     if (a === null || a === undefined) {
       return Object.create(null, {
         ...pds,
-        valueOf: { value() { return a } },
-        toJSON: { value() { return a } }
+        valueOf: { value() { return a }, writable: true },
+        toJSON: { value() { return a }, writable: true }
       });
     }
     switch (typeof a) {
@@ -322,6 +323,15 @@ export function defineIterableProperty<T extends {}, N extends keyof T, V>(obj: 
             Object.assign(boxedObject, a);
           }
           if (boxedObject[Iterability] === 'shallow') {
+            /*
+            BROKEN: fails nested properties
+            Object.defineProperty(boxedObject, 'valueOf', {
+              value() {
+                return boxedObject
+              },
+              writable: true
+            });
+            */
             return boxedObject;
           }
           // else proxy the result so we can track members of the iterable object
@@ -330,19 +340,21 @@ export function defineIterableProperty<T extends {}, N extends keyof T, V>(obj: 
             // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
             set(target, p, value, receiver) {
               if (Reflect.set(target, p, value, receiver)) {
-                obj[name] = obj[name]
-                // @ts-ignore - everything has a valueOf?
-                .valueOf();
+                // @ts-ignore - Fix
+                obj[name] = obj[name].valueOf();
                 return true;
               }
               return false;
             },
             // Implement the logic that returns a mapped iterator for the specified field
             get(target, p, receiver) {
+// BROKEN: if (p === 'valueOf') return function() { return /*a / breaks nested properties */boxedObject };
               if (Reflect.getOwnPropertyDescriptor(target,p)?.enumerable) {
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, p, receiver);
+                const props = Object.getOwnPropertyDescriptors(boxedObject.map(o => o[p as keyof V]));
+                (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
                 // @ts-ignore - Fix
-                return box(realValue, Object.getOwnPropertyDescriptors((boxedObject as Exclude<typeof boxedObject, typeof Ignore>).map(o => o[p as keyof V]).unique()));
+                return box(realValue, props);
               }
               return Reflect.get(target, p, receiver);
             },
@@ -356,7 +368,7 @@ export function defineIterableProperty<T extends {}, N extends keyof T, V>(obj: 
         // Boxes types, including BigInt
         return Object.defineProperties(Object(a), {
           ...pds,
-          toJSON: { value() { return a.valueOf() } }
+          toJSON: { value() { return a.valueOf() }, writable: true }
         });
     }
     throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');

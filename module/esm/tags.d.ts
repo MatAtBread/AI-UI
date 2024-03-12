@@ -39,7 +39,7 @@ type Extends<A, B> = A extends any[] ? B extends any[] ? Extends<A[number], B[nu
 type MergeBaseTypes<T, Base> = {
     [K in keyof Base | keyof T]: K extends (keyof T & keyof Base) ? Extends<T[K], Base[K]> : K extends keyof T ? T[K] : K extends keyof Base ? Base[K] : never;
 };
-type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
+export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
     [K in keyof Omit<IP, typeof Iterability>]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
 } : {
     [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & Partial<AsyncExtraIterable<IP[K]>>;
