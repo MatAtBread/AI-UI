@@ -514,7 +514,8 @@ export const tag = <TagLoader>function <Tags extends string,
         for (const base of newCallStack) {
           base.iterable && Object.keys(base.iterable).forEach(
             // @ts-ignore
-            k => e[k] = e[k].valueOf());
+            k => e[k] = e[k]
+          );
         }
       }
       return e;

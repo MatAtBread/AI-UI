@@ -426,7 +426,7 @@ export const tag = function (_1, _2, _3) {
                 for (const base of newCallStack) {
                     base.iterable && Object.keys(base.iterable).forEach(
                     // @ts-ignore
-                    k => e[k] = e[k].valueOf());
+                    k => e[k] = e[k]);
                 }
             }
             return e;

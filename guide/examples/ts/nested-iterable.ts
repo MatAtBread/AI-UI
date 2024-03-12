@@ -2,7 +2,7 @@ import { tag, Iterators } from '../../../module/esm/ai-ui.js'
 
 const { div, button, input } = tag();
 
-type Type = { n: number, s: string };
+type Type = { n: number, s: string, nest: { f: boolean} };
 
 const T = div.extended({
   iterable: {
@@ -10,12 +10,20 @@ const T = div.extended({
     foo: {
       //[Iterators.Iterability]: 'shallow',
       n: 0,
-      s: 'z'
+      s: 'z',
+      nest: {
+        f: true
+      }
     } as Type
   },
   constructed() {
+    this.foo.nest.f.consume!(f => { this.style.backgroundColor = f == true ? 'cyan' : 'magenta' });
+    this.foo.nest.consume!(({f}) => { this.style.textAlign = f == true ? 'right' : 'left' });
     return [
-      div("num is: ", this.num, " ", input({ type: 'range', value: this.num.map!(n => String(100-n)) })),
+      div(
+        input({ type: 'range', value: this.num.map!(n => String(100-n)) }),
+        "num is: ", this.num, " "
+      ),
       div("n is: ", this.foo.n),
       div("s is: ", this.foo.s),
       div("s is: ", this.foo.s),

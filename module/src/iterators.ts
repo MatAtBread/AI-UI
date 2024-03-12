@@ -317,7 +317,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
           // @ts-expect-error - Ignore is the INITIAL value
           if (boxedObject === Ignore) {
             if (DEBUG)
-              console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
+              console.info('(AI-UI)', `The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
             if (Array.isArray(a))
               boxedObject = Object.defineProperties([...a] as V, pds);
             else
@@ -344,25 +344,20 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
             set(target, key, value, receiver) {
               if (Reflect.set(target, key, value, receiver)) {
                 // @ts-ignore - Fix
-                obj[name] = obj[name].valueOf();
+                push(obj[name]);
                 return true;
               }
               return false;
             },
             // Implement the logic that returns a mapped iterator for the specified field
             get(target, key, receiver) {
-              /* BROKEN: fails nested properties *
-              if (key === 'valueOf') return function() {
-                return target
-              }
-              **/
+              if (key === 'valueOf')
+                return ()=>boxedObject;
               if (Reflect.getOwnPropertyDescriptor(target,key)?.enumerable) {
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
                 const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
-                  // @ts-ignore
-                  const ov = o[key as keyof V].valueOf();
-                  // @ts-ignore
-                  const pv = p.valueOf();
+                  const ov = o?.[key as keyof V]?.valueOf();
+                  const pv = p?.valueOf();
                   if (typeof ov === typeof pv && ov == pv)
                     return Ignore;
                   return o[key as keyof V]
