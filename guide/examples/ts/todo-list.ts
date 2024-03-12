@@ -46,7 +46,8 @@ const AddItem = div.extended({
     description: input
   },
   constructed() {
-    return [div({
+    return [
+      div({
       style: {
         display: 'inline-block',
         width: "50%"
@@ -58,7 +59,8 @@ const AddItem = div.extended({
         style: {
           width: "100%"
         }
-      })),
+      })
+    ),
     button({
       disabled: this.when('input:#description')(_ => !Boolean(this.ids.description.value)).initially(true),
       onclick: (e) => {
@@ -76,15 +78,17 @@ const AddItem = div.extended({
 });
 
 const App = div.extended({
+  ids:{
+    todo: div,
+  },
   constructed() {
-    let add: ReturnType<typeof AddItem>;
-    let todo: ReturnType<typeof div>;
+    const add = AddItem();
     return [
       h2("To Do List"),
-      add = AddItem(),
-      todo = div(
+      add,
+      div({id:'todo'},
         add.item.map!(newItem => [
-          todo.children,
+          this.ids.todo.children,
           ToDoItem(newItem)
         ])
       )

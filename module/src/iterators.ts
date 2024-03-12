@@ -287,7 +287,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
   });
   return obj as any;
 
-  function box(a: V, pds: HelperDescriptors<V>): V & AsyncExtraIterable<V> {
+  function box<V>(a: V, pds: HelperDescriptors<V>): V & AsyncExtraIterable<V> {
     let boxedObject = Ignore as unknown as (V & AsyncExtraIterable<V> & Partial<Iterability>);
     if (a === null || a === undefined) {
       return Object.create(null, {
@@ -341,8 +341,8 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
 
           return new Proxy(boxedObject, {
             // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
-            set(target, p, value, receiver) {
-              if (Reflect.set(target, p, value, receiver)) {
+            set(target, key, value, receiver) {
+              if (Reflect.set(target, key, value, receiver)) {
                 // @ts-ignore - Fix
                 obj[name] = obj[name].valueOf();
                 return true;
@@ -350,20 +350,28 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
               return false;
             },
             // Implement the logic that returns a mapped iterator for the specified field
-            get(target, p, receiver) {
+            get(target, key, receiver) {
               /* BROKEN: fails nested properties
               if (p === 'valueOf') return function() {
                 return a ? boxedObject
               }
               */
-              if (Reflect.getOwnPropertyDescriptor(target,p)?.enumerable) {
-                const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, p, receiver);
-                const props = Object.getOwnPropertyDescriptors(boxedObject.map(o => o[p as keyof V]));
+              if (Reflect.getOwnPropertyDescriptor(target,key)?.enumerable) {
+                const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
+                const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
+                  // @ts-ignore
+                  const ov = o[key as keyof V].valueOf();
+                  // @ts-ignore
+                  const pv = p.valueOf();
+                  if (typeof ov === typeof pv && ov == pv)
+                    return Ignore;
+                  return o[key as keyof V]
+                }));
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
                 // @ts-ignore - Fix
                 return box(realValue, props);
               }
-              return Reflect.get(target, p, receiver);
+              return Reflect.get(target, key, receiver);
             },
           });
         }
