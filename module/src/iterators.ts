@@ -275,7 +275,6 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
     extras[Iterability] = Object.getOwnPropertyDescriptor(v, Iterability)!;
   }
 
-  let boxedObject = Ignore as unknown as (V & AsyncExtraIterable<V> & Partial<Iterability>);
   let a = box(v, extras);
 
   Object.defineProperty(obj, name, {
@@ -289,6 +288,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
   return obj as any;
 
   function box(a: V, pds: HelperDescriptors<V>): V & AsyncExtraIterable<V> {
+    let boxedObject = Ignore as unknown as (V & AsyncExtraIterable<V> & Partial<Iterability>);
     if (a === null || a === undefined) {
       return Object.create(null, {
         ...pds,
@@ -348,7 +348,11 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
             },
             // Implement the logic that returns a mapped iterator for the specified field
             get(target, p, receiver) {
-// BROKEN: if (p === 'valueOf') return function() { return /*a / breaks nested properties */boxedObject };
+              /* BROKEN: fails nested properties
+              if (p === 'valueOf') return function() {
+                return a ? boxedObject
+              }
+              */
               if (Reflect.getOwnPropertyDescriptor(target,p)?.enumerable) {
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, p, receiver);
                 const props = Object.getOwnPropertyDescriptors(boxedObject.map(o => o[p as keyof V]));

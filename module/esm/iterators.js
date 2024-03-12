@@ -226,7 +226,6 @@ export function defineIterableProperty(obj, name, v) {
     if (typeof v === 'object' && v && Iterability in v) {
         extras[Iterability] = Object.getOwnPropertyDescriptor(v, Iterability);
     }
-    let boxedObject = Ignore;
     let a = box(v, extras);
     Object.defineProperty(obj, name, {
         get() { return a; },
@@ -239,6 +238,7 @@ export function defineIterableProperty(obj, name, v) {
     });
     return obj;
     function box(a, pds) {
+        let boxedObject = Ignore;
         if (a === null || a === undefined) {
             return Object.create(null, {
                 ...pds,
@@ -298,7 +298,11 @@ export function defineIterableProperty(obj, name, v) {
                         },
                         // Implement the logic that returns a mapped iterator for the specified field
                         get(target, p, receiver) {
-                            // BROKEN: if (p === 'valueOf') return function() { return /*a / breaks nested properties */boxedObject };
+                            /* BROKEN: fails nested properties
+                            if (p === 'valueOf') return function() {
+                              return a ? boxedObject
+                            }
+                            */
                             if (Reflect.getOwnPropertyDescriptor(target, p)?.enumerable) {
                                 const realValue = Reflect.get(boxedObject, p, receiver);
                                 const props = Object.getOwnPropertyDescriptors(boxedObject.map(o => o[p]));
