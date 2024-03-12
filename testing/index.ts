@@ -87,10 +87,13 @@ function unbox(a: any):any {
     if (Array.isArray(a)) {
       return a.map(a => unbox(a));
     }
+    a = a.valueOf();
+    if (typeof a !== 'object')
+      return a;
     return Object.fromEntries(Object.entries(a).map(([k,v]) => [
-      k, 
+      k,
       (v && typeof v === 'object' && 'toJSON' in v)
-        ? (Symbol.asyncIterator in v && 'toJSON' in v) ? unbox((v as any).toJSON()) : unbox(v) 
+        ? (Symbol.asyncIterator in v && 'toJSON' in v) ? unbox((v as any).toJSON()) : unbox(v)
         : v
     ]));
   }
@@ -109,7 +112,7 @@ async function captureLogs(file: string) {
       console.log((String(line++) + ")").padEnd(5).grey, ...args);
     } else {
       console.log("|/-\\|/-\\"[line++%8]);
-      console.log("\x1B[2A");    
+      console.log("\x1B[2A");
     }
   }
   const env = {
@@ -131,7 +134,7 @@ async function captureLogs(file: string) {
     }
   };
   await Promise.race([
-    eval(`(async function({${Object.keys(env)}}) {\n${fnCode}\n})`)(env), 
+    eval(`(async function({${Object.keys(env)}}) {\n${fnCode}\n})`)(env),
     noTimeout ? new Promise(() => { }) : sleep(30, new Error(`Timeout running ${file}`))
   ]);
   return logs;
@@ -204,7 +207,7 @@ function fuzzyRegExEq(a: any, b: any) {
   a = a ?? null;
   b = b ?? null;
   if (a === b) return true;
-  
+
   if (a instanceof Date)
     a = a.toISOString();
   if (b instanceof Date)
