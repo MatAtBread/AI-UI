@@ -159,19 +159,21 @@ if (elt1.boolIter == elt2.boolIter.valueOf())             // ✅ Works - RHS is 
 if (elt1.boolIter.valueOf() === elt2.boolIter.valueOf())  // ✅ Works - Both are primitive, no coercion required
 ```
 
-The way iterables are implemented, you can always call `.valueOf()` to get the underlying value the iterable represents, as in the example above.
+The way iterables are implemented, you can always call `.valueOf()` to get the underlying value the iterable represents, as in the example above. You might find the MDN article on [Type coercion](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#type_coercion) helpful in understanding JavaScript coerces types.
 
-Similarly, if the `iterable` declares an object rather than a primtive, it is _always_ spread into a new object before being turned into an async iterable, so the source object doesn't hold inappropriate references to the iterable that might prevent garbage collection.
+### iterable `object` properties
 
-THis means that:
+If the `iterable` declares an object rather than a primtive (string, number, bigint, ...), it is _always_ spread into a new object before being turned into an async iterable, so the source object doesn't hold inappropriate references to the iterable that might prevent garbage collection. Note that this also means changes to the source do not cause the iterable to yield updates - you have to update the property on the element, not what it was assigned from.
+
+Tgis means that:
 ```javascript
 const p = { x: 10, y: 20};
-elt.center = p;
-if (elt.center === p) // Never true: p has been spread into elt.center, not referenced.
+elt.center = p; // `centre` is an iterable property that is an object
+if (elt.center === p)             // ❌ Never true: p has been spread into elt.center, not referenced.
+if (elt.center.valueOf() === p)   // ✅ True
 ```
-Even the `.valueOf()` technique won't work here, unless you have implemented your own valuation routine. You might find the MDN article on [Type coercion](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#type_coercion) helpful in understanding JavaScript coerces types.
 
-Currently, for implementation reasons, iterables can't be arrays. If you really want an iterable to be an array type, place the array inside an object:
+Currently, for implementation reasons, iterables can't be arrays (mainly as their `map` and `filter` properties clash with those of helped async iterators). If you really want an iterable to be an array type, place the array inside an object. To access the Array methods, use the `.valueOf()` function to retreive the source of the iterator:
 ```typescript
 const Chart = div.extended({
   iterable:{
@@ -179,7 +181,11 @@ const Chart = div.extended({
     data:{
       values: [] as number[]; // Correct
     }
+  },
+  declare:{
+    myFunc() { return this.data.values.valueOf().slice(0,-1) }
   }
+
 });
 
 const ch = Chart();
