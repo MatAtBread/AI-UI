@@ -392,33 +392,20 @@ export const tag = <TagLoader>function <Tags extends string,
                 ap.next().then(update).catch(error);
               }
 
-              if (!isAsyncIter<unknown>(value)) {
-                // This has a real value, which might be an object
-                if (value && typeof value === 'object' && !isPromiseLike(value)) {
-                  if (value instanceof Node) {
-                    if (DEBUG)
-                      console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
-                    d[k] = value;
+              if (isPromiseLike(value)) {
+                value.then(value => {
+                  if (value && typeof value === 'object') {
+                    assignObject(value, k);
                   } else {
-                    // Note - if we're copying to ourself (or an array of different length),
-                    // we're decoupling common object references, so we need a clean object to
-                    // assign into
-                    if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
-                      if (value.constructor === Object || value.constructor === Array) {
-                        d[k] = new (value.constructor);
-                        assign(d[k], value);
-                      } else {
-                        // This is some sort of constructed object, which we can't clone, so we have to copy by reference
-                        d[k] = value;
-                      }
-                    } else {
-                      if (Object.getOwnPropertyDescriptor(d,k)?.set)
-                        d[k] = value;
-                      else
-                       assign(d[k], value);
-                    }
+                    if (s[k] !== undefined)
+                      d[k] = s[k];
                   }
-                } else {
+                }, error => console.log("Failed to set attribute", error))
+              } else if (!isAsyncIter<unknown>(value)) {
+                // This has a real value, which might be an object
+                if (value && typeof value === 'object' && !isPromiseLike(value))
+                  assignObject(value, k);
+                else {
                   if (s[k] !== undefined)
                     d[k] = s[k];
                 }
@@ -431,6 +418,35 @@ export const tag = <TagLoader>function <Tags extends string,
           } catch (ex: unknown) {
             console.warn('(AI-UI)', "assignProps", k, s[k], ex);
             throw ex;
+          }
+        }
+
+        function assignObject(value: any, k: string) {
+          {
+            if (value instanceof Node) {
+              if (DEBUG)
+                console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+              d[k] = value;
+            } else {
+              // Note - if we're copying to ourself (or an array of different length),
+              // we're decoupling common object references, so we need a clean object to
+              // assign into
+              if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
+                if (value.constructor === Object || value.constructor === Array) {
+                  d[k] = new (value.constructor);
+                  assign(d[k], value);
+                } else {
+                  // This is some sort of constructed object, which we can't clone, so we have to copy by reference
+                  d[k] = value;
+                }
+              } else {
+                if (Object.getOwnPropertyDescriptor(d, k)?.set)
+                  d[k] = value;
+
+                else
+                  assign(d[k], value);
+              }
+            }
           }
         }
       })(base, props);
