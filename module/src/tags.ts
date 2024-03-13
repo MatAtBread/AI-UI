@@ -12,13 +12,16 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   | Array<ChildTags>
   | Iterable<ChildTags>; // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
 
-export type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent union distribution
-  ? X extends AsyncProvider<infer U>
+type AsyncAttr<X> = AsyncProvider<X> | Promise<X>;
+
+export type PossiblyAsync<X> =
+  [X] extends [object] // Not "naked" to prevent union distribution
+  ? X extends AsyncAttr<infer U>
   ? PossiblyAsync<U>
   : X extends Function
-  ? X | AsyncProvider<X>
-  : AsyncProvider<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; }
-  : X | AsyncProvider<X> | undefined;
+  ? X | AsyncAttr<X>
+  : AsyncAttr<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; }
+  : X | AsyncAttr<X> | undefined;
 
 type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
@@ -29,7 +32,7 @@ type RootObj = object;
 
 // Internal types supporting TagCreator
 type AsyncGeneratedObject<X extends RootObj> = {
-  [K in keyof X]: X[K] extends AsyncProvider<infer Value> ? Value : X[K]
+  [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K]
 };
 
 type IDS<I> = {

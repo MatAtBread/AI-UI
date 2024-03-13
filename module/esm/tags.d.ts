@@ -1,8 +1,11 @@
 import type { AsyncExtraIterable, AsyncProvider, Ignore, Iterability } from "./iterators.js";
 export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
-export type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncProvider<X> : AsyncProvider<Partial<X>> | {
+type AsyncAttr<X> = AsyncProvider<X> | Promise<X>;
+export type PossiblyAsync<X> = [
+    X
+] extends [object] ? X extends AsyncAttr<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncAttr<X> : AsyncAttr<Partial<X>> | {
     [K in keyof X]?: PossiblyAsync<X[K]>;
-} : X | AsyncProvider<X> | undefined;
+} : X | AsyncAttr<X> | undefined;
 type DeepPartial<X> = [X] extends [object] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;
@@ -14,7 +17,7 @@ export type Instance<T extends {
 } & Record<string, unknown>> = T;
 type RootObj = object;
 type AsyncGeneratedObject<X extends RootObj> = {
-    [K in keyof X]: X[K] extends AsyncProvider<infer Value> ? Value : X[K];
+    [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K];
 };
 type IDS<I> = {
     ids: {
