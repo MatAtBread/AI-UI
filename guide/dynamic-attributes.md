@@ -22,8 +22,8 @@ document.body.append(
 );
 
 /* A simple async "sleep" function */
-function sleep(seconds) {
-  return new Promise(resolve => setTimeout(resolve, seconds * 1000))
+function sleep<T>(seconds, o?: T) {
+  return new Promise<T>(resolve => setTimeout(() => resolve(o), seconds * 1000))
 }
 
 async function *blink(t = 1) {
@@ -46,44 +46,19 @@ async function *style() {
 ```
 Try the above code [example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/dynamic-attributes.html)
 
-Unlike dynamic content, attributes cannot be specified as a Promise
-
-> _NOTE: This design decision was taken as some attributes are actually useful as Promises. Although no standard DOM Node types have any "Promised" attributes, there are numerous examples of third-party components that do._
-
-If you really need to specify a Promised attribute, wrap it in an async generator:
+As with specifying children an call to a TagFunction, you can also provide attributes from a Promise, and therefore an async function:
 
 ```javascript
-/* Like sleep, but resolves to the specified value */
-function later(x, seconds) {
-  return new Promise(resolve => setTimeout(()=>resolve(x), seconds * 1000));
-}
-
-async function *once(promise) {
-  yield promise;
-}
-
-document.body.append(div({
-  style:{
-    color: once(later('red',1)) /* The Promise is wrapped in an async iterable, and AI-UI will set the color to 'red' when it resolves after a second */
-  }
-},))
+document.body.append(
+  div({
+      style:{
+        backgroundColor: sleep(2,"blue")
+      }
+    },
+    'Set style.backgroundColor after 2 seconds')
+);
 ```
-Of course, in the above case, if the function is yours (rather than a 3rd party function that returns a Promise), you coukd just use an async generator, which doesn't need wrapping:
-```javascript
-/* Like sleep, but resolves to the specified value */
-async function *later(x, seconds) {
-  await sleep(seconds);
-  yield x;
-}
-
-document.body.append(div({
-  style:{
-    color: later('red',1) 
-  }
-},))
-```
-
-This, and other ways to manipulate async iterators are discussed in the next section: Iterators
+JavaScript `async function *(...){}` generators are not the only way to create async iterators. The AIUI [when(...)](./when.md) function create async iterators from DOM elements and events, and AIUI provides a number of other ways to manipulate async iterators which are discussed in the next section, [iterators](./iterators.md). Setting attributes dynamically works really well with [`iterables`](./prototype.md), allowing you to create your own elements that behave very similarly to native DOM elements.
 
 ____
 

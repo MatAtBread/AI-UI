@@ -75,6 +75,7 @@ const chuckJoke = generatorHelpers(async function *() {
 });
 
 ```
+...or avoid this necessity altogether with `import 'ai-ui/augment-iterators.js';`
 
 Try the above code [example (right click and open in new tab)](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/iterators.html)
 
@@ -83,7 +84,7 @@ ____
 
 | < Prev | ^ |  Next > |
 |:-------|:-:|--------:|
-| [Dynamic Content](./iterators.md) | [Index](./index.md) | [Create new tags](./extended.md) |
+| [Iterators](./iterators.md) | [Index](./index.md) | [Create new tags](./extended.md) |
 
 
 

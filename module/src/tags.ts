@@ -1,6 +1,6 @@
 /* Types for tag creation, implemented by `tag()` in ai-ui.ts */
 
-import { AsyncExtraIterable, AsyncProvider, Ignore } from "./iterators";
+import type { AsyncExtraIterable, AsyncProvider, Ignore, Iterability } from "./iterators.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
@@ -12,23 +12,27 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   | Array<ChildTags>
   | Iterable<ChildTags>; // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
 
-export type PossiblyAsync<X> = [X] extends [object] // Not "naked" to prevent union distribution
-  ? X extends AsyncProvider<infer U>
+type AsyncAttr<X> = AsyncProvider<X> | Promise<X>;
+
+export type PossiblyAsync<X> =
+  [X] extends [object] // Not "naked" to prevent union distribution
+  ? X extends AsyncAttr<infer U>
   ? PossiblyAsync<U>
   : X extends Function
-  ? X | AsyncProvider<X>
-  : AsyncProvider<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; }
-  : X | AsyncProvider<X> | undefined;
+  ? X | AsyncAttr<X>
+  : AsyncAttr<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; }
+  : X | AsyncAttr<X> | undefined;
 
 type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
-export type Instance<T extends {} = Record<string, unknown>> = T;
+export const UniqueID = Symbol("Unique ID");
+export type Instance<T extends { [UniqueID]: string } = { [UniqueID]: string } & Record<string, unknown>> = T;
 
 type RootObj = object;
 
 // Internal types supporting TagCreator
 type AsyncGeneratedObject<X extends RootObj> = {
-  [K in keyof X]: X[K] extends AsyncProvider<infer Value> ? Value : X[K]
+  [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K]
 };
 
 type IDS<I> = {
@@ -114,7 +118,6 @@ type MergeBaseTypes<T, Base> = {
   See https://github.com/microsoft/TypeScript/issues/43826
 */
 
-type IterableProperties<IP> = {
   /* We choose the following type description to avoid the issues above. Because the AsyncExtraIterable
     is Partial it can be omitted from assignments:
       this.prop = value;  // Valid, as long as valus has the same type as the prop
@@ -124,11 +127,21 @@ type IterableProperties<IP> = {
 
     This relies on a hack to `wrapAsyncHelper` in iterators.ts when *accepts* a Partial<AsyncIterator>
     but casts it to a AsyncIterator before use.
+
+    The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
+    By default, the currently implementation does a one-level deep mapping, so an iterable property 'obj' is itself
+    iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
+    iterable, but it's membetrs are just POJS values.
   */
-  [K in keyof IP]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
+
+export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
+  [K in keyof Omit<IP,typeof Iterability>]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>
+} : {
+  [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & Partial<AsyncExtraIterable<IP[K]>>
 }
 
-type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never }; // Basically anything, _except_ an array
+// Basically anything, _except_ an array, as they clash with map, filter
+type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never };
 type OptionalIterablePropertyValue = IterablePropertyValue | undefined | null;
 
 type NeverEmpty<O extends RootObj> = {} extends O ? never : O;

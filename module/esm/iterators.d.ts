@@ -1,3 +1,4 @@
+import { IterableProperties } from "./tags.js";
 export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
     push(value: T): boolean;
 };
@@ -28,9 +29,20 @@ export declare const asyncExtras: {
 export declare function queueIteratableIterator<T>(stop?: () => void): QueueIteratableIterator<T>;
 export declare function pushIterator<T>(stop?: () => void, bufferWhenNoConsumers?: boolean): PushIterator<T>;
 export declare function broadcastIterator<T>(stop?: () => void): BroadcastIterator<T>;
-export declare function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & {
-    [n in N]: V & AsyncExtraIterable<V>;
+declare global {
+    interface ObjectConstructor {
+        defineProperties<T, M extends {
+            [K: string | symbol]: TypedPropertyDescriptor<any>;
+        }>(o: T, properties: M & ThisType<any>): T & {
+            [K in keyof M]: M[K] extends TypedPropertyDescriptor<infer T> ? T : never;
+        };
+    }
+}
+export declare const Iterability: unique symbol;
+export type Iterability<Depth extends 'shallow' = 'shallow'> = {
+    [Iterability]: Depth;
 };
+export declare function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>>;
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;

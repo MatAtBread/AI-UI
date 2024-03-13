@@ -1,5 +1,6 @@
 import { DEBUG } from "./debug.js";
 import { DeferredPromise, deferred } from "./deferred.js";
+import { IterableProperties } from "./tags.js";
 
 /* Things to suppliement the JS base AsyncIterable */
 export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
@@ -154,7 +155,6 @@ export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false)
 
   The iterators stops running when the number of consumers decreases to zero
 */
-
 export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
   let ai = new Set<QueueIteratableIterator<T>>();
 
@@ -196,7 +196,19 @@ export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
    yields when the property is set.
    This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
-export function defineIterableProperty<T extends {}, N extends string | number | symbol, V>(obj: T, name: N, v: V): T & { [n in N]: V & AsyncExtraIterable<V> } {
+
+declare global {
+  interface ObjectConstructor {
+    defineProperties<T, M extends { [K: string | symbol]: TypedPropertyDescriptor<any> }>(o: T, properties: M & ThisType<any>): T & {
+      [K in keyof M]: M[K] extends TypedPropertyDescriptor<infer T> ? T : never
+    };
+  }
+}
+
+export const Iterability = Symbol("Iterability");
+export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
+
+export function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
@@ -209,30 +221,46 @@ export function defineIterableProperty<T extends {}, N extends string | number |
     const b = bi[Symbol.asyncIterator]();
     extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
     push = bi.push;
-    Object.keys(asyncHelperFunctions).map(k =>
-      extras[k as keyof typeof extras] = { value: b[k as keyof typeof b], enumerable: false, writable: false }
+    Object.keys(asyncHelperFunctions).forEach(k =>
+      extras[k as keyof typeof extras] = {
+        // @ts-ignore - Fix
+        value: b[k as keyof typeof b],
+        enumerable: false,
+        writable: false
+      }
     )
     Object.defineProperties(a, extras);
     return b;
   }
 
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
-  const lazyAsyncMethod = (method: string) => function (this: unknown, ...args: any[]) {
-    initIterator();
-    return a[method].call(this, ...args);
+  function lazyAsyncMethod<M extends keyof typeof asyncHelperFunctions>(method: M) {
+    return function(this: unknown, ...args: any[]) {
+      initIterator();
+      // @ts-ignore - Fix
+      return a[method].call(this, ...args);
+    } as (typeof asyncHelperFunctions)[M];
   }
 
-  const extras: Record<keyof typeof asyncHelperFunctions | typeof Symbol.asyncIterator, PropertyDescriptor> = {
-    [Symbol.asyncIterator]: {
-      enumerable: false, writable: true,
-      value: initIterator
-    }
-  } as Record<keyof typeof asyncHelperFunctions | typeof Symbol.asyncIterator, PropertyDescriptor>;
+  type HelperDescriptors<T> = {
+    [K in keyof AsyncExtraIterable<T>]: TypedPropertyDescriptor<AsyncExtraIterable<T>[K]>
+  } & {
+    [Iterability]?: TypedPropertyDescriptor<'shallow'>
+  };
 
-  Object.keys(asyncHelperFunctions).map(k =>
-    extras[k as keyof typeof extras] = {
+  const extras = {
+    [Symbol.asyncIterator]: {
       enumerable: false,
       writable: true,
+      value: initIterator
+    }
+  } as HelperDescriptors<V>;
+
+  (Object.keys(asyncHelperFunctions) as (keyof typeof asyncHelperFunctions)[]).forEach((k) =>
+    extras[k] = {
+      enumerable: false,
+      writable: true,
+      // @ts-ignore - Fix
       value: lazyAsyncMethod(k)
     }
   )
@@ -243,54 +271,123 @@ export function defineIterableProperty<T extends {}, N extends string | number |
     return push(v);
   }
 
+  if (typeof v === 'object' && v && Iterability in v) {
+    extras[Iterability] = Object.getOwnPropertyDescriptor(v, Iterability)!;
+  }
+
   let a = box(v, extras);
 
   Object.defineProperty(obj, name, {
     get(): V { return a },
     set(v: V) {
-      a = box(v, extras);
+      if (v !== a) a = box(v, extras);
       push(v?.valueOf() as V);
     },
     enumerable: true
   });
   return obj as any;
+
+  function box<V>(a: V, pds: HelperDescriptors<V>): V & AsyncExtraIterable<V> {
+    let boxedObject = Ignore as unknown as (V & AsyncExtraIterable<V> & Partial<Iterability>);
+    if (a === null || a === undefined) {
+      return Object.create(null, {
+        ...pds,
+        valueOf: { value() { return a }, writable: true },
+        toJSON: { value() { return a }, writable: true }
+      });
+    }
+    switch (typeof a) {
+      case 'object':
+        /* TODO: This is problematic as the object might have clashing keys and nested members.
+          The current implementation:
+          * Spreads iterable objects in to a shallow copy of the original object, and overrites clashing members like `map`
+          *     this.iterableObj.map(o => o.field);
+          * The iterator will yield on
+          *     this.iterableObj = newValue;
+
+          * Members access is proxied, so that:
+          *     (set) this.iterableObj.field = newValue;
+          * ...causes the underlying object to yield by re-assignment (therefore calling the setter)
+          * Similarly:
+          *     (get) this.iterableObj.field
+          * ...causes the iterator for the base object to be mapped, like
+          *     this.iterableObject.map(o => o[field])
+        */
+        if (!(Symbol.asyncIterator in a)) {
+          // @ts-expect-error - Ignore is the INITIAL value
+          if (boxedObject === Ignore) {
+            if (DEBUG)
+              console.info('(AI-UI)', `The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
+            if (Array.isArray(a))
+              boxedObject = Object.defineProperties([...a] as V, pds);
+            else
+              boxedObject = Object.defineProperties({ ...(a as V) }, pds);
+          } else {
+            Object.assign(boxedObject, a);
+          }
+          if (boxedObject[Iterability] === 'shallow') {
+            /*
+            BROKEN: fails nested properties
+            Object.defineProperty(boxedObject, 'valueOf', {
+              value() {
+                return boxedObject
+              },
+              writable: true
+            });
+            */
+            return boxedObject;
+          }
+          // else proxy the result so we can track members of the iterable object
+
+          return new Proxy(boxedObject, {
+            // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
+            set(target, key, value, receiver) {
+              if (Reflect.set(target, key, value, receiver)) {
+                // @ts-ignore - Fix
+                push(obj[name]);
+                return true;
+              }
+              return false;
+            },
+            // Implement the logic that returns a mapped iterator for the specified field
+            get(target, key, receiver) {
+              if (key === 'valueOf')
+                return ()=>boxedObject;
+              if (Reflect.getOwnPropertyDescriptor(target,key)?.enumerable) {
+                const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
+                const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
+                  const ov = o?.[key as keyof V]?.valueOf();
+                  const pv = p?.valueOf();
+                  if (typeof ov === typeof pv && ov == pv)
+                    return Ignore;
+                  return o?.[key as keyof V]
+                }));
+                (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
+                // @ts-ignore - Fix
+                return box(realValue, props);
+              }
+              return Reflect.get(target, key, receiver);
+            },
+          });
+        }
+        return a as (V & AsyncExtraIterable<V>);
+      case 'bigint':
+      case 'boolean':
+      case 'number':
+      case 'string':
+        // Boxes types, including BigInt
+        return Object.defineProperties(Object(a), {
+          ...pds,
+          toJSON: { value() { return a.valueOf() }, writable: true }
+        });
+    }
+    throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
+  }
 }
 
-function box(a: unknown, pds: Record<string | symbol, PropertyDescriptor>) {
-  if (a === null || a === undefined) {
-    return Object.create(null, {
-      ...pds,
-      valueOf: { value() { return a } },
-      toJSON: { value() { return a } }
-    });
-  }
-  switch (typeof a) {
-    case 'object':
-      /* TODO: This is problematic as the object might have clashing keys.
-        The alternatives are:
-        - Don't add the pds, then the object remains unmolested, but can't be used with .map, .filter, etc
-        - examine the object and decide whether to insert the prototype (breaks built in objects, works with PoJS)
-        - don't allow objects as iterable properties, which avoids the `deep tree` problem
-        - something else
-      */
-      if (!(Symbol.asyncIterator in a)) {
-        if (DEBUG)
-          console.info('(AI-UI)', 'Iterable properties of type "object" will be spread to prevent re-initialisation.', a);
-        return Object.defineProperties({ ...a }, pds);
-      }
-      return a;
-    case 'bigint':
-    case 'boolean':
-    case 'number':
-    case 'string':
-      // Boxes types, including BigInt
-      return Object.defineProperties(Object(a), {
-        ...pds,
-        toJSON: { value() { return a.valueOf() } }
-      });
-  }
-  throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
-}
+/*
+  Extensions to the AsyncIterable:
+*/
 
 /* Merge asyncIterables into a single asyncIterable */
 
@@ -367,10 +464,6 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
   return iterableHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
 }
 
-/*
-  Extensions to the AsyncIterable:
-*/
-
 function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
   return isAsyncIterable(i)
     && Object.keys(asyncExtras)
@@ -399,6 +492,7 @@ type MaybePromised<T> = PromiseLike<T> | T;
 
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
+
 export function filterMap<U, R>(source: AsyncIterable<U>,
   fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
   initialValue: R | typeof Ignore = Ignore
@@ -438,7 +532,7 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
             // The source threw. Tell the consumer
             reject({ done: true, value: ex })
         ).catch(ex => {
-          // The callback threw 
+          // The callback threw
           ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
           reject({ done: true, value: ex })
         })

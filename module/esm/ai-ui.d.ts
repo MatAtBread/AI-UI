@@ -1,5 +1,5 @@
 import { WhenParameters, WhenReturn } from './when.js';
-import { ChildTags, TagCreator } from './tags.js';
+import { ChildTags, TagCreator, UniqueID } from './tags.js';
 export { when } from './when.js';
 export { ChildTags, Instance, TagCreator } from './tags';
 export * as Iterators from './iterators.js';
@@ -12,6 +12,8 @@ interface TagLoader {
     /** @deprecated - Legacy function similar to Element.append/before/after */
     appender(container: Node, before?: Node): (c: ChildTags) => (Node | ((Element & PoElementMethods)))[];
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];
+    UniqueID: typeof UniqueID;
+    augmentGlobalAsyncGenerators(): void;
     <Tags extends keyof HTMLElementTagNameMap>(): {
         [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]>;
     };
@@ -30,5 +32,6 @@ interface TagLoader {
     <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>;
 }
 export declare const tag: TagLoader;
+export declare function augmentGlobalAsyncGenerators(): void;
 export declare let enableOnRemovedFromDOM: () => void;
 export declare function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>): Record<string, Element>;
