@@ -398,11 +398,10 @@ export const tag = function (_1, _2, _3) {
     }
     function extended(_overrides) {
         const overrides = (typeof _overrides !== 'function')
-            ? (instance) => _overrides
+            ? (instance) => Object.assign({}, _overrides, { [UniqueID]: uniqueTagID })
             : _overrides;
-        const uniqueTagID = 'ai-ui-' + Date.now().toString(36) + (idCount++).toString(36) + Math.random().toString(36).slice(2);
-        const staticInstance = { [UniqueID]: uniqueTagID };
-        let staticExtensions = overrides(staticInstance);
+        const uniqueTagID = Date.now().toString(36) + (idCount++).toString(36) + Math.random().toString(36).slice(2);
+        let staticExtensions = overrides({ [UniqueID]: uniqueTagID });
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
             poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
@@ -419,8 +418,7 @@ export const tag = function (_1, _2, _3) {
             const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack };
             const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
             e.constructor = extendTag;
-            const ped = { [UniqueID]: uniqueTagID };
-            const tagDefinition = overrides(ped);
+            const tagDefinition = overrides({ [UniqueID]: uniqueTagID });
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
             deepDefine(e, tagDefinition.override);
@@ -448,7 +446,7 @@ export const tag = function (_1, _2, _3) {
         };
         const extendTag = Object.assign(extendTagFn, {
             super: this,
-            overrides,
+            overrides: Object.assign(staticExtensions, { [UniqueID]: uniqueTagID }),
             extended,
             valueOf: () => {
                 const keys = [...Object.keys(staticExtensions.declare || {}) /*, ...Object.keys(staticExtensions.prototype || {})*/];
@@ -464,7 +462,7 @@ export const tag = function (_1, _2, _3) {
         (function walkProto(creator) {
             if (creator?.super)
                 walkProto(creator.super);
-            const proto = creator.overrides?.(staticInstance);
+            const proto = creator.overrides;
             if (proto) {
                 deepDefine(fullProto, proto?.prototype);
                 deepDefine(fullProto, proto?.override);

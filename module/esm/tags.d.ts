@@ -114,7 +114,7 @@ type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<Possibl
 export type TagCreator<Base extends RootObj, Super extends (never | TagCreator<any, any>) = never, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;
     super: Super;
-    overrides?: (<A extends Instance>(a: A) => Overrides);
+    overrides?: Overrides;
     readonly name: string;
     [Symbol.hasInstance](elt: any): boolean;
 } & Statics;

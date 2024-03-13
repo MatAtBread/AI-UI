@@ -1,5 +1,6 @@
 import { tag } from '../../../module/esm/ai-ui.js';
 import { iterableHelpers, pushIterator } from '../../../module/esm/iterators.js'
+import { UniqueID } from '../../../module/esm/tags.js';
 
 const { div, h2, input, span, pre, button } = tag();
 
@@ -18,7 +19,7 @@ const mousePosPush = pushIterator<{x: number, y: number}>(()=>{
   console.log("stop mousePos")
   window.removeEventListener('mousemove', mousemove);
 });
-const mousePos = mousePosPush.multi(); 
+const mousePos = mousePosPush.multi();
 window.addEventListener('mousemove', mousemove);
 
 const Lazy = h2.extended((instance:{ myAttr: number }) => ({
@@ -34,7 +35,7 @@ const Lazy = h2.extended((instance:{ myAttr: number }) => ({
     Lazy: true,
     myAttr: 57,
     get thing() { return String(instance.myAttr) },
-    set thing(v:string) { 
+    set thing(v:string) {
       instance.myAttr = Number(v);
       this.dispatchEvent(new Event('change'))
     },
@@ -54,9 +55,9 @@ const Lazy = h2.extended((instance:{ myAttr: number }) => ({
   }
 }));
 
-const Lazier = Lazy.extended({
+const Lazier = Lazy.extended(inst => ({
   override:{
-    className: `Lazier Lazy`,
+    className: `${inst[UniqueID]}-Lazier Lazy`,
     style:{
       borderRight: '2px solid black'
     },
@@ -65,11 +66,11 @@ const Lazier = Lazy.extended({
     Lazier: true
   },
   styles:`
-    .Lazier {
+    .${inst[UniqueID]}-Lazier {
       font-family: sans-serif;
     }
   `
-});
+}));
 
 const Laziest = Lazier.extended({
   override:{
@@ -117,7 +118,7 @@ const App = div.extended({
       this.when('keyup:#text').initially({start: "Enter some text"}).map(e => ('type' in e) ? div({
         style:{
           color: blinky(this.ids.text!.value)
-        }        
+        }
       },this.ids.text?.value || e.type) : e.start),
       interval(250,10,n=>div(n),'error'),
       interval(333,10,n=>div(10-n),'complete'),
@@ -133,7 +134,7 @@ const App = div.extended({
       },'mapped'),
       this.when(blinky('div'))(
         s => div({
-          onclick() { this.remove() }, 
+          onclick() { this.remove() },
           style:{ color: s }
         },"div")
       ),
@@ -143,18 +144,18 @@ const App = div.extended({
       div({ style: { color: this.when(sleep(1000,'red')) }},"iter/promise ",this.when(sleep(1000,123))),
 
       mousePos.map(p => div({
-        onclick() { this.remove() }, 
+        onclick() { this.remove() },
       },
         "New div", JSON.stringify(p))
       ),
 
       div({
-        onclick() { this.remove() }, 
+        onclick() { this.remove() },
       },
         mousePos.map(p => ["Same div, new content", JSON.stringify(p)]).initially("...Move the mouse...")
       ),
       div({
-        onclick() { this.remove() }, 
+        onclick() { this.remove() },
         textContent: mousePos.map(p => 'Div.textContent ' + JSON.stringify(p))
       }),
 
@@ -243,4 +244,3 @@ for await (const x of app.when('#lazy','@ready').waitFor(done => setTimeout(done
     console.log("(map),filter",x);
   }
 })();
-  
