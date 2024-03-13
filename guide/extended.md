@@ -88,7 +88,7 @@ In order to explain how these members interact and support each other, we're goi
 
 We're going to do this by creating tags that encapsulate the data source and the chart UI, and show how we can statically layout and style the page, whilst ensuring the page remains dynamically updated according to user input.
 
-You can see the source [here](./examples/ts/weather.ts), or try it [here](https://raw.githack.com/MatAtBread/AI-UI/0.9.11/guide/examples/ts/ts-example.html?weather.ts)
+You can see the source [here](./examples/ts/weather.ts), or try it [here](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/ts/ts-example.html?weather.ts)
 
 In the following sections, we'll go through the code in more detail, explaining how the members of an `extended({...})` definition work together, improving the implementation on the way.
 
