@@ -276,11 +276,34 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
   }
 
   let a = box(v, extras);
+  let piped = false;
 
   Object.defineProperty(obj, name, {
     get(): V { return a },
     set(v: V) {
-      if (v !== a) a = box(v, extras);
+      if (v !== a) {
+        if (piped) {
+          throw new Error(`Iterable "${name.toString()}" is already consuming another iterator`)
+        }
+        if (isAsyncIterable(v)) {
+          // Need to make this lazy really - difficult since we don't
+          // know if anyone has already started consuming it. Since assigning
+          // multiple async iterators to a single iterable is probably a bad idea
+          // (since what do we do: merge? terminate the first then consume the second?),
+          // the solution here (one of many possibilities) is only to allow ONE lazy
+          // assignment if and only if this iterable property has not been 'get' yet.
+          // However, this would at present possibly break the initialisation of iterable
+          // properties as the are initialized by auto-assignment, if it were initialized
+          // to an async iterator
+          piped = true;
+          if (DEBUG)
+            console.info('(AI-UI)',
+              new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
+          consume.call(v,v => { push(v?.valueOf() as V) }).finally(() => piped = false);
+        } else {
+          a = box(v, extras);
+        }
+      }
       push(v?.valueOf() as V);
     },
     enumerable: true
