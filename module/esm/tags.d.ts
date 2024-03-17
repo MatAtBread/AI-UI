@@ -10,11 +10,9 @@ type DeepPartial<X> = [X] extends [object] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;
 export declare const UniqueID: unique symbol;
-export type Instance<T extends {
+export type Instance<T extends Record<string, unknown> = {}> = {
     [UniqueID]: string;
-} = {
-    [UniqueID]: string;
-} & Record<string, unknown>> = T;
+} & T;
 type RootObj = object;
 type AsyncGeneratedObject<X extends RootObj> = {
     [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K];

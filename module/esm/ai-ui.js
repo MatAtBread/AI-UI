@@ -449,7 +449,7 @@ export const tag = function (_1, _2, _3) {
             overrides: Object.assign(staticExtensions, { [UniqueID]: uniqueTagID }),
             extended,
             valueOf: () => {
-                const keys = [...Object.keys(staticExtensions.declare || {}) /*, ...Object.keys(staticExtensions.prototype || {})*/];
+                const keys = [...Object.keys(staticExtensions.declare || {}), ...Object.keys(staticExtensions.iterable || {})];
                 return `${extendTag.name}: {${keys.join(', ')}}\n \u21AA ${this.valueOf()}`;
             }
         });

@@ -26,7 +26,7 @@ export type PossiblyAsync<X> =
 type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
 export const UniqueID = Symbol("Unique ID");
-export type Instance<T extends { [UniqueID]: string } = { [UniqueID]: string } & Record<string, unknown>> = T;
+export type Instance<T extends Record<string, unknown> = {}> = { [UniqueID]: string } & T;
 
 type RootObj = object;
 
