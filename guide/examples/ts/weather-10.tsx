@@ -1,5 +1,4 @@
 import { tag } from '../../../module/esm/ai-ui.js';
-import React from '../../../module/esm/jsx-runtime.js';
 
 const { div, img, input } = tag();
 
@@ -163,4 +162,4 @@ const App = div.extended({
 });
 
 /* Create and add the "App" element to the document so the user can see it! */
-document.body.appendChild(App());
+document.body.appendChild(<App/>);

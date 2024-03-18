@@ -7,6 +7,15 @@ function AIUIJSX(tagName, attrs, ...children) {
             ? tagCreators[tagName]?.(attrs, ...children)
             : tagName(attrs, ...children));
 }
+/* Support for React 17's _jsx(tag,attrs) */
+function sterilise(attrs) {
+    const childless = { ...attrs };
+    delete childless.children;
+    return childless;
+}
+export const jsx = (tagName, attrs) => AIUIJSX(tagName, sterilise(attrs), attrs.children);
+export const jsxs = jsx;
+export const Fragment = AIUIJSX;
 export default {
     AIUIJSX
 };

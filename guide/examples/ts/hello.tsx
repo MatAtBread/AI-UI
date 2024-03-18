@@ -23,11 +23,6 @@ const e0 = <Div>123</Div>;
 const q0 = <><Div>Hello</Div><div>xyz</div></>;
 const [a0,b0] = q0;
 
-const d1 = React.AIUIJSX("div", null, 123);
-const e1 = React.AIUIJSX(Div, null, 123);
-const q1 = React.AIUIJSX(React.AIUIJSX, null, React.AIUIJSX(Div, null, "Hello"), React.AIUIJSX("div", null, "xyz"));
-const [a1,b1] = q1;
-
 async function* count() { for (let i = 0; i < 10; i++) { yield i; await new Promise(r => setTimeout(r, 500)) } }
 
 const r =
