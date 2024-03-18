@@ -9,8 +9,8 @@
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
     "strictNullChecks": true,
     "lib": ["DOM","DOM.Iterable","ES2020"],
-    "jsxFactory": "PoJSX",
-    "jsxFragmentFactory": "PoJSX",
+    "jsxFactory": "AIUIJSX",
+    "jsxFragmentFactory": "AIUIJSX",
     "jsx": "react"
     // "jsx": "react-jsx",
     // "jsxImportSource": "../../../module/esm"

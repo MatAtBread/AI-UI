@@ -1,15 +1,15 @@
-import { ChildTags } from "./ai-ui.js";
-export declare const PoJSX: <T extends {}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T, ...children: ChildTags[]) => any;
-export declare const jsx: <T extends {
-    children?: any;
-}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T) => any;
-export declare const jsxs: <T extends {
-    children?: any;
-}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T) => any;
-export declare const Fragment: <T extends {
-    children?: any;
-}>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T) => any;
+import { ChildTags, TagCreator } from "./ai-ui.js";
+type AIUIJSXElement<N extends (keyof HTMLElementTagNameMap | typeof AIUIJSX | TagCreator<any, any>), C extends ChildTags[]> = N extends typeof AIUIJSX ? C : N extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[N] : N extends TagCreator<any, any> ? ReturnType<N> : never;
+declare function AIUIJSX<T extends {}, N extends (keyof HTMLElementTagNameMap | typeof AIUIJSX | TagCreator<any, any>), C extends ChildTags[]>(tagName: N, attrs: T | null, ...children: C): AIUIJSXElement<N, C>;
+declare global {
+    namespace JSX {
+        type Element = AIUIJSXElement<any, any>;
+        type IntrinsicElements = {
+            [K in keyof HTMLElementTagNameMap]: Partial<HTMLElementTagNameMap[K]>;
+        };
+    }
+}
 declare const _default: {
-    PoJSX: <T extends {}>(tagName: Function | keyof HTMLElementTagNameMap, attrs: T, ...children: ChildTags[]) => any;
+    AIUIJSX: typeof AIUIJSX;
 };
 export default _default;

@@ -150,9 +150,9 @@ const App = div.extended({
       The WeatherForecast is a Chart plus a `geo` attribute that is updated automatically
       from the Location.geo AsyncIterable.
     */
-   let loc: ReturnType<typeof Location>;
+   const loc = <Location/> as ReturnType<typeof Location>;
     return <>
-      {loc = <Location/>}
+      {loc}
       <WeatherForecast
         width={600}
         height={400}

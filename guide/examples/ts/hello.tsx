@@ -1,9 +1,9 @@
 import { tag } from '../../../module/esm/ai-ui.js'
 import React from '../../../module/esm/jsx-runtime.js';
 
-const { div: _div } = tag();
+const { div } = tag();
 
-const Div = _div.extended({
+const Div = div.extended({
   iterable: {
     thing: 0
   },
@@ -18,9 +18,13 @@ const Div = _div.extended({
   }
 });
 
-const q = [<Div>Hello</Div>,<div>xyz</div>];
+const d0 = <div>123</div>;
+const q0 = <><Div>Hello</Div><div>xyz</div></>;
+const [a0,b0] = q0;
 
-console.log(q);
+const q1 = React.AIUIJSX(React.AIUIJSX, null, React.AIUIJSX(Div, null, "Hello"), React.AIUIJSX("div", null, "xyz"));
+const [a1,b1] = q1;
+
 async function* count() { for (let i = 0; i < 10; i++) { yield i; await new Promise(r => setTimeout(r, 500)) } }
 
 const r =
