@@ -17,9 +17,6 @@ export const jsx = (tagName, attrs) => tagName === jsx
     : (typeof tagName === 'string' ? tag([tagName])[tagName] : tagName)(sterilise(attrs), attrs.children);
 export const jsxs = jsx;
 export const Fragment = jsx;
-/*declare global {
-  const PoJSX;
-  var React; // Doesn't really exist, just declated to suppress a VSCode/tsc warning
-}
-(globalThis as any).PoJSX = PoJSX;
-*/ 
+export default {
+    PoJSX
+};

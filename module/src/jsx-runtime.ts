@@ -25,9 +25,6 @@ export const jsx = <T extends { children?: any}>(tagName: keyof HTMLElementTagNa
 export const jsxs = jsx;
 export const Fragment = jsx;
 
-/*declare global {
-  const PoJSX;
-  var React; // Doesn't really exist, just declated to suppress a VSCode/tsc warning
-}
-(globalThis as any).PoJSX = PoJSX;
-*/
+export default {
+  PoJSX
+};

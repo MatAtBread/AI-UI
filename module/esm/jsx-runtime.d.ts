@@ -9,3 +9,7 @@ export declare const jsxs: <T extends {
 export declare const Fragment: <T extends {
     children?: any;
 }>(tagName: keyof HTMLElementTagNameMap | Function, attrs: T) => any;
+declare const _default: {
+    PoJSX: <T extends {}>(tagName: Function | keyof HTMLElementTagNameMap, attrs: T, ...children: ChildTags[]) => any;
+};
+export default _default;
