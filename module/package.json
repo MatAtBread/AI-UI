@@ -38,7 +38,7 @@
   },
   "scripts": {
     "watch": "bash watch.sh",
-    "build": "npm run clean && npm run build-esm && npm run build-web && npm run build-web-dev",
+    "build": "npm run clean && npm run build-esm && npm run build-web && npm run build-web-dev && cp esm/jsx-runtime.js esm/jsx-runtime",
     "build-esm": "tsc -p tsconfig.json",
     "build-web": "webpack && webpack --config webpack.cjs.js",
     "build-web-dev": "webpack --config webpack.dev.js && webpack --config webpack.cjs-dev.js",

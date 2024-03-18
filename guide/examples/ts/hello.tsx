@@ -18,7 +18,7 @@ const Div = div.extended({
   }
 });
 
-const d0 = <div>123</div>;
+const d0 = <div title="Thing">123</div>;
 const e0 = <Div>123</Div>;
 const q0 = <><Div>Hello</Div><div>xyz</div></>;
 const [a0,b0] = q0;

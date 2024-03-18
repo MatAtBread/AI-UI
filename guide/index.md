@@ -1,6 +1,4 @@
-## AI-UI Guide
-
-Using AI-UI in your web apps
+## Using AI-UI in your web apps
 
 * [Your first web page](./your-first-web-page.md)
 * [Dynamic content](./dynamic-content.md)
@@ -17,8 +15,8 @@ Using AI-UI in your web apps
 * [API reference: Other properties of `tag`, tags and tag functions](./api-reference.md)
 * [Advanced tag creation - SVG, additional prototype functions & more](./tag-creation.md) _coming soon_
 * [Augmenting the standard DOM API with AI-UI](./augment-dom-api.md) _coming soon_
-* [JSX](./tsx.md) _coming soon_
+* [JSX](./tsx.md)
 
-Development info
+## [Examples](./examples.md)
 
-* [Developers info](./developers.md)
+## [Developers info](./developers.md)
