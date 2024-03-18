@@ -10,7 +10,7 @@
     "jsdom": "^24.0.0",
     "ts-loader": "^9.5.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3",
+    "typescript": "^5.4.2",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
   },
@@ -44,7 +44,7 @@
     "build-web-dev": "webpack --config webpack.dev.js && webpack --config webpack.cjs-dev.js",
     "clean": "rm -rf dist/* esm/*",
     "prepublishOnly": "npm run build && npm test",
-    "test": "tsc -p ../type_tests/tsconfig.json && npm run tests",
+    "test": "tsc -p ../type_tests/tsconfig.json && npm run tests --",
     "tests": "ts-node ../testing/index.ts"
   },
   "types": "./esm/ai-ui.d.ts",

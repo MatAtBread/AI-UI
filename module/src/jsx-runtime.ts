@@ -40,7 +40,9 @@ export const Fragment = jsx;
 
 declare global {
   namespace JSX {
-    type Element = AIUIJSXElement<any,any>;
+    // NB: Element doesn't work. Because the TS JSX transformer doesn't capture the type of the tag or it's children
+    // we have to union all the possibilities, which degrades to `any`
+    type Element = AIUIJSXElement<keyof HTMLElementTagNameMap | TagCreator<any>/* Tag name/function */, ChildTags[]>;
     type IntrinsicElements = {
       [K in keyof HTMLElementTagNameMap]: Partial<HTMLElementTagNameMap[K]>
     }
