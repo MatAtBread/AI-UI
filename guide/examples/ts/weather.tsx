@@ -1,4 +1,5 @@
-import { tag } from '../../../module/esm/ai-ui.js' // 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js';
+import React from '../../../module/esm/jsx-runtime.js';
 
 const { div, img, input } = tag();
 
@@ -54,47 +55,55 @@ const Chart = img.extended({
     },
     onload() { this.style.opacity = '1' },
   },
+  iterable: {
+    data: null as { x: (string | number)[], y: number[] } | null
+  },
   declare: {
-    label: '',
-    set data([xData, yData]: [(string | number)[], number[]]) {
-      this.style.opacity = '0.2';
-      this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=`
-        + encodeURIComponent(JSON.stringify({
-          type: 'line',
-          data: {
-            labels: xData,
-            datasets: [{
-              label: this.label,
-              data: yData
-            }]
+    label: ''
+  },
+  constructed() {
+    this.data.consume!(data => {
+      if (data) {
+        this.style.opacity = '0.2';
+        this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=`
+          + encodeURIComponent(JSON.stringify({
+            type: 'line',
+            data: {
+              labels: data.x,
+              datasets: [{
+                label: this.label,
+                data: data.y
+              }]
+            }
           }
-        }))
-    }
+        ))
+      }
+    })
   }
 });
 
 /* Define a weather-specific Chart. It's like a chart, but exposes a `geo` attribute
 that when set, fetches and displays the weather forecast for the specified GeoInfo */
 const WeatherForecast = Chart.extended({
-  declare: {
-    // New property initialisations
-    set geo(g: GeoInfo | undefined) {
+  iterable: {
+    geo: undefined as GeoInfo | undefined
+  },
+  constructed() {
+    this.geo.consume!(async g => {
       this.style.opacity = '0.2';
       if (g) {
-        /* Note: we can't use `await` here as setters can't be generators or otherwise
-          interrupt the execution of their caller, so we fall back to .then() */
-        getWeatherForecast(g).then(forecast => {
-          this.label = g.name + ', ' + g.country;
-          /* setting the data on a Chart will cause it to redraw */
-          this.data = [
-            forecast.time.map(t => new Date(t * 1000).toDateString()),
-            forecast.temperature_2m_max
-          ];
-        });
+        const forecast = await getWeatherForecast(g)
+        this.label = g.name + ', ' + g.country;
+        /* setting the data on a Chart will cause it to redraw */
+        this.data = {
+          x: forecast.time.map(t => new Date(t * 1000).toDateString()),
+          y: forecast.temperature_2m_max
+        };
       }
-    }
+    });
   }
 });
+
 /* Define a "Location" element that is like an input tag that defaults to 'block' display style,
   and can indicate errors in a predefined way.
 
@@ -108,29 +117,30 @@ const WeatherForecast = Chart.extended({
 */
 const Location = input.extended({
   declare: {
-    geo() {
-      return this.when('change').map(async _ => {
-        try {
-          this.disabled = true;
-          const g = await getGeoInfo(this.value);
-          const lastGeo = g?.results?.[0];
-          return lastGeo;
-        } finally {
-          this.disabled = false;
-        }
-      })
+    geo: undefined as AsyncIterable<GeoInfo> | undefined
+  },
+  override: {
+    placeholder: 'Enter a town...',
+    style: {
+      display: 'block'
+    },
+    onkeydown() {
+      this.style.backgroundColor = '';
     }
   },
   constructed() {
-    this.attributes = {
-      placeholder: 'Enter a town...',
-      style: {
-        display: 'block',
-        backgroundColor: this.geo().map(g => g ? '' : '#fdd')
+    this.geo = this.when("change").map(async ()=>{
+      try {
+        this.disabled = true;
+        const g = await getGeoInfo(this.value);
+        this.style.backgroundColor = g?.results?.[0] ? '' : '#fdd'
+        return g?.results?.[0];
+      } finally {
+        this.disabled = false;
       }
-    };
-    this.onkeydown = () =>
-      this.style.backgroundColor = '';
+    });
+    if (this.value)
+      this.dispatchEvent(new Event('change'));
   }
 });
 
@@ -140,17 +150,17 @@ const App = div.extended({
       The WeatherForecast is a Chart plus a `geo` attribute that is updated automatically
       from the Location.geo AsyncIterable.
     */
-    const location = Location();
-    return [
-      location,
-      WeatherForecast({
-        width: 600,
-        height: 400,
-        geo: location.geo(),
-      })
-    ]
+   const loc = <Location/> as ReturnType<typeof Location>;
+    return <>
+      {loc}
+      <WeatherForecast
+        width={600}
+        height={400}
+        geo={loc.geo}
+      />
+    </>
   }
 });
 
 /* Create and add the "App" element to the document so the user can see it! */
-document.body.appendChild(App());
+document.body.appendChild(<App/>);

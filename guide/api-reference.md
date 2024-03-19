@@ -72,7 +72,7 @@ The string description of this tag function. This includes its hierarchy, and wh
 `console.log(h2.valueOf())`
 > TagCreator: &lt;h2&gt;
 
-From the [WaetherForecast](https://github.com/MatAtBread/AI-UI/blob/main/guide/examples/ts/weather-10.ts) example:
+From the [WeatherForecast](./examples/ts/weather.ts) example:
 
 `console.log(WeatherForecast.valueOf())`
 > &lt;ai-WeatherForecast&gt;: {geo}  
@@ -99,7 +99,7 @@ const VanillaDiv = div.extended({
 const MyDiv = VanillaDiv.extended({
   override:{
     info() {
-      // Call the super implementation of click.
+      // Call the super implementation of info().
       return VanillaDiv.info.call(this);
     }
   }

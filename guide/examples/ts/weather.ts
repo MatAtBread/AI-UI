@@ -1,4 +1,4 @@
-import { tag } from '../../../module/esm/ai-ui.js' // 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js';
 
 const { div, img, input } = tag();
 
@@ -40,52 +40,82 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 }
 
 /*
-  Define a "Chart" so it is like an image, but with additional attributes called `label`,
-  `xData` and `yData`.
+  Define a "Chart" so it is like an image, but with additional attributes called `label` and `data`.
 
-  When these are all set, draw a chart for the data within the image.
-  Use opacity to indicate we're loading
+  When `data` is set, draw a chart for the data within the image.
+  Use opacity to indicate we're loading.
 */
 
 const Chart = img.extended({
   override: {
-    // Overrides for existing attributes
     style: {
       transition: 'opacity 0.5s',
       opacity: '0.2'
     },
     onload() { this.style.opacity = '1' },
   },
-  declare:{
-    // New property initialisations
-    label: '',
-    xData: [] as (string | number)[],
-    set yData(d: number[]) {
-      if (this.xData && this.label) {
+  iterable: {
+    data: null as { x: (string | number)[], y: number[] } | null
+  },
+  declare: {
+    label: ''
+  },
+  constructed() {
+    this.data.consume!(data => {
+      if (data) {
         this.style.opacity = '0.2';
         this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=`
           + encodeURIComponent(JSON.stringify({
-          type: 'line',
-          data: {
-            labels: this.xData,
-            datasets: [{
-              label: this.label,
-              data: d
-            }]
-          }
-        }))
+            type: 'line',
+            data: {
+              labels: data.x,
+              datasets: [{
+                label: this.label,
+                data: data.y
+              }]
+            }
+          }))
       }
-    }
+    })
+  }
+});
+
+/* Define a weather-specific Chart. It's like a chart, but exposes a `geo` attribute
+that when set, fetches and displays the weather forecast for the specified GeoInfo */
+const WeatherForecast = Chart.extended({
+  iterable: {
+    geo: undefined as GeoInfo | undefined
+  },
+  constructed() {
+    this.geo.consume!(async g => {
+      this.style.opacity = '0.2';
+      if (g) {
+        const forecast = await getWeatherForecast(g)
+        this.label = g.name + ', ' + g.country;
+        /* setting the data on a Chart will cause it to redraw */
+        this.data = {
+          x: forecast.time.map(t => new Date(t * 1000).toDateString()),
+          y: forecast.temperature_2m_max
+        };
+      }
+    });
   }
 });
 
 /* Define a "Location" element that is like an input tag that defaults to 'block' display style,
-  and can indicate errors in a predefined way */
+  and can indicate errors in a predefined way.
+
+  In this revision of the code, we expose the GeoInfo as an AsyncIterable, by mapping the location
+  string (the input.value) via the GeoInfo API call.
+
+  Additionally, this allows us to localise the error handling - the indication of the error no longer
+  leaks out to become the responsibility of the element containing the Location. The tag is now responsible
+  for handling input, asynchronous resolution and error handling without external knowledge of where it
+  is contained within the DOM, and without the rest of the DOM knowing about it's internals.
+*/
 const Location = input.extended({
-  declare:{
-    showError(f: boolean) {
-      (this.style as any).backgroundColor = f ? '#fdd' : '';
-    }
+  declare: {
+    geo: undefined as AsyncIterable<GeoInfo> | undefined
   },
   override: {
     placeholder: 'Enter a town...',
@@ -93,75 +123,38 @@ const Location = input.extended({
       display: 'block'
     },
     onkeydown() {
-      this.showError(false);
+      this.style.backgroundColor = '';
     }
+  },
+  constructed() {
+    this.geo = this.when("change").map(async ()=>{
+      try {
+        this.disabled = true;
+        const g = await getGeoInfo(this.value);
+        this.style.backgroundColor = g?.results?.[0] ? '' : '#fdd'
+        return g?.results?.[0];
+      } finally {
+        this.disabled = false;
+      }
+    });
+    if (this.value)
+      this.dispatchEvent(new Event('change'));
   }
 });
 
 const App = div.extended({
-  /* The `ids` member defines the *type* of the children of this tag by their id.
-
-  In this case, we declare that anything with the id:'weather' is a Chart tag. This allows
-  our IDE to correctly work out what attributes and methods the element supports at run-
-  time.
-
-  Note, the `ids` member will appear in the transpiled .js file, but in fact are unused at
-  run-time, the declarations merely serve to inform Typescript which ids are which
-  types
-  */
-  ids:{
-    weather: Chart,
-    location: Location
-  },
-  async constructed() {
-    /* When we're constructed, create a Location element and a Chart element.
-      We also keep a reference to tha thing we're creating as we're using it in
-      am event handler. This is the common way to do this in DOM code, but is better
-      handled using `when`.
+  constructed() {
+    /* When we're constructed, create a Location element and a WeatherForecast element.
+      The WeatherForecast is a Chart plus a `geo` attribute that is updated automatically
+      from the Location.geo AsyncIterable.
     */
-
+    const location = Location();
     return [
-      Location({
-        id: 'location',
-        onchange: async () => {
-          /* Note: this is the "obvious" way to do this (set the chart when the event
-            fires), however AI-UI provides the `when` mechanism to make this much
-            simpler and cleaner way, avoiding things like requiring the `app` closure
-            which is needed as `this` is hidden by the event handler definition.
-
-            However, being just normal DOM elements, we choose to do it the "obvious" way
-            in order introduce new concepts in the appropriate places.
-
-            See https://github.com/MatAtBread/AI-UI/blob/main/guide/when.md
-          */
-          try {
-            /* Here we use the `ids` member directly, and VSCode knows that the
-            child of the app called `location` is a Location.
-
-            Note that although the type of the child is known, the element might not actually
-            exist in the DOM, so we use the non-null assertion operator (!) as we know (as
-            opposed to testing at run-time) it exists in the case.
-            */
-            const geo = await getGeoInfo(this.ids.location!.value);
-            const forecast = await getWeatherForecast(geo.results[0]);
-
-
-            /* Similarly, `weather` is a Chart */
-
-            this.ids.weather!.label = geo.results[0].name + ', ' + geo.results[0].country;
-            this.ids.weather!.xData = forecast.time.map(t => new Date().toDateString());
-
-            /* ...and setting the yData on a Chart will cause it to redraw the chart */
-            this.ids.weather!.yData = forecast.temperature_2m_max;
-          } catch (ex) {
-            this.ids.location!.showError(true);
-          }
-        }
-      }),
-      Chart({
-        id: 'weather',
+      location,
+      WeatherForecast({
         width: 600,
-        height: 400
+        height: 400,
+        geo: location.geo
       })
     ]
   }

@@ -129,7 +129,7 @@ const Secret = div.extended({
 });
 ```
 
-Creating behaviours for iterable properties is also a very powerful technique. The following tag is an image based chart that on construction is set up to consume a "data" member and draw a chart of the supplied data. You can see it in operation [here](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/ts/ts-example.html?weather-8.ts)
+Creating behaviours for iterable properties is also a very powerful technique. The following tag is an image based chart that on construction is set up to consume a "data" member and draw a chart of the supplied data. You can see it in operation [here](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/ts/ts-example.html?weather.ts)
 
 ```typescript
 const Chart = img.extended({
