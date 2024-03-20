@@ -6,7 +6,7 @@ import { DEBUG } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
-export { ChildTags, Instance, TagCreator } from './tags'
+export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags'
 export * as Iterators from './iterators.js';
 
 /* A holder for prototypes specified when `tag(...p)` is invoked, which are always
@@ -468,9 +468,9 @@ export const tag = <TagLoader>function <Tags extends string,
     [callStackSymbol]?: Overrides[];
   } | ChildTags, ...children: ChildTags[]) => Element
 
-  type ExtendTagFunctionInstance = ExtendTagFunction & {
+  interface ExtendTagFunctionInstance extends ExtendTagFunction {
     super: TagCreator<Element>;
-    overrides: (instance: Instance) => Overrides;
+    definition: Overrides;
     valueOf: () => string;
     extended: (this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) => ExtendTagFunctionInstance;
   };
@@ -484,13 +484,12 @@ export const tag = <TagLoader>function <Tags extends string,
   }
 
   function extended(this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) {
-    const overrides = (typeof _overrides !== 'function')
-      ? (instance: Instance) => _overrides
+    const instanceDefinition = (typeof _overrides !== 'function')
+      ? (instance: Instance) => Object.assign({},_overrides,instance)
       : _overrides
 
-    const uniqueTagID = 'ai-ui-'+Date.now().toString(36)+(idCount++).toString(36)+Math.random().toString(36).slice(2);
-    const staticInstance: Instance = { [UniqueID]: uniqueTagID };
-    let staticExtensions: Overrides = overrides(staticInstance);
+    const uniqueTagID = Date.now().toString(36)+(idCount++).toString(36)+Math.random().toString(36).slice(2);
+    let staticExtensions: Overrides = instanceDefinition({ [UniqueID]: uniqueTagID });
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
       poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
@@ -508,8 +507,7 @@ export const tag = <TagLoader>function <Tags extends string,
       const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack  };
       const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
       e.constructor = extendTag;
-      const ped: Instance = { [UniqueID]: uniqueTagID };
-      const tagDefinition = overrides(ped);
+      const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
       combinedAttrs[callStackSymbol].push(tagDefinition);
       deepDefine(e, tagDefinition.prototype);
       deepDefine(e, tagDefinition.override);
@@ -539,10 +537,10 @@ export const tag = <TagLoader>function <Tags extends string,
 
     const extendTag: ExtendTagFunctionInstance = Object.assign(extendTagFn, {
       super: this,
-      overrides,
+      definition: Object.assign(staticExtensions, { [UniqueID]: uniqueTagID }),
       extended,
       valueOf: () => {
-        const keys = [...Object.keys(staticExtensions.declare || {})/*, ...Object.keys(staticExtensions.prototype || {})*/];
+        const keys = [...Object.keys(staticExtensions.declare || {}), ...Object.keys(staticExtensions.iterable || {})];
         return `${extendTag.name}: {${keys.join(', ')}}\n \u21AA ${this.valueOf()}`
       }
     });
@@ -557,7 +555,7 @@ export const tag = <TagLoader>function <Tags extends string,
       if (creator?.super)
         walkProto(creator.super);
 
-      const proto = creator.overrides?.(staticInstance);
+      const proto = creator.definition;
       if (proto) {
         deepDefine(fullProto, proto?.prototype);
         deepDefine(fullProto, proto?.override);

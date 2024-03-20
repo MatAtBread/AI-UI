@@ -148,5 +148,5 @@ ____
 
 | < Prev | ^ |  Next > |
 |:-------|:-:|--------:|
-| [# Composition with `constructed()`](./constructed.md) | [Index](./index.md) | [Styling extended elements](./styles.md) |
+| [Composition with `constructed()`](./constructed.md) | [Index](./index.md) | [Styling extended elements](./styles.md) |
 

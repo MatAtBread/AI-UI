@@ -79,11 +79,10 @@ Bundle source: `npm i @matatbread/ai-ui`
 
 Get started with simple, easy to maintain web pages that work seamlessly with user-input, remote data sources and other dynamic sources of data and interaction without the complexity of a bespoke build or execution framework.
 
-* Check out the [guide](https://github.com/MatAtBread/AI-UI/tree/main#readme) on GitHub
-* Jump straight to the tutorial with [your first web page](https://github.com/MatAtBread/AI-UI/blob/main/guide/your-first-web-page.md)
-* See all the docs in the [index](https://github.com/MatAtBread/AI-UI/blob/main/guide/index.md)
+* Jump straight to the tutorial with [your first web page](../guide/your-first-web-page.md)
+* See all the docs in the [index](../guide/index.md)
 
-Interested in contributing? Please check out the [developers](https://github.com/MatAtBread/AI-UI/blob/main/guide/developers.md) page.
+Interested in contributing? Please check out the [developers](../guide/developers.md) page.
 
 AI-UI and it's closed-source precursors have been used in used a variety production contexts for years by thousands of end users:
 * Home Automation UI

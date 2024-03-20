@@ -1,7 +1,7 @@
 import { WhenParameters, WhenReturn } from './when.js';
 import { ChildTags, TagCreator, UniqueID } from './tags.js';
 export { when } from './when.js';
-export { ChildTags, Instance, TagCreator } from './tags';
+export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags';
 export * as Iterators from './iterators.js';
 type OtherMembers = {};
 interface PoElementMethods {

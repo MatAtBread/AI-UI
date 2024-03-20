@@ -26,7 +26,7 @@ export type PossiblyAsync<X> =
 type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
 export const UniqueID = Symbol("Unique ID");
-export type Instance<T extends { [UniqueID]: string } = { [UniqueID]: string } & Record<string, unknown>> = T;
+export type Instance<T extends Record<string, unknown> = {}> = { [UniqueID]: string } & T;
 
 type RootObj = object;
 
@@ -303,7 +303,7 @@ export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */
-type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+export type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
 
 /* A TagCreator is TagCreatorFunction decorated with some extra methods */
 export type TagCreator<Base extends RootObj,
@@ -315,7 +315,7 @@ export type TagCreator<Base extends RootObj,
   /* It is based on a "super" TagCreator */
   super: Super
   /* It has a function that exposes the differences between the tags it creates and its super */
-  overrides?: (<A extends Instance>(a: A) => Overrides); /* null for base tags */
+  definition?: Overrides; /* Contains the definitions & UniqueID for an extended tag. undefined for base tags */
   /* It has a name (set to a class or definition location), which is helpful when debugging */
   readonly name: string;
   /* Can test if an element was created by this function or a base tag function */

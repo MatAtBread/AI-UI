@@ -10,11 +10,9 @@ type DeepPartial<X> = [X] extends [object] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;
 export declare const UniqueID: unique symbol;
-export type Instance<T extends {
+export type Instance<T extends Record<string, unknown> = {}> = {
     [UniqueID]: string;
-} = {
-    [UniqueID]: string;
-} & Record<string, unknown>> = T;
+} & T;
 type RootObj = object;
 type AsyncGeneratedObject<X extends RootObj> = {
     [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K];
@@ -110,11 +108,11 @@ interface ExtendedTag {
     } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>): CheckPropertyClashes<BaseCreator, P, O, D, IP, TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>>>;
 }
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
-type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+export type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
 export type TagCreator<Base extends RootObj, Super extends (never | TagCreator<any, any>) = never, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;
     super: Super;
-    overrides?: (<A extends Instance>(a: A) => Overrides);
+    definition?: Overrides;
     readonly name: string;
     [Symbol.hasInstance](elt: any): boolean;
 } & Statics;

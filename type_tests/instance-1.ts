@@ -1,4 +1,4 @@
-import type { TagCreator } from '../module/src/ai-ui';
+import type { Instance, TagCreator } from '../module/src/ai-ui';
 
 export async function* ai<T>(t: T) { yield t }
 
@@ -33,7 +33,7 @@ const Ctn = Div.extended({
 */
 
 declare var Div: TagCreator<HTMLDivElement>;
-const Icon = Div.extended((instance:{ icon: string }) => ({
+const Icon = Div.extended((instance: Instance<{ icon: string }>) => ({
   declare: {
     icon: ''
   },
