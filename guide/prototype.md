@@ -106,7 +106,7 @@ const BetterButton = button.extended({
       style:{
         color: this.inactive.map!(f => f ? 'grey' : 'red')
       },
-      disabled: this.inactive
+      disabled: this.inactive.map!(f => f)
     };
     // The above is actually the same as - the code style is a matter of personal preference.
     this.inactive.consume(f => {
