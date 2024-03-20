@@ -1,12 +1,14 @@
 import { tag } from "./ai-ui.js";
-/* Support for React.createElement */
-const tagCreators = tag();
-function AIUIJSX(tagName, attrs, ...children) {
-    return (tagName === AIUIJSX ? children
-        : typeof tagName === 'string'
-            ? tagCreators[tagName]?.(attrs, ...children)
-            : tagName(attrs, ...children));
-}
+/* Support for React.createElement(type, props, ...children) */
+const baseTags = tag();
+const AIUIJSX = (tagName, attrs, ...children) => {
+    return tagName === AIUIJSX ? children
+        : tagName instanceof Function
+            // @ts-ignore
+            ? tagName(attrs, ...children)
+            // @ts-ignore
+            : baseTags[tagName](attrs, ...children);
+};
 /* Support for React 17's _jsx(tag,attrs) */
 function sterilise(attrs) {
     const childless = { ...attrs };

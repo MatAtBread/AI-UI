@@ -60,8 +60,8 @@ function tagFn.extended({
 Creates a new tag creating function. See [extended](./extended.md).
 The created function has the following additional members.
 
-### tagFn.overrides
-The definition object used to create the extended tags
+### tagFn.definition
+The definition object used to create the extended tags (ie containing declare, ids, override, styles, iterable, constructed members)
 
 ### tagFn.super
 The tag function that this tag function extends. For base tags, this will throw an exception if called.
@@ -75,9 +75,9 @@ The string description of this tag function. This includes its hierarchy, and wh
 From the [WeatherForecast](./examples/ts/weather.ts) example:
 
 `console.log(WeatherForecast.valueOf())`
-> &lt;ai-WeatherForecast&gt;: {geo}  
->   ↪ &lt;ai-Chart&gt;: {label, data}  
->   ↪ TagCreator: &lt;img&gt;  
+> &lt;ai-WeatherForecast&gt;: {geo}
+>   ↪ &lt;ai-Chart&gt;: {label, data}
+>   ↪ TagCreator: &lt;img&gt;
 
 ### tagFn.name
 The name of the tag function

@@ -1,25 +1,31 @@
-import { ChildTags, TagCreator, tag } from "./ai-ui.js"
+import { ChildTags, TagCreatorFunction, tag } from "./ai-ui.js"
 
-/* Support for React.createElement */
-const tagCreators = tag();
+/* Support for React.createElement(type, props, ...children) */
+const baseTags = tag();
+
+type AIUIJSXTag = (keyof HTMLElementTagNameMap | TagCreatorFunction<Element> | AIUIJSX);
 
 type AIUIJSXElement<
-  N extends (keyof HTMLElementTagNameMap | typeof AIUIJSX | TagCreator<any,any>),
+  N extends AIUIJSXTag,
   C extends ChildTags[]
-> = N extends typeof AIUIJSX ? C
-: N extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[N]
-: N extends TagCreator<any,any> ? ReturnType<N>
-: never;
+> = N extends TagCreatorFunction<Element> ? ReturnType<N>
+  : N extends keyof HTMLElementTagNameMap ? ReturnType<TagCreatorFunction<HTMLElementTagNameMap[keyof HTMLElementTagNameMap]>>
+  : N extends AIUIJSX ? C
+  : never;
 
-function AIUIJSX<
+type AIUIJSX = <
   T extends {},
-  N extends (keyof HTMLElementTagNameMap | typeof AIUIJSX | TagCreator<any,any>),
+  N extends AIUIJSXTag,
   C extends ChildTags[]
->(tagName: N, attrs: T | null, ...children: C): AIUIJSXElement<N,C> {
-  return (tagName === AIUIJSX ? children
-    : typeof tagName === 'string'
-      ? (tagCreators[tagName as keyof HTMLElementTagNameMap] as any)?.(attrs, ...children)
-      : (tagName as TagCreator<any,any>)(attrs, ...children))
+>(tagName: N, attrs: T | null, ...children: C) => AIUIJSXElement<N, C>;
+
+const AIUIJSX: AIUIJSX = (tagName, attrs, ...children) => {
+  return tagName === AIUIJSX ? children
+    : tagName instanceof Function
+    // @ts-ignore
+    ? tagName(attrs, ...children)
+    // @ts-ignore
+    : baseTags[tagName](attrs, ...children)
 }
 
 /* Support for React 17's _jsx(tag,attrs) */
@@ -29,7 +35,7 @@ function sterilise<T extends { children?: any }>(attrs: T): Omit<T, 'children'> 
   return childless;
 }
 
-export const jsx = <T extends { children?: any }>(tagName: (keyof HTMLElementTagNameMap | typeof AIUIJSX | TagCreator<any,any>), attrs: T) =>
+export const jsx = <T extends { children?: ChildTags[] }>(tagName: AIUIJSXTag, attrs: T) =>
   AIUIJSX(tagName, sterilise(attrs), attrs.children);
 
 export const jsxs = jsx;
@@ -40,7 +46,7 @@ declare global {
   namespace JSX {
     // NB: Element doesn't work. Because the TS JSX transformer doesn't capture the type of the tag or it's children
     // we have to union all the possibilities, which degrades to `any`
-    type Element = AIUIJSXElement<keyof HTMLElementTagNameMap | TagCreator<any>/* Tag name/function */, ChildTags[]>;
+    type Element = AIUIJSXElement<keyof HTMLElementTagNameMap | TagCreatorFunction<any>/* Tag name/function */, ChildTags[]>;
     type IntrinsicElements = {
       [K in keyof HTMLElementTagNameMap]: Partial<HTMLElementTagNameMap[K]>
     }
