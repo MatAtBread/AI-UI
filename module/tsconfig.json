@@ -9,7 +9,8 @@
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
     "outDir": "./esm",
     "lib": ["DOM","DOM.Iterable","ES2020"],
-    "typeRoots": []
+    "typeRoots": [],
+    "noErrorTruncation": true
   },
   "include": [ "src/*.ts"]
 }

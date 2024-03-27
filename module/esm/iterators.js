@@ -325,7 +325,16 @@ export function defineIterableProperty(obj, name, v) {
                         get(target, key, receiver) {
                             if (key === 'valueOf')
                                 return () => boxedObject;
-                            if (Reflect.getOwnPropertyDescriptor(target, key)?.enumerable) {
+                            const targetProp = Reflect.getOwnPropertyDescriptor(target, key);
+                            // We include `targetProp === undefined` so we can nested monitor properties that are actually defined (yet)
+                            // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
+                            // defintions like:
+                            //   iterable: { stuff: as Record<string, string | number ... }
+                            if (targetProp === undefined || targetProp.enumerable) {
+                                if (targetProp === undefined) {
+                                    // @ts-ignore
+                                    target[key] = undefined;
+                                }
                                 const realValue = Reflect.get(boxedObject, key, receiver);
                                 const props = Object.getOwnPropertyDescriptors(boxedObject.map((o, p) => {
                                     const ov = o?.[key]?.valueOf();
@@ -571,6 +580,39 @@ function broadcast() {
         }
     };
 }
+/*
+//const Missing = Symbol("Missing");
+type Combine<A,B> = A|B/*A extends object
+  ? B extends object
+    ? {
+      [K in keyof A | keyof B]:
+      Exclude<
+        Combine<
+          K extends keyof A ? A[K] : typeof Missing,
+          K extends keyof B ? B[K] : typeof Missing
+        >,
+        typeof Missing
+      >
+    }
+    : A | B
+  : A | B;* /
+
+type IntersectAsyncIterable<A extends AsyncIterable<any>> =
+  A extends AsyncIterable<infer R>
+  ? A extends AsyncIterable<R> & infer B extends AsyncIterable<any>
+    ? Combine<R, IntersectAsyncIterable<B>>
+    : R
+  : never;
+/*
+type AsyncIterableIntersection<A> = AsyncIterable<IntersectAsyncIterable<A>>;
+
+async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: IntersectAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
+  let last: unknown = undefined;
+  for await (const u of this as AsyncIterable<any>)
+    last = f?.(u);
+  await last;
+}
+*/
 async function consume(f) {
     let last = undefined;
     for await (const u of this)
