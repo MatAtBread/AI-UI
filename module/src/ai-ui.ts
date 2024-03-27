@@ -400,7 +400,7 @@ export const tag = <TagLoader>function <Tags extends string,
                     if (s[k] !== undefined)
                       d[k] = s[k];
                   }
-                }, error => console.log("Failed to set attribute", error))
+                }, error => console.log('(AI-UI)',"Failed to set attribute", error))
               } else if (!isAsyncIter<unknown>(value)) {
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value))
@@ -513,7 +513,10 @@ export const tag = <TagLoader>function <Tags extends string,
       deepDefine(e, tagDefinition.override);
       deepDefine(e, tagDefinition.declare);
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
-        defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
+        if (k in e) {
+          if (DEBUG) console.log('(AI-UI)',`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
+        } else
+          defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
       });
       if (combinedAttrs[callStackSymbol] === newCallStack) {
         if (!noAttrs)
@@ -704,7 +707,7 @@ export function augmentGlobalAsyncGenerators() {
     g = Object.getPrototypeOf(g);
   }
   if (DEBUG && !g) {
-    console.log("Failed to augment the prototype of `(async function*())()`");
+    console.log('(AI-UI)',"Failed to augment the prototype of `(async function*())()`");
   }
 }
 
