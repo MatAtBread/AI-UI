@@ -2,7 +2,7 @@ import { tag, Iterators } from '../../../module/esm/ai-ui.js'
 
 const { div, button, input } = tag();
 
-type Type = { n: number, s: string, nest: { f: boolean} };
+type Type = { n: number, s: string, nest: { f: boolean }, g?: number };
 
 const T = div.extended({
   iterable: {
@@ -20,6 +20,7 @@ const T = div.extended({
     slider: input
   },
   constructed() {
+    this.foo.g?.consume!(g => console.log("g=",g));
     this.foo.nest.f.consume!(f => { this.style.backgroundColor = f == true ? '#ffc' : '#cff' });
     this.foo.nest.consume!(nest => { this.ids.slider.style.float = nest?.f == true ? 'right' : 'left' });
     return [
