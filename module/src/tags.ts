@@ -173,7 +173,7 @@ type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends
   = (OverlappingKeys<O,D>
     | OverlappingKeys<IP,D>
     | OverlappingKeys<IP,O>
-    | OverlappingKeys<IP,TagCreatorAttributes<BaseCreator>>
+//    | OverlappingKeys<IP,TagCreatorAttributes<BaseCreator>>
     | OverlappingKeys<D,TagCreatorAttributes<BaseCreator>>
     | OverlappingKeys<D,P>
     | OverlappingKeys<O,P>
@@ -184,7 +184,7 @@ type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends
     : { '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, TagCreatorAttributes<BaseCreator>> }
   : OmitType<{
     '`declare` clashes with base properties': OverlappingKeys<D,TagCreatorAttributes<BaseCreator>>,
-    '`iterable` clashes with base properties': OverlappingKeys<IP,TagCreatorAttributes<BaseCreator>>,
+//    '`iterable` clashes with base properties': OverlappingKeys<IP,TagCreatorAttributes<BaseCreator>>,
     '`iterable` clashes with `override`': OverlappingKeys<IP,O>,
     '`iterable` clashes with `declare`': OverlappingKeys<IP,D>,
     '`override` clashes with `declare`': OverlappingKeys<O,D>,
