@@ -1,4 +1,5 @@
 import type { TagCreator } from '../module/src/ai-ui';
+import { AsyncExtraIterable } from '../module/src/iterators';
 import { Flatten } from '../module/src/tags';
 
 export type AssertEqual<T, Expected> = [T] extends [Expected]
@@ -15,47 +16,53 @@ const I1 = Base.extended({
     payload: {} as { one?: 'ONE' }
   },
   constructed(){
-    this.payload;
-    this.payload?.one;
-    // @ts-expect-error - two is not declared by I1
-    this.payload?.two;
+    this.payload.consume!(m => { [m.one == 'ONE'] });
+    this.payload!.one!.consume!(m => { m == 'ONE' });
   }
 });
+
+const i1 = I1();
+i1.payload.consume!(m => { [m.one == 'ONE'] });
+i1.payload!.one!.consume!(m => { m == 'ONE' });
 
 type IntersectionReturnType<A> = 
   A extends (()=>infer R) 
   ? A extends (()=>R) & infer B 
     ? R & IntersectionReturnType<B>
     : R
-  : A;
+  : unknown;
+
+var payload: 
+  { two?: ("TWO" & Partial<AsyncExtraIterable<"TWO" | undefined>>) | undefined; } 
+& Partial<AsyncExtraIterable<{ two?: "TWO" | undefined }>> 
+& { one?: ("ONE" & Partial<AsyncExtraIterable<"ONE" | undefined>>) | undefined; } 
+& Partial<AsyncExtraIterable<{ one?: "ONE" | undefined; }>>;
+
+type Q = Flatten<Required<typeof payload>>;
+type F = Required<Flatten<typeof payload>>;
+type A = ReturnType<Q[typeof Symbol.asyncIterator]>;
+type B = IntersectionReturnType<Q[typeof Symbol.asyncIterator]>;
 
 const I2 = I1.extended({
   iterable:{
     payload: {} as { two?: 'TWO' }
   },
-  constructed(){
-    const pa = this.payload[Symbol.asyncIterator]!;
-    const ta = pa();
-    type PR = IntersectionReturnType<typeof pa>;
-    type TR = ReturnType<typeof pa>;
-
-    this.payload;
-    this.payload?.one;
-    this.payload?.two;
+  async constructed(){
+    const ap = this.payload as Required<typeof this.payload>;
+    this.payload.consume!(m => { [m.one == 'ONE', m.two == 'TWO'] });
+    this.payload!.one!.consume!(m => { m == 'ONE' });
+    this.payload!.two!.consume!(m => { m == 'TWO' });
   }
 });
 
 
-const i1 = I1();
 const i2 = I2();
+i2.payload.consume!(m => { [m.one == 'ONE', m.two == 'TWO'] });
+i2.payload!.one!.consume!(m => { m == 'ONE' });
+i2.payload!.two!.consume!(m => { m == 'TWO' });
 
-i1.payload?.one;
-// @ts-expect-error - two is not declared by I1
-i1.payload?.two;
 
-i2.payload?.one;
-i2.payload?.two;
-
+/*
 export const BaseDevice = Base.extended({
   iterable: {
     payload: {} as {
@@ -91,3 +98,4 @@ export const ZigbeeDevice = BaseDevice.extended({
     this.payload.consume!(m => { [m.basic, m.linkquality] });
   }
 });
+*/
