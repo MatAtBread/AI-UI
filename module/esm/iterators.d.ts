@@ -1,4 +1,4 @@
-import { IterableProperties } from "./tags.js";
+import { Flatten, IterableProperties } from "./tags.js";
 export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
     push(value: T): boolean;
 };
@@ -59,7 +59,9 @@ declare function initially<U, I = U>(this: AsyncIterable<U>, initValue: I): Asyn
 declare function waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncIterableIterator<U>;
 declare function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T>;
 declare function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U>;
-declare function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void>;
+type IntersectAsyncIterable<Q extends Partial<AsyncIterable<any>>> = IntersectAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
+type IntersectAsyncIterator<F, And = {}, Or = never> = F extends () => AsyncIterator<infer T> ? F extends (() => AsyncIterator<T>) & infer B ? IntersectAsyncIterator<B, T extends object ? And & T : And, T extends object ? Or : Or | T> : T extends object ? And & T : Or | T : Exclude<Flatten<Partial<And>> | Or, Record<string, never>>;
+declare function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: IntersectAsyncIterable<U>) => void | PromiseLike<void>): Promise<void>;
 export declare const asyncHelperFunctions: {
     map: typeof map;
     filter: typeof filter;

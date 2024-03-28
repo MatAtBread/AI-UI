@@ -1,6 +1,6 @@
 import { DEBUG } from "./debug.js";
 import { DeferredPromise, deferred } from "./deferred.js";
-import { IterableProperties } from "./tags.js";
+import { Flatten, IterableProperties } from "./tags.js";
 
 /* Things to suppliement the JS base AsyncIterable */
 export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
@@ -680,43 +680,18 @@ function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
   }
 }
 
-/*
-//const Missing = Symbol("Missing");
-type Combine<A,B> = A|B/*A extends object 
-  ? B extends object
-    ? {
-      [K in keyof A | keyof B]:
-      Exclude<
-        Combine<
-          K extends keyof A ? A[K] : typeof Missing,
-          K extends keyof B ? B[K] : typeof Missing
-        >, 
-        typeof Missing
-      >
-    }
-    : A | B
-  : A | B;* /
+type IntersectAsyncIterable<Q extends Partial<AsyncIterable<any>>> = IntersectAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
+type IntersectAsyncIterator<F, And = {}, Or = never> =
+  F extends ()=>AsyncIterator<infer T>
+  ? F extends (()=>AsyncIterator<T>) & infer B
+  ? IntersectAsyncIterator<B, T extends object ? And & T : And, T extends object ? Or : Or | T>
+  : T extends object ? And & T : Or | T
+  : Exclude<Flatten<Partial<And>> | Or, Record<string,never>>;   
 
-type IntersectAsyncIterable<A extends AsyncIterable<any>> = 
-  A extends AsyncIterable<infer R> 
-  ? A extends AsyncIterable<R> & infer B extends AsyncIterable<any>
-    ? Combine<R, IntersectAsyncIterable<B>>
-    : R
-  : never;
-/*
-type AsyncIterableIntersection<A> = AsyncIterable<IntersectAsyncIterable<A>>;
 
 async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: IntersectAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
   let last: unknown = undefined;
-  for await (const u of this as AsyncIterable<any>)
-    last = f?.(u);
-  await last;
-}
-*/
-
-async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void> {
-  let last: unknown = undefined;
-  for await (const u of this as AsyncIterable<U>)
+  for await (const u of this as AsyncIterable<IntersectAsyncIterable<U>>)
     last = f?.(u);
   await last;
 }
