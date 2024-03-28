@@ -69,6 +69,7 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
     throw new Error('Cannot set ids on ' + this.valueOf());
   },
   when: function (...what) {
+    // @ts-ignore
     return when(this, ...what)
   }
 };

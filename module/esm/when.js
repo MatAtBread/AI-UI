@@ -1,6 +1,6 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { iterableHelpers, asyncExtras, merge, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
+import { iterableHelpers, asyncExtras, merge, queueIteratableIterator } from "./iterators.js";
 const eventObservations = new Map();
 function docEventHandler(ev) {
     const observations = eventObservations.get(ev.type);
@@ -64,7 +64,8 @@ function whenEvent(container, what) {
         eventObservations.set(eventName, new Set());
     }
     const queue = queueIteratableIterator(() => eventObservations.get(eventName)?.delete(details));
-    const multi = asyncHelperFunctions.multi.call(queue);
+    // @ts-ignore
+    const multi = queue.multi();
     const details /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
         push: queue.push,
         terminate(ex) { multi.return?.(ex); },
@@ -149,6 +150,7 @@ export function when(container, ...sources) {
                 return { done: true, value: undefined };
             }
         };
+        // @ts-ignore
         return chainAsync(ai);
     }
     const merged = (iterators.length > 1)

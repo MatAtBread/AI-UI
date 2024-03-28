@@ -16,22 +16,15 @@ export function asyncIterator(o) {
         return o;
     throw new Error("Not as async provider");
 }
-/* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
-  something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
-  the same arguments returns a AsyncExtraIterable<X>
-*/
-function wrapAsyncHelper(fn) {
-    return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
-}
 export const asyncExtras = {
-    map: wrapAsyncHelper(map),
-    filter: wrapAsyncHelper(filter),
-    unique: wrapAsyncHelper(unique),
-    waitFor: wrapAsyncHelper(waitFor),
-    multi: wrapAsyncHelper(multi),
-    broadcast: wrapAsyncHelper(broadcast),
-    initially: wrapAsyncHelper(initially),
-    consume: consume,
+    map,
+    filter,
+    unique,
+    waitFor,
+    multi,
+    broadcast,
+    initially,
+    consume,
     merge(...m) {
         return merge(this, ...m);
     }
@@ -94,7 +87,7 @@ export function queueIteratableIterator(stop = () => { }) {
             return true;
         }
     };
-    return q;
+    return iterableHelpers(q);
 }
 /* An AsyncIterable which typed objects can be published to.
   The queue can be read by multiple consumers, who will each receive
@@ -446,15 +439,22 @@ export function iterableHelpers(ai) {
 export function generatorHelpers(g) {
     // @ts-ignore: TS type madness
     return function (...args) {
+        // @ts-ignore: TS type madness
         return iterableHelpers(g(...args));
     };
+}
+async function consume(f) {
+    let last = undefined;
+    for await (const u of this)
+        last = f?.(u);
+    await last;
 }
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 export function filterMap(source, fn, initialValue = Ignore) {
     let ai;
     let prev = Ignore;
-    return {
+    const fai = {
         [Symbol.asyncIterator]() {
             return this;
         },
@@ -493,6 +493,7 @@ export function filterMap(source, fn, initialValue = Ignore) {
             return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
         }
     };
+    return iterableHelpers(fai);
 }
 function map(mapper) {
     return filterMap(this, mapper);
@@ -527,7 +528,7 @@ function multi() {
                 .catch(error => current.reject({ done: true, value: error }));
         }
     }
-    return {
+    const mai = {
         [Symbol.asyncIterator]() {
             consumers += 1;
             return this;
@@ -558,6 +559,7 @@ function multi() {
             return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
         }
     };
+    return iterableHelpers(mai);
 }
 function broadcast() {
     const ai = this[Symbol.asyncIterator]();
@@ -574,16 +576,10 @@ function broadcast() {
             }
         }).catch(ex => b.close(ex));
     })();
-    return {
+    return iterableHelpers({
         [Symbol.asyncIterator]() {
             return b[Symbol.asyncIterator]();
         }
-    };
-}
-async function consume(f) {
-    let last = undefined;
-    for await (const u of this)
-        last = f?.(u);
-    await last;
+    });
 }
 export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };

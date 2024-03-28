@@ -156,13 +156,14 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   }
 
   const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
-  const multi = asyncHelperFunctions.multi.call(queue);
+  // @ts-ignore
+  const multi = queue.multi() as AsyncExtraIterable<Event> & AsyncIterator<Event>;
 
   const details: EventObservation<keyof GlobalEventHandlersEventMap> /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
     push: queue.push,
     terminate(ex: Error) { multi.return?.(ex)},
     container,
-    selector: selector || null
+    selector: selector || null 
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
@@ -260,6 +261,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
         return { done: true, value: undefined };
       }
     };
+    // @ts-ignore
     return chainAsync(ai);
   }
 

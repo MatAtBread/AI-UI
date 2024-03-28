@@ -31,30 +31,22 @@ export function asyncIterator<T>(o: AsyncProvider<T>) {
   throw new Error("Not as async provider");
 }
 
-/* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
-  something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
-  the same arguments returns a AsyncExtraIterable<X>
-*/
-function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(fn: (this: AsyncIterable<T>, ...args: Args) => X) {
-  return function (this: Partial<AsyncIterable<T>>, ...args: Args) { return iterableHelpers(fn.call(this as AsyncIterable<T>, ...args)) }
-}
-
 type AsyncIterableHelpers = typeof asyncExtras;
 export const asyncExtras = {
-  map: wrapAsyncHelper(map),
-  filter: wrapAsyncHelper(filter),
-  unique: wrapAsyncHelper(unique),
-  waitFor: wrapAsyncHelper(waitFor),
-  multi: wrapAsyncHelper(multi),
-  broadcast: wrapAsyncHelper(broadcast),
-  initially: wrapAsyncHelper(initially),
-  consume: consume,
+  map,
+  filter,
+  unique,
+  waitFor,
+  multi,
+  broadcast,
+  initially,
+  consume,
   merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A) {
     return merge(this, ...m);
   }
 };
 
-export function queueIteratableIterator<T>(stop = () => { }): QueueIteratableIterator<T> {
+export function queueIteratableIterator<T>(stop = () => { }) {
   let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
   let _items = [] as T[] | null;
 
@@ -111,7 +103,7 @@ export function queueIteratableIterator<T>(stop = () => { }): QueueIteratableIte
       return true;
     }
   };
-  return q;
+  return iterableHelpers(q);
 }
 
 /* An AsyncIterable which typed objects can be published to.
@@ -388,11 +380,11 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                 }
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
                 const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
-                  const ov = o?.[key as keyof V]?.valueOf();
+                  const ov = o?.[key as keyof typeof o]?.valueOf();
                   const pv = p?.valueOf();
                   if (typeof ov === typeof pv && ov == pv)
                     return Ignore;
-                  return o?.[key as keyof V]
+                  return o?.[key as keyof typeof o]
                 }));
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
                 // @ts-ignore - Fix
@@ -514,24 +506,42 @@ export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A ext
   : (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never) {
   // @ts-ignore: TS type madness
   return function (...args: A) {
+    // @ts-ignore: TS type madness
     return iterableHelpers(g(...args))
   }
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
+type IntersectAsyncIterable<Q extends Partial<AsyncIterable<any>>> = IntersectAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
+type IntersectAsyncIterator<F, And = {}, Or = never> =
+  F extends ()=>AsyncIterator<infer T>
+  ? F extends (()=>AsyncIterator<T>) & infer B
+  ? IntersectAsyncIterator<B, T extends object ? And & T : And, T extends object ? Or : Or | T>
+  : T extends object ? And & T : Or | T
+  : Exclude<Flatten<Partial<And>> | Or, Record<string,never>>;   
+
+async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: IntersectAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
+  let last: unknown = undefined;
+  for await (const u of this as AsyncIterable<IntersectAsyncIterable<U>>)
+    last = f?.(u);
+  await last;
+}
+
 type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => R | PromiseLike<R | typeof Ignore>);
 type MaybePromised<T> = PromiseLike<T> | T;
 
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 
-export function filterMap<U, R>(source: AsyncIterable<U>,
-  fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
+type PartialIterable = Partial<AsyncIterable<any>>;
+
+export function filterMap<U extends PartialIterable, R>(source: U,
+  fn: (o: IntersectAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
   initialValue: R | typeof Ignore = Ignore
-): AsyncIterableIterator<R> {
-  let ai: AsyncIterator<U>;
+): AsyncExtraIterable<R> {
+  let ai: AsyncIterator<IntersectAsyncIterable<U>>;
   let prev: R | typeof Ignore = Ignore;
-  return {
+  const fai = {
     [Symbol.asyncIterator]() {
       return this;
     },
@@ -545,7 +555,7 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
 
       return new Promise<IteratorResult<R>>(function step(resolve, reject) {
         if (!ai)
-          ai = source[Symbol.asyncIterator]();
+          ai = source[Symbol.asyncIterator]!();
         ai.next(...args).then(
           p => p.done
             ? resolve(p)
@@ -580,32 +590,34 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
       // The consumer told us to return, so we need to terminate the source
       return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
     }
-  }
+  };
+  return iterableHelpers(fai)
 }
 
-function map<U, R>(this: AsyncIterable<U>, mapper: Mapper<U, R>) {
+function map<U extends PartialIterable, R>(this: U, mapper: Mapper<IntersectAsyncIterable<U>, R>) {
   return filterMap(this, mapper);
 }
 
-function filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<boolean>) {
+function filter<U extends PartialIterable>(this: U, fn: (o: IntersectAsyncIterable<U>) => boolean | PromiseLike<boolean>) {
   return filterMap(this, async o => (await fn(o) ? o : Ignore));
 }
 
-function unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterableIterator<U> {
+function unique<U extends PartialIterable>(this: U, fn?: (next: IntersectAsyncIterable<U>, prev: IntersectAsyncIterable<U>) => boolean | PromiseLike<boolean>): AsyncExtraIterable<IntersectAsyncIterable<U>> {
   return fn
     ? filterMap(this, async (o, p) => (p === Ignore || await fn(o, p)) ? o : Ignore)
     : filterMap(this, (o, p) => o === p ? Ignore : o);
 }
 
-function initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I> {
-  return filterMap(this as AsyncIterable<U | I>, o => o, initValue);
+function initially<U extends PartialIterable, I = IntersectAsyncIterable<U>>(this: U, initValue: I): AsyncExtraIterable<IntersectAsyncIterable<U> | I> {
+  return filterMap(this, o => o, initValue);
 }
 
-function waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void) {
-  return filterMap(this, o => new Promise<U>(resolve => { cb(() => resolve(o)); return o }));
+function waitFor<U extends PartialIterable>(this: U, cb: (done: (value: void | PromiseLike<void>) => void) => void) {
+  return filterMap(this, o => new Promise<IntersectAsyncIterable<U>>(resolve => { cb(() => resolve(o)); return o }));
 }
 
-function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
+function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<IntersectAsyncIterable<U>> {
+  type T = IntersectAsyncIterable<U>;
   const source = this;
   let consumers = 0;
   let current: DeferredPromise<IteratorResult<T, any>>;
@@ -622,7 +634,7 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
     }
   }
 
-  return {
+  const mai = {
     [Symbol.asyncIterator]() {
       consumers += 1;
       return this;
@@ -630,7 +642,7 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
 
     next() {
       if (!ai) {
-        ai = source[Symbol.asyncIterator]();
+        ai = source[Symbol.asyncIterator]!();
         step();
       }
       return current;
@@ -656,11 +668,12 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
       return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
     }
   };
+  return iterableHelpers(mai);
 }
 
-function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
-  const ai = this[Symbol.asyncIterator]();
-  const b = broadcastIterator<U>(() => ai.return?.());
+function broadcast<U extends PartialIterable>(this: U) {
+  const ai = this[Symbol.asyncIterator]!();
+  const b = broadcastIterator<IntersectAsyncIterable<U>>(() => ai.return?.());
   (function step() {
     ai.next().then(v => {
       if (v.done) {
@@ -673,27 +686,11 @@ function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
     }).catch(ex => b.close(ex));
   })();
 
-  return {
+  return iterableHelpers({
     [Symbol.asyncIterator]() {
       return b[Symbol.asyncIterator]();
     }
-  }
-}
-
-type IntersectAsyncIterable<Q extends Partial<AsyncIterable<any>>> = IntersectAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
-type IntersectAsyncIterator<F, And = {}, Or = never> =
-  F extends ()=>AsyncIterator<infer T>
-  ? F extends (()=>AsyncIterator<T>) & infer B
-  ? IntersectAsyncIterator<B, T extends object ? And & T : And, T extends object ? Or : Or | T>
-  : T extends object ? And & T : Or | T
-  : Exclude<Flatten<Partial<And>> | Or, Record<string,never>>;   
-
-
-async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: IntersectAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
-  let last: unknown = undefined;
-  for await (const u of this as AsyncIterable<IntersectAsyncIterable<U>>)
-    last = f?.(u);
-  await last;
+  })
 }
 
 export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
