@@ -1,6 +1,6 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { iterableHelpers, asyncExtras, merge, queueIteratableIterator } from "./iterators.js";
+import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
 const eventObservations = new Map();
 function docEventHandler(ev) {
     const observations = eventObservations.get(ev.type);
@@ -64,11 +64,10 @@ function whenEvent(container, what) {
         eventObservations.set(eventName, new Set());
     }
     const queue = queueIteratableIterator(() => eventObservations.get(eventName)?.delete(details));
-    // @ts-ignore
     const multi = queue.multi();
     const details /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
         push: queue.push,
-        terminate(ex) { multi.return?.(ex); },
+        terminate(ex) { queue.return?.(ex); },
         container,
         selector: selector || null
     };
@@ -84,7 +83,7 @@ async function* neverGonnaHappen() {
   a following function, or used directly as an iterable */
 function chainAsync(src) {
     function mappableAsyncIterable(mapper) {
-        return asyncExtras.map.call(src, mapper);
+        return src.map(mapper);
     }
     return Object.assign(iterableHelpers(mappableAsyncIterable), {
         [Symbol.asyncIterator]: () => src[Symbol.asyncIterator]()
@@ -150,15 +149,15 @@ export function when(container, ...sources) {
                 return { done: true, value: undefined };
             }
         };
-        // @ts-ignore
-        return chainAsync(ai);
+        // @ ts-ignore
+        return chainAsync(iterableHelpers(ai));
     }
     const merged = (iterators.length > 1)
         ? merge(...iterators)
         : iterators.length === 1
             ? iterators[0]
             : (neverGonnaHappen());
-    return chainAsync(merged);
+    return chainAsync(iterableHelpers(merged));
 }
 function elementIsInDOM(elt) {
     if (document.body.contains(elt))

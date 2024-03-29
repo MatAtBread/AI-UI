@@ -232,6 +232,10 @@ export type Overrides = ExtensionDefinition<
 
 export type TagCreatorAttributes<T extends TagCreator<any,any>> = T extends TagCreator<infer B,any> ? B:never;
 
+type UnwrapIterables<IP> = {
+  [K in keyof IP]: Exclude<IP[K], AsyncExtraIterable<any>>
+}
+
 interface ExtendedTag {
   <
       // `this` in this.extended(...)
@@ -251,15 +255,17 @@ interface ExtendedTag {
       // iterable properties - primitives (will be boxed)
       IP extends { [k: string]: OptionalIterablePropertyValue } = {},
       // Combined Effective Type of this extended tag
-      CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>,
+      CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, Omit<TagCreatorAttributes<BaseCreator>, keyof IP>>,
+      // Combined inherited iterables
+      CIP extends { [k: string]: OptionalIterablePropertyValue } = IP & UnwrapIterables<Pick<TagCreatorAttributes<BaseCreator>, keyof IP>>,
       // Combined ThisType
-      CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>
+      CTT = ReadWriteAttributes<IterableProperties<CIP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, Omit<TagCreatorAttributes<BaseCreator>, keyof IP>>>
     >(this: BaseCreator, _:
-      ((instance: any) => (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>))
+      ((instance: any) => (ThisType<CTT> & ExtensionDefinition<P, O, D, CIP, I, C, S>))
     )
-    : CheckPropertyClashes<BaseCreator, P, O, D, IP,
+    : CheckPropertyClashes<BaseCreator, P, O, D, CIP,
       TagCreator<
-        FlattenOthers<CET & IterableProperties<IP>>,
+        FlattenOthers<CET & IterableProperties<CIP>>,
         BaseCreator,
         // Static members attached to the tag creator
         PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>
@@ -284,14 +290,16 @@ interface ExtendedTag {
     // iterable properties - primitives (will be boxed)
     IP extends { [k: string]: OptionalIterablePropertyValue } = {},
     // Combined Effective Type of this extended tag
-    CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>,
+    CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, Omit<TagCreatorAttributes<BaseCreator>, keyof IP>>,
+    // Combined inherited iterables
+    CIP extends { [k: string]: OptionalIterablePropertyValue } = IP & UnwrapIterables<Pick<TagCreatorAttributes<BaseCreator>, keyof IP>>,
     // Combined ThisType
-    CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>
+    CTT = ReadWriteAttributes<IterableProperties<CIP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, Omit<TagCreatorAttributes<BaseCreator>, keyof IP>>>
   >(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>)
   :
-  CheckPropertyClashes<BaseCreator, P, O, D, IP,
+  CheckPropertyClashes<BaseCreator, P, O, D, CIP,
       TagCreator<
-        FlattenOthers<CET & IterableProperties<IP>>,
+        FlattenOthers<CET & IterableProperties<CIP>>,
         BaseCreator,
         // Static members attached to the tag creator
         PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>

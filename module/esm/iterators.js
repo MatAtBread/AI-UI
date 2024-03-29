@@ -1,5 +1,7 @@
 import { DEBUG } from "./debug.js";
 import { deferred } from "./deferred.js";
+;
+;
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
 }
@@ -16,7 +18,7 @@ export function asyncIterator(o) {
         return o;
     throw new Error("Not as async provider");
 }
-export const asyncExtras = {
+const asyncExtras = {
     map,
     filter,
     unique,
@@ -181,7 +183,7 @@ export function defineIterableProperty(obj, name, v) {
         const b = bi[Symbol.asyncIterator]();
         extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
         push = bi.push;
-        Object.keys(asyncHelperFunctions).forEach(k => extras[k] = {
+        Object.keys(asyncExtras).forEach(k => extras[k] = {
             // @ts-ignore - Fix
             value: b[k],
             enumerable: false,
@@ -205,7 +207,7 @@ export function defineIterableProperty(obj, name, v) {
             value: initIterator
         }
     };
-    Object.keys(asyncHelperFunctions).forEach((k) => extras[k] = {
+    Object.keys(asyncExtras).forEach((k) => extras[k] = {
         enumerable: false,
         writable: true,
         // @ts-ignore - Fix
@@ -432,7 +434,8 @@ function isExtraIterable(i) {
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
 export function iterableHelpers(ai) {
     if (!isExtraIterable(ai)) {
-        Object.assign(ai, asyncExtras);
+        Object.defineProperties(ai, Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k, v]) => [k, { ...v, enumerable: false }])));
+        //Object.assign(ai, asyncExtras);
     }
     return ai;
 }
@@ -576,10 +579,11 @@ function broadcast() {
             }
         }).catch(ex => b.close(ex));
     })();
-    return iterableHelpers({
+    const bai = {
         [Symbol.asyncIterator]() {
             return b[Symbol.asyncIterator]();
         }
-    });
+    };
+    return iterableHelpers(bai);
 }
-export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
+//export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
