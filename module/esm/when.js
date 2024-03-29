@@ -149,7 +149,6 @@ export function when(container, ...sources) {
                 return { done: true, value: undefined };
             }
         };
-        // @ ts-ignore
         return chainAsync(iterableHelpers(ai));
     }
     const merged = (iterators.length > 1)

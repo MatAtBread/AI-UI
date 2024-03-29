@@ -46,8 +46,8 @@ export declare function defineIterableProperty<T extends {}, N extends string | 
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
-export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> : never;
-export declare function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G): (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never);
+export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown>;
+export declare function generatorHelpers<G extends (...args: any[]) => R, R extends AsyncGenerator>(g: G): ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T, any, unknown> ? T : unknown>;
 type HelperAsyncIterable<Q extends Partial<AsyncIterable<any>>> = HelperAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
 type HelperAsyncIterator<F, And = {}, Or = never> = F extends () => AsyncIterator<infer T> ? T : never;
 declare function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: HelperAsyncIterable<U>) => void | PromiseLike<void>): Promise<void>;

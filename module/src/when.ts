@@ -260,7 +260,6 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
         return { done: true, value: undefined };
       }
     };
-    // @ ts-ignore
     return chainAsync(iterableHelpers(ai));
   }
 

@@ -25,7 +25,6 @@ const elementProtype = {
         throw new Error('Cannot set ids on ' + this.valueOf());
     },
     when: function (...what) {
-        // @ts-ignore
         return when(this, ...what);
     }
 };
@@ -445,7 +444,8 @@ export const tag = function (_1, _2, _3) {
                 // so the full hierarchy gets to consume the initial state
                 for (const base of newCallStack) {
                     base.iterable && Object.keys(base.iterable).forEach(
-                    // @ts-ignore
+                    // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if
+                    // k is one of them.
                     k => e[k] = e[k]);
                 }
             }

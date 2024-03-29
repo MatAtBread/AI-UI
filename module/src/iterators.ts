@@ -376,7 +376,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
               //   iterable: { stuff: as Record<string, string | number ... }
               if (targetProp === undefined || targetProp.enumerable) {
                 if (targetProp === undefined) {
-                  // @ts-ignore
+                  // @ts-ignore - Fix
                   target[key] = undefined;
                 }
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
@@ -496,7 +496,7 @@ function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
 }
 
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
-export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> : never {
+export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown> {
   if (!isExtraIterable(ai)) {
     Object.defineProperties(ai, 
       Object.fromEntries(
@@ -509,13 +509,11 @@ export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A extends 
   return ai as A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> : never
 }
 
-export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G)
-  : (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never) {
-  // @ts-ignore: TS type madness
-  return function (...args: A) {
-    // @ts-ignore: TS type madness
-    return iterableHelpers(g(...args))
-  }
+export function generatorHelpers<G extends (...args: any[]) => R, R extends AsyncGenerator>(g: G) {
+  return function (...args:Parameters<G>): ReturnType<G> {
+    const ai = g(...args);
+    return iterableHelpers(ai) as ReturnType<G>;
+  } as ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T> ? T : unknown>
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */

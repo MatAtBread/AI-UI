@@ -327,7 +327,7 @@ export function defineIterableProperty(obj, name, v) {
                             //   iterable: { stuff: as Record<string, string | number ... }
                             if (targetProp === undefined || targetProp.enumerable) {
                                 if (targetProp === undefined) {
-                                    // @ts-ignore
+                                    // @ts-ignore - Fix
                                     target[key] = undefined;
                                 }
                                 const realValue = Reflect.get(boxedObject, key, receiver);
@@ -440,10 +440,9 @@ export function iterableHelpers(ai) {
     return ai;
 }
 export function generatorHelpers(g) {
-    // @ts-ignore: TS type madness
     return function (...args) {
-        // @ts-ignore: TS type madness
-        return iterableHelpers(g(...args));
+        const ai = g(...args);
+        return iterableHelpers(ai);
     };
 }
 async function consume(f) {
