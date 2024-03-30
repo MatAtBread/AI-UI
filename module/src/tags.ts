@@ -28,16 +28,14 @@ type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]
 export const UniqueID = Symbol("Unique ID");
 export type Instance<T extends Record<string, unknown> = {}> = { [UniqueID]: string } & T;
 
-type RootObj = object;
-
 // Internal types supporting TagCreator
-type AsyncGeneratedObject<X extends RootObj> = {
+type AsyncGeneratedObject<X extends object> = {
   [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K]
 };
 
 type IDS<I> = {
   ids: {
-    [J in keyof I]: I[J] extends TagCreator<any, any> ? ReturnType<I[J]> : never;
+    [J in keyof I]: I[J] extends ExTagCreator<any, any> ? ReturnType<I[J]> : never;
   }
 }
 
@@ -65,25 +63,30 @@ type TypedEventHandlers<T> = {
   : GlobalEventHandlers[K];
 };
 
-type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers)
-  ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T>
-  : T;
+// type ReTypedEventHandlers<T> = T extends GlobalEventHandlers
+//   ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T>
+//   : T;
+type ReTypedEventHandlers<T> = {
+  [K in keyof T]: K extends keyof GlobalEventHandlers 
+    ? OmitThisParameter<T[K]> & ThisType<T> 
+    : T[K]
+}
 
 type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
   get attributes(): NamedNodeMap;
   set attributes(v: DeepPartial<PossiblyAsync<Base>>);
 }
 
-type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
+// type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
 
 export type Flatten<O> = [{
   [K in keyof O]: O[K]
 }][number];
 
-type FlattenOthers<Src, Others = HTMLElement> =
-  Src extends Partial<Others>
-  ? Flatten<Omit<Src, keyof Partial<Others>>> & Pick<Src, keyof Partial<Others>>
-  : Flatten<Src>
+// type FlattenOthers<Src, Others = HTMLElement> =
+//   Src extends Partial<Others>
+//   ? Flatten<Omit<Src, keyof Partial<Others>>> & Pick<Src, keyof Partial<Others>>
+//   : Flatten<Src>
 
 type Extends<A, B> =
   A extends any[]
@@ -144,7 +147,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never };
 type OptionalIterablePropertyValue = IterablePropertyValue | undefined | null;
 
-type NeverEmpty<O extends RootObj> = {} extends O ? never : O;
+type NeverEmpty<O extends object> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
 type PickType<T, V> = [{ [K in keyof T as T[K] extends V ? K : never]: T[K] }][number]
 
@@ -169,7 +172,7 @@ type OverlappingKeys<A,B> = B extends never ? never
   : A extends never ? never
   : keyof A & keyof B;
 
-type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, D extends Overrides, Result = never>
+type CheckPropertyClashes<BaseCreator extends ExTagCreator<any, any>, D extends Overrides, Result = never>
   = (OverlappingKeys<D['override'],D['declare']>
     | OverlappingKeys<D['iterable'],D['declare']>
     | OverlappingKeys<D['iterable'],D['override']>
@@ -193,68 +196,29 @@ type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, D extends Ov
     '`prototype` (deprecated) clashes with `iterable`': OverlappingKeys<D['iterable'],D['prototype']>
   }, never>
 
-/*
-type ExtensionDefinition<
-  // prototype (deprecated, but can be used to extend a single property type in a union)
-  P extends RootObj,
-  // overrides - same types as Base, or omitted
-  O extends RootObj,
-  // declare - any types
-  D extends RootObj,
-  // Iterable properties
-  IP extends {
-    [k: string]: OptionalIterablePropertyValue;
-  },
-  // ids - tagCreators
-  I extends {
-    [idExt: string]: TagCreator<any, any>;
-  },
-  // constructed()
-  C extends () => (ChildTags | void | Promise<void | ChildTags>),
-  // styles (string)
-  S extends string | undefined
-  > = {
-    /** @deprecated * / prototype?: P;
-    override?: O;
-    declare?: D;
-    iterable?: IP;
-    ids?: I;
-    constructed?: C;
-    styles?: S;
-  };
+export type Overrides = {
+  /** @deprecated */ prototype?: object;
+  override?: object;
+  declare?: object;
+  iterable?: { [k: string]: OptionalIterablePropertyValue };
+  ids?: { [id: string]: ExTagCreator<any, any>; };
+  constructed?: () => (ChildTags | void | Promise<void | ChildTags>);
+  styles?: string;
+}
 
-// The base, generic extension definition, used by ai-ui
-export type Overrides = ExtensionDefinition<
-  object,object,object,
-  { [k: string]: OptionalIterablePropertyValue },
-  { [id: string]: TagCreator<any, any>; },
-  () => (ChildTags | void | Promise<void | ChildTags>),
-  string>;
-*/
-  export type Overrides = {
-    /** @deprecated */ prototype?: object;
-    override?: object;
-    declare?: object;
-    iterable?: { [k: string]: OptionalIterablePropertyValue };
-    ids?: { [id: string]: TagCreator<any, any>; };
-    constructed?: () => (ChildTags | void | Promise<void | ChildTags>);
-    styles?: string;
-  }
-
-
-export type TagCreatorAttributes<T extends TagCreator<any,any>> = T extends TagCreator<infer B,any> ? B:never;
+export type TagCreatorAttributes<T extends ExTagCreator<any,any>> = T extends ExTagCreator<infer B,any> ? B:never;
 
 type UnwrapIterables<IP> = {
   [K in keyof IP]: Exclude<IP[K], AsyncExtraIterable<any>>
 }
 
-type CombinedEffectiveType<Base extends TagCreator<any,any>, D extends Overrides> = 
+type CombinedEffectiveType<Base extends ExTagCreator<any,any>, D extends Overrides> = 
   D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 
-type CombinedIterableProperties<Base extends TagCreator<any,any>, D extends Overrides> = 
+type CombinedIterableProperties<Base extends ExTagCreator<any,any>, D extends Overrides> = 
    D['iterable'] & UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 ;
-type CombinedThisType<Base extends TagCreator<any,any>, D extends Overrides> = 
+type CombinedThisType<Base extends ExTagCreator<any,any>, D extends Overrides> = 
   ReadWriteAttributes<
     IterableProperties<CombinedIterableProperties<Base,D>> & 
     AsyncGeneratedObject<CombinedEffectiveType<Base,D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;
@@ -262,13 +226,14 @@ type CombinedThisType<Base extends TagCreator<any,any>, D extends Overrides> =
 interface ExtendedTag {
     // `this` in this.extended(...) is BaseCreator
     <
-    BaseCreator extends TagCreator<any, any>,
+    BaseCreator extends ExTagCreator<any, any>,
     Definitions extends Overrides = {}
   >(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<NoInfer<BaseCreator>,NoInfer<Definitions>>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
-      TagCreator<
-        FlattenOthers<CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>>,
-        BaseCreator,
+      ExTagCreator<
+//      FlattenOthers<CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>>,
+      CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
+      BaseCreator,
         // Static members attached to the tag creator
         PickType<
           Definitions['declare']
@@ -281,12 +246,13 @@ interface ExtendedTag {
   >;
 
   <
-    BaseCreator extends TagCreator<any, any>,
+    BaseCreator extends ExTagCreator<any, any>,
     Definitions extends Overrides = {}
   >(this: BaseCreator, _: ThisType<CombinedThisType<NoInfer<BaseCreator>,NoInfer<Definitions>>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
-      TagCreator<
-        FlattenOthers<CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>>,
+      ExTagCreator<
+        // FlattenOthers<CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>>,
+        CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
         BaseCreator,
         // Static members attached to the tag creator
         PickType<
@@ -304,11 +270,12 @@ export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */
-export type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
 
-/* A TagCreator is TagCreatorFunction decorated with some extra methods */
-export type TagCreator<Base extends RootObj,
-  Super extends (never | TagCreator<any, any>) = never,
+/* A TagCreator is TagCreatorFunction decorated with some extra methods. The Super & Statics args are only
+ever specified by ExtendedTag (internally), and so is not exported */
+type ExTagCreator<Base extends object,
+  Super extends (never | ExTagCreator<any, any>) = never,
   Statics = {}
 > = TagCreatorFunction<Base> & {
   /* It can also be extended */
@@ -323,9 +290,17 @@ export type TagCreator<Base extends RootObj,
   [Symbol.hasInstance](elt: any): boolean;
 } & Statics;
 
+export type TagCreator<Base extends object,
+  Super extends (never | ExTagCreator<any, any>) = never,
+  Statics = {}
+> = ExTagCreator<Base, Super, Statics>;
+
 // declare var Base: TagCreator<HTMLElement>;
 // var b = Base();
 // b.outerText;
+
+// const Same = Base.extended({});
+// Same().tagName
 
 // const Ex = Base.extended({
 //   declare:{
@@ -338,4 +313,4 @@ export type TagCreator<Base extends RootObj,
 // var y = Ex();
 // y.textContent;
 // y.attr;
-// y.it.consume!(n=>{});
+// y.it!.consume!(n=>{});
