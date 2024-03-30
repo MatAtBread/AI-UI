@@ -105,5 +105,5 @@ type ExTagCreator<Base extends object, Super extends (never | ExTagCreator<any, 
     readonly name: string;
     [Symbol.hasInstance](elt: any): boolean;
 } & Statics;
-export type TagCreator<Base extends object, Super extends (never | ExTagCreator<any, any>) = never, Statics = {}> = ExTagCreator<Base, Super, Statics>;
+export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 export {};

@@ -39,33 +39,6 @@ type IDS<I> = {
   }
 }
 
-// Like GlobalEventHandlers, but with `this` removed
-// Commented section was fixed add/removeEventListener, but causes issues elsewmhere
-type UntypedEventHandlers = {
-  [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R))
-  ? null | ((event: E) => R)
-  /*: GlobalEventHandlers[K] extends (event:infer E, listener:infer L, ...more:infer M) => infer R
-    ? L extends (this: any, ev: infer V) => any
-      ? (event: E, listener:(ev: V) => any, ...more: M) => R
-      : (event: E, listener:L, ...more: M) => R */
-  : GlobalEventHandlers[K];
-}
-
-// Like GlobalEventHandlers, but with `this` specified
-// Commented section was fixed add/removeEventListener, but causes issues elsewmhere
-type TypedEventHandlers<T> = {
-  [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R))
-  ? null | ((this: T, event: E) => R)
-  /*: GlobalEventHandlers[K] extends (event:infer E, listener: infer L, ...more:infer M) => infer R
-    ? L extends (this: any, ev: infer V) => any
-      ? (event: E, listener:(this: T, ev: V) => any, ...more: M) => R
-      : (event: E, listener:L, ...more: M) => R */
-  : GlobalEventHandlers[K];
-};
-
-// type ReTypedEventHandlers<T> = T extends GlobalEventHandlers
-//   ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T>
-//   : T;
 type ReTypedEventHandlers<T> = {
   [K in keyof T]: K extends keyof GlobalEventHandlers 
     ? OmitThisParameter<T[K]> & ThisType<T> 
@@ -77,16 +50,9 @@ type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
   set attributes(v: DeepPartial<PossiblyAsync<Base>>);
 }
 
-// type StaticMembers<P, Base> = P & Omit<Base, keyof HTMLElement>;
-
 export type Flatten<O> = [{
   [K in keyof O]: O[K]
 }][number];
-
-// type FlattenOthers<Src, Others = HTMLElement> =
-//   Src extends Partial<Others>
-//   ? Flatten<Omit<Src, keyof Partial<Others>>> & Pick<Src, keyof Partial<Others>>
-//   : Flatten<Src>
 
 type Extends<A, B> =
   A extends any[]
@@ -98,7 +64,6 @@ type Extends<A, B> =
   : B extends A ? B // Overrides don't narrow base
   : A extends B ? B & Flatten<Omit<A, keyof B>> // Overrides extend base
   : never;
-
 
 type MergeBaseTypes<T, Base> = {
   [K in keyof Base | keyof T]
@@ -223,15 +188,14 @@ type CombinedThisType<Base extends ExTagCreator<any,any>, D extends Overrides> =
     IterableProperties<CombinedIterableProperties<Base,D>> & 
     AsyncGeneratedObject<CombinedEffectiveType<Base,D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;
 
+// `this` in this.extended(...) is BaseCreator
 interface ExtendedTag {
-    // `this` in this.extended(...) is BaseCreator
-    <
+  <
     BaseCreator extends ExTagCreator<any, any>,
     Definitions extends Overrides = {}
   >(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<NoInfer<BaseCreator>,NoInfer<Definitions>>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
       ExTagCreator<
-//      FlattenOthers<CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>>,
       CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
       BaseCreator,
         // Static members attached to the tag creator
@@ -251,7 +215,6 @@ interface ExtendedTag {
   >(this: BaseCreator, _: ThisType<CombinedThisType<NoInfer<BaseCreator>,NoInfer<Definitions>>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
       ExTagCreator<
-        // FlattenOthers<CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>>,
         CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
         BaseCreator,
         // Static members attached to the tag creator
@@ -290,10 +253,7 @@ type ExTagCreator<Base extends object,
   [Symbol.hasInstance](elt: any): boolean;
 } & Statics;
 
-export type TagCreator<Base extends object,
-  Super extends (never | ExTagCreator<any, any>) = never,
-  Statics = {}
-> = ExTagCreator<Base, Super, Statics>;
+export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 
 // declare var Base: TagCreator<HTMLElement>;
 // var b = Base();
