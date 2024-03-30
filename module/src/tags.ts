@@ -31,17 +31,19 @@ export type Instance<T extends Record<string, unknown> = {}> = { [UniqueID]: str
 // Internal types supporting TagCreator
 type AsyncGeneratedObject<X extends object> = {
   [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K]
-};
+}
 
 type IDS<I> = {
   ids: {
-    [J in keyof I]: I[J] extends ExTagCreator<any, any> ? ReturnType<I[J]> : never;
+    [J in keyof I]: I[J] extends ExTagCreator<any> ? ReturnType<I[J]> : never;
   }
 }
 
 type ReTypedEventHandlers<T> = {
   [K in keyof T]: K extends keyof GlobalEventHandlers 
-    ? OmitThisParameter<T[K]> & ThisType<T> 
+    ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E)=>any 
+      ? (this: T, e: E)=>any | null
+      : T[K]
     : T[K]
 }
 
@@ -137,7 +139,7 @@ type OverlappingKeys<A,B> = B extends never ? never
   : A extends never ? never
   : keyof A & keyof B;
 
-type CheckPropertyClashes<BaseCreator extends ExTagCreator<any, any>, D extends Overrides, Result = never>
+type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overrides, Result = never>
   = (OverlappingKeys<D['override'],D['declare']>
     | OverlappingKeys<D['iterable'],D['declare']>
     | OverlappingKeys<D['iterable'],D['override']>
@@ -166,24 +168,24 @@ export type Overrides = {
   override?: object;
   declare?: object;
   iterable?: { [k: string]: OptionalIterablePropertyValue };
-  ids?: { [id: string]: ExTagCreator<any, any>; };
+  ids?: { [id: string]: ExTagCreator<any>; };
   constructed?: () => (ChildTags | void | Promise<void | ChildTags>);
   styles?: string;
 }
 
-export type TagCreatorAttributes<T extends ExTagCreator<any,any>> = T extends ExTagCreator<infer B,any> ? B:never;
+export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer B,any> ? B:never;
 
 type UnwrapIterables<IP> = {
   [K in keyof IP]: Exclude<IP[K], AsyncExtraIterable<any>>
 }
 
-type CombinedEffectiveType<Base extends ExTagCreator<any,any>, D extends Overrides> = 
+type CombinedEffectiveType<Base extends ExTagCreator<any>, D extends Overrides> = 
   D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 
-type CombinedIterableProperties<Base extends ExTagCreator<any,any>, D extends Overrides> = 
+type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = 
    D['iterable'] & UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 ;
-type CombinedThisType<Base extends ExTagCreator<any,any>, D extends Overrides> = 
+type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = 
   ReadWriteAttributes<
     IterableProperties<CombinedIterableProperties<Base,D>> & 
     AsyncGeneratedObject<CombinedEffectiveType<Base,D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;
@@ -191,11 +193,11 @@ type CombinedThisType<Base extends ExTagCreator<any,any>, D extends Overrides> =
 // `this` in this.extended(...) is BaseCreator
 interface ExtendedTag {
   <
-    BaseCreator extends ExTagCreator<any, any>,
+    BaseCreator extends ExTagCreator<any>,
     Definitions extends Overrides = {}
-  >(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<NoInfer<BaseCreator>,NoInfer<Definitions>>> & Definitions)
+  >(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<BaseCreator,Definitions>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
-      ExTagCreator<
+    ExTagCreator<
       CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
       BaseCreator,
         // Static members attached to the tag creator
@@ -210,22 +212,22 @@ interface ExtendedTag {
   >;
 
   <
-    BaseCreator extends ExTagCreator<any, any>,
+    BaseCreator extends ExTagCreator<any>,
     Definitions extends Overrides = {}
-  >(this: BaseCreator, _: ThisType<CombinedThisType<NoInfer<BaseCreator>,NoInfer<Definitions>>> & Definitions)
+  >(this: BaseCreator, _: ThisType<CombinedThisType<BaseCreator,Definitions>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
-      ExTagCreator<
-        CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
-        BaseCreator,
-        // Static members attached to the tag creator
-        PickType<
-          Definitions['declare']
-          & Definitions['override'] 
-          & Definitions['prototype'] 
-          & TagCreatorAttributes<BaseCreator>,
-          any
-        >
+    ExTagCreator<
+      CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
+      BaseCreator,
+      // Static members attached to the tag creator
+      PickType<
+        Definitions['declare']
+        & Definitions['override'] 
+        & Definitions['prototype'] 
+        & TagCreatorAttributes<BaseCreator>,
+        any
       >
+    >
   >;
 }
 
@@ -238,7 +240,7 @@ export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<P
 /* A TagCreator is TagCreatorFunction decorated with some extra methods. The Super & Statics args are only
 ever specified by ExtendedTag (internally), and so is not exported */
 type ExTagCreator<Base extends object,
-  Super extends (never | ExTagCreator<any, any>) = never,
+  Super extends (unknown | ExTagCreator<any>) = unknown,
   Statics = {}
 > = TagCreatorFunction<Base> & {
   /* It can also be extended */
@@ -258,19 +260,31 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 // declare var Base: TagCreator<HTMLElement>;
 // var b = Base();
 // b.outerText;
+// b.oninput = function(e) {
+//   this === e.target
+// };
 
 // const Same = Base.extended({});
 // Same().tagName
 
 // const Ex = Base.extended({
+//   override:{
+//     onclick(e: MouseEvent) { this === e.target }
+//   },
 //   declare:{
 //     attr: 0,
 //   },
 //   iterable:{
 //     it: 0
 //   }
-// });
+// });b.oninput = function(e) {
+//   this === e.target
+// };
+
 // var y = Ex();
+// y.oninput = function(e) {
+//   this === e.target
+// };
 // y.textContent;
 // y.attr;
 // y.it!.consume!(n=>{});
