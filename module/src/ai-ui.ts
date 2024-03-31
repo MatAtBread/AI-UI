@@ -476,8 +476,8 @@ export const tag = <TagLoader>function <Tags extends string,
   };
 
   function tagHasInstance(this: ExtendTagFunctionInstance, e: any) {
-    for (let etf: ExtendTagFunctionInstance | TagCreator<any> = this; etf; etf = etf.super) {
-      if (e.constructor === etf)
+    for (let c = e.constructor; c; c = c.super) {
+      if (c === this)
         return true;
     }
     return false;
@@ -640,6 +640,12 @@ export const tag = <TagLoader>function <Tags extends string,
       extended, // How to extend this (base) tag
       valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>` }
     });
+
+    Object.defineProperty(tagCreator, Symbol.hasInstance, {
+      value: tagHasInstance,
+      writable: true,
+      configurable: true
+    })
 
     Object.defineProperty(tagCreator, "name", { value: '<' + k + '>' });
     // @ts-ignore
