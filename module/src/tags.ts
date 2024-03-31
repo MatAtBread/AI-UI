@@ -175,20 +175,54 @@ export type Overrides = {
 
 export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer B,any> ? B:never;
 
+type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = 
+  D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
+
+type DeepMerge<A,B> = A extends object 
+? B extends object 
+  ? {
+      [K in (keyof A | keyof B)]: 
+        K extends (keyof A & keyof B) 
+        ? DeepMerge<A[K], B[K]>
+        : K extends keyof A 
+          ? A[K]
+          : K extends keyof B
+          ? B[K]
+          : never
+    } 
+  : A | B 
+: A | B;
+
+//type CombinedIterableProperties<Base extends ExTagCreator<any,any,any,any>, D extends Overrides> = 
+//DeepMerge<
+//  D['iterable']
+//  (Base extends ExTagCreator<any,any,any,infer CIP> ? CIP : never)
+//>
+  //& UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
+
 type UnwrapIterables<IP> = {
   [K in keyof IP]: Exclude<IP[K], AsyncExtraIterable<any>>
 }
-
-type CombinedEffectiveType<Base extends ExTagCreator<any>, D extends Overrides> = 
-  D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
-
+  
 type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = 
-   D['iterable'] & UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
-;
-type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = 
+  D['iterable'] & UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
+
+  type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = 
   ReadWriteAttributes<
-    IterableProperties<CombinedIterableProperties<Base,D>> & 
-    AsyncGeneratedObject<CombinedEffectiveType<Base,D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;
+    IterableProperties<CombinedIterableProperties<Base,D>> 
+    & AsyncGeneratedObject<CombinedNonIterableProperties<Base,D>>, 
+    D['declare'] 
+    & D['override'] 
+    & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>
+  >;
+
+type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<
+Definitions['declare']
+& Definitions['override'] 
+& Definitions['prototype'] 
+& TagCreatorAttributes<Base>,
+any
+>;
 
 // `this` in this.extended(...) is BaseCreator
 interface ExtendedTag {
@@ -198,17 +232,12 @@ interface ExtendedTag {
   >(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<BaseCreator,Definitions>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
     ExTagCreator<
-      CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
+      IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
+      & CombinedNonIterableProperties<BaseCreator,Definitions>,
       BaseCreator,
-        // Static members attached to the tag creator
-        PickType<
-          Definitions['declare']
-          & Definitions['override'] 
-          & Definitions['prototype'] 
-          & TagCreatorAttributes<BaseCreator>,
-          any
-        >
-      >
+      StaticReferences<BaseCreator, Definitions>,
+      CombinedIterableProperties<BaseCreator,Definitions>      
+    >
   >;
 
   <
@@ -216,17 +245,12 @@ interface ExtendedTag {
     Definitions extends Overrides = {}
   >(this: BaseCreator, _: ThisType<CombinedThisType<BaseCreator,Definitions>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
-    ExTagCreator<
-      CombinedEffectiveType<BaseCreator,Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>,
+    ExTagCreator< 
+    IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
+    & CombinedNonIterableProperties<BaseCreator,Definitions>,
       BaseCreator,
-      // Static members attached to the tag creator
-      PickType<
-        Definitions['declare']
-        & Definitions['override'] 
-        & Definitions['prototype'] 
-        & TagCreatorAttributes<BaseCreator>,
-        any
-      >
+      StaticReferences<BaseCreator, Definitions>,
+      CombinedIterableProperties<BaseCreator,Definitions>      
     >
   >;
 }
@@ -241,7 +265,8 @@ export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<P
 ever specified by ExtendedTag (internally), and so is not exported */
 type ExTagCreator<Base extends object,
   Super extends (unknown | ExTagCreator<any>) = unknown,
-  Statics = {}
+  Statics = {},
+  CIP = {}
 > = TagCreatorFunction<Base> & {
   /* It can also be extended */
   extended: ExtendedTag
@@ -264,10 +289,14 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 //   this === e.target
 // };
 
-// const Same = Base.extended({});
+// const Same = Base.extended({
+//   iterable:{
+//     mat: 0
+//   }
+// });
 // Same().tagName
 
-// const Ex = Base.extended({
+// const Ex = Same.extended({
 //   override:{
 //     onclick(e: MouseEvent) { this === e.target }
 //   },
@@ -275,9 +304,12 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 //     attr: 0,
 //   },
 //   iterable:{
-//     it: 0
+//     it: 0,
+//     foo: { a: 1 }
 //   }
-// });b.oninput = function(e) {
+// });
+
+// b.oninput = function(e) {
 //   this === e.target
 // };
 
@@ -288,3 +320,28 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 // y.textContent;
 // y.attr;
 // y.it!.consume!(n=>{});
+// Ex.onclick
+// Ex.attr
+
+// const F = Ex.extended({
+//   iterable:{
+//     foo:{
+//       b: true
+//     },
+//     bar: ''
+//   },
+//   constructed(){
+//     this.bar.consume!(b => {});
+//     this.it.consume!(b => {});
+//     this.foo.consume!(b => {});
+//     this.foo.b.consume!(b => {});
+//     this.foo.a.consume!(b => {});
+//       }
+// });
+
+// F().foo.consume!(b => {});
+// F().foo.b.consume!(b => {});
+// F().foo.a.consume!(b => {});
+
+// F().it
+// F().bar

@@ -86,19 +86,20 @@ export type Overrides = {
     styles?: string;
 };
 export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer B, any> ? B : never;
+type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 type UnwrapIterables<IP> = {
     [K in keyof IP]: Exclude<IP[K], AsyncExtraIterable<any>>;
 };
-type CombinedEffectiveType<Base extends ExTagCreator<any>, D extends Overrides> = D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = D['iterable'] & UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
-type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = ReadWriteAttributes<IterableProperties<CombinedIterableProperties<Base, D>> & AsyncGeneratedObject<CombinedEffectiveType<Base, D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;
+type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = ReadWriteAttributes<IterableProperties<CombinedIterableProperties<Base, D>> & AsyncGeneratedObject<CombinedNonIterableProperties<Base, D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;
+type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<Definitions['declare'] & Definitions['override'] & Definitions['prototype'] & TagCreatorAttributes<Base>, any>;
 interface ExtendedTag {
-    <BaseCreator extends ExTagCreator<any>, Definitions extends Overrides = {}>(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<BaseCreator, Definitions>> & Definitions): CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<CombinedEffectiveType<BaseCreator, Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>>, BaseCreator, PickType<Definitions['declare'] & Definitions['override'] & Definitions['prototype'] & TagCreatorAttributes<BaseCreator>, any>>>;
-    <BaseCreator extends ExTagCreator<any>, Definitions extends Overrides = {}>(this: BaseCreator, _: ThisType<CombinedThisType<BaseCreator, Definitions>> & Definitions): CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<CombinedEffectiveType<BaseCreator, Definitions> & IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>>, BaseCreator, PickType<Definitions['declare'] & Definitions['override'] & Definitions['prototype'] & TagCreatorAttributes<BaseCreator>, any>>>;
+    <BaseCreator extends ExTagCreator<any>, Definitions extends Overrides = {}>(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<BaseCreator, Definitions>> & Definitions): CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>> & CombinedNonIterableProperties<BaseCreator, Definitions>, BaseCreator, StaticReferences<BaseCreator, Definitions>, CombinedIterableProperties<BaseCreator, Definitions>>>;
+    <BaseCreator extends ExTagCreator<any>, Definitions extends Overrides = {}>(this: BaseCreator, _: ThisType<CombinedThisType<BaseCreator, Definitions>> & Definitions): CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>> & CombinedNonIterableProperties<BaseCreator, Definitions>, BaseCreator, StaticReferences<BaseCreator, Definitions>, CombinedIterableProperties<BaseCreator, Definitions>>>;
 }
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
 export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
-type ExTagCreator<Base extends object, Super extends (unknown | ExTagCreator<any>) = unknown, Statics = {}> = TagCreatorFunction<Base> & {
+type ExTagCreator<Base extends object, Super extends (unknown | ExTagCreator<any>) = unknown, Statics = {}, CIP = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;
     super: Super;
     definition?: Overrides;
