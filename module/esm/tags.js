@@ -1,4 +1,6 @@
-/* Types for tag creation, implemented by `tag()` in ai-ui.ts */
+/* Types for tag creation, implemented by `tag()` in ai-ui.ts.
+  No code/data is declared in this file (except the re-exported symbols from iterators.ts).
+*/
 export const UniqueID = Symbol("Unique ID");
 // declare var Base: TagCreator<HTMLElement>;
 // var b = Base();
@@ -11,6 +13,10 @@ export const UniqueID = Symbol("Unique ID");
 //     mat: 0
 //   }
 // });
+// type Q1 = BaseIterables<typeof Base>;
+// type Q2 = BaseIterables<typeof Same>;
+// type Q3 = BaseIterables<typeof Ex>;
+// type Q4 = BaseIterables<typeof F>;
 // Same().tagName
 // const Ex = Same.extended({
 //   override:{

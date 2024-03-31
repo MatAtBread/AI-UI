@@ -1,4 +1,6 @@
-/* Types for tag creation, implemented by `tag()` in ai-ui.ts */
+/* Types for tag creation, implemented by `tag()` in ai-ui.ts. 
+  No code/data is declared in this file (except the re-exported symbols from iterators.ts).
+*/
 
 import type { AsyncExtraIterable, AsyncProvider, Ignore, Iterability } from "./iterators.js";
 
@@ -56,6 +58,10 @@ export type Flatten<O> = [{
   [K in keyof O]: O[K]
 }][number];
 
+export type DeepFlatten<O> = [{
+  [K in keyof O]: Flatten<O[K]>
+}][number];
+
 type Extends<A, B> =
   A extends any[]
   ? B extends any[]
@@ -111,8 +117,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 }
 
 // Basically anything, _except_ an array, as they clash with map, filter
-type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & { splice?: never };
-type OptionalIterablePropertyValue = IterablePropertyValue | undefined | null;
+type OptionalIterablePropertyValue = (string | number | bigint | boolean | object | undefined | null) & { splice?: never };
 
 type NeverEmpty<O extends object> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
@@ -173,41 +178,30 @@ export type Overrides = {
   styles?: string;
 }
 
-export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer B,any> ? B:never;
+// Infer the effective set of attributes from an ExTagCreator
+export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer BaseAttrs> 
+  ? BaseAttrs
+  : never;
+
+// Infer the effective set of iterable attributes from the _ancestors_ of an ExTagCreator
+type BaseIterables<Base> = 
+  Base extends ExTagCreator<infer _A, infer B, infer D, infer _D extends Overrides> 
+  ? BaseIterables<B> extends never 
+    ? D['iterable'] extends unknown 
+      ? {} 
+      : D['iterable']
+    : BaseIterables<B> & D['iterable']
+  : never;
 
 type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = 
-  D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
+  D['declare'] 
+  & D['override'] 
+  & IDS<D['ids']> 
+  & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 
-type DeepMerge<A,B> = A extends object 
-? B extends object 
-  ? {
-      [K in (keyof A | keyof B)]: 
-        K extends (keyof A & keyof B) 
-        ? DeepMerge<A[K], B[K]>
-        : K extends keyof A 
-          ? A[K]
-          : K extends keyof B
-          ? B[K]
-          : never
-    } 
-  : A | B 
-: A | B;
+type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable'];
 
-//type CombinedIterableProperties<Base extends ExTagCreator<any,any,any,any>, D extends Overrides> = 
-//DeepMerge<
-//  D['iterable']
-//  (Base extends ExTagCreator<any,any,any,infer CIP> ? CIP : never)
-//>
-  //& UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
-
-type UnwrapIterables<IP> = {
-  [K in keyof IP]: Exclude<IP[K], AsyncExtraIterable<any>>
-}
-  
-type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = 
-  D['iterable'] & UnwrapIterables<Pick<TagCreatorAttributes<Base>, keyof D['iterable']>>;
-
-  type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = 
+type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = 
   ReadWriteAttributes<
     IterableProperties<CombinedIterableProperties<Base,D>> 
     & AsyncGeneratedObject<CombinedNonIterableProperties<Base,D>>, 
@@ -217,12 +211,12 @@ type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overri
   >;
 
 type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<
-Definitions['declare']
-& Definitions['override'] 
-& Definitions['prototype'] 
-& TagCreatorAttributes<Base>,
-any
->;
+  Definitions['declare']
+  & Definitions['override'] 
+  & Definitions['prototype'] 
+  & TagCreatorAttributes<Base>,
+  any
+  >;
 
 // `this` in this.extended(...) is BaseCreator
 interface ExtendedTag {
@@ -235,8 +229,8 @@ interface ExtendedTag {
       IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
       & CombinedNonIterableProperties<BaseCreator,Definitions>,
       BaseCreator,
-      StaticReferences<BaseCreator, Definitions>,
-      CombinedIterableProperties<BaseCreator,Definitions>      
+      Definitions,
+      StaticReferences<BaseCreator, Definitions>
     >
   >;
 
@@ -249,8 +243,8 @@ interface ExtendedTag {
     IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
     & CombinedNonIterableProperties<BaseCreator,Definitions>,
       BaseCreator,
-      StaticReferences<BaseCreator, Definitions>,
-      CombinedIterableProperties<BaseCreator,Definitions>      
+      Definitions,
+      StaticReferences<BaseCreator, Definitions>
     >
   >;
 }
@@ -265,8 +259,8 @@ export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<P
 ever specified by ExtendedTag (internally), and so is not exported */
 type ExTagCreator<Base extends object,
   Super extends (unknown | ExTagCreator<any>) = unknown,
+  SuperDefs extends Overrides = {},
   Statics = {},
-  CIP = {}
 > = TagCreatorFunction<Base> & {
   /* It can also be extended */
   extended: ExtendedTag
@@ -278,9 +272,12 @@ type ExTagCreator<Base extends object,
   readonly name: string;
   /* Can test if an element was created by this function or a base tag function */
   [Symbol.hasInstance](elt: any): boolean;
-} & Statics;
+} & 
+// `Statics` here is that same as StaticReferences<Super, SuperDefs>, but the circular reference breaks TS
+// so we compute the Statics outside this type declaration as pass them as a result
+Statics;
 
-export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
+export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {}>;
 
 // declare var Base: TagCreator<HTMLElement>;
 // var b = Base();
@@ -294,6 +291,12 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 //     mat: 0
 //   }
 // });
+
+// type Q1 = BaseIterables<typeof Base>;
+// type Q2 = BaseIterables<typeof Same>;
+// type Q3 = BaseIterables<typeof Ex>;
+// type Q4 = BaseIterables<typeof F>;
+
 // Same().tagName
 
 // const Ex = Same.extended({
@@ -345,3 +348,4 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, {}>;
 
 // F().it
 // F().bar
+
