@@ -118,7 +118,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 }
 
 // Basically anything, _except_ an array, as they clash with map, filter
-type OptionalIterablePropertyValue = (string | number | bigint | boolean | object | undefined | null) & { splice?: never };
+type OptionalIterablePropertyValue = (string | number | bigint | boolean | undefined | null) | (object & { splice?: never });
 
 type NeverEmpty<O extends object> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
