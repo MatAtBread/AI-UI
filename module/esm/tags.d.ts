@@ -42,10 +42,11 @@ type Extends<A, B> = A extends any[] ? B extends any[] ? Extends<A[number], B[nu
 type MergeBaseTypes<T, Base> = {
     [K in keyof Base | keyof T]: K extends (keyof T & keyof Base) ? Extends<T[K], Base[K]> : K extends keyof T ? T[K] : K extends keyof Base ? Base[K] : never;
 };
+export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
-    [K in keyof Omit<IP, typeof Iterability>]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
+    [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>;
 } : {
-    [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & Partial<AsyncExtraIterable<IP[K]>>;
+    [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>;
 };
 type OptionalIterablePropertyValue = (string | number | bigint | boolean | object | undefined | null) & {
     splice?: never;
@@ -65,10 +66,11 @@ type ExcessKeys<A, B> = A extends any[] ? B extends any[] ? ExcessKeys<A[number]
     [K in keyof A]: K extends keyof B ? A[K] extends (B[K] extends Function ? B[K] : DeepPartial<B[K]>) ? never : B[K] : _Not_Declared_;
 }, never>>;
 type OverlappingKeys<A, B> = B extends never ? never : A extends never ? never : keyof A & keyof B;
-type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overrides, Result = never> = (OverlappingKeys<D['override'], D['declare']> | OverlappingKeys<D['iterable'], D['declare']> | OverlappingKeys<D['iterable'], D['override']> | OverlappingKeys<D['declare'], TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D['declare'], D['prototype']> | OverlappingKeys<D['override'], D['prototype']> | OverlappingKeys<D['iterable'], D['prototype']>) extends never ? ExcessKeys<D['override'], TagCreatorAttributes<BaseCreator>> extends never ? Result : {
+type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overrides, Result = never> = (OverlappingKeys<D['override'], D['declare']> | OverlappingKeys<D['iterable'], D['declare']> | OverlappingKeys<D['iterable'], D['override']> | OverlappingKeys<D['iterable'], Omit<TagCreatorAttributes<BaseCreator>, keyof BaseIterables<BaseCreator>>> | OverlappingKeys<D['declare'], TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D['declare'], D['prototype']> | OverlappingKeys<D['override'], D['prototype']> | OverlappingKeys<D['iterable'], D['prototype']>) extends never ? ExcessKeys<D['override'], TagCreatorAttributes<BaseCreator>> extends never ? Result : {
     '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<D['override'], TagCreatorAttributes<BaseCreator>>;
 } : OmitType<{
-    '`declare` clashes with base properties': OverlappingKeys<D, TagCreatorAttributes<BaseCreator>>;
+    '`declare` clashes with base properties': OverlappingKeys<D['declare'], TagCreatorAttributes<BaseCreator>>;
+    '`iterable` clashes with base properties': OverlappingKeys<D['iterable'], Omit<TagCreatorAttributes<BaseCreator>, keyof BaseIterables<BaseCreator>>>;
     '`iterable` clashes with `override`': OverlappingKeys<D['iterable'], D['override']>;
     '`iterable` clashes with `declare`': OverlappingKeys<D['iterable'], D['declare']>;
     '`override` clashes with `declare`': OverlappingKeys<D['override'], D['declare']>;
@@ -90,7 +92,7 @@ export type Overrides = {
     styles?: string;
 };
 export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer BaseAttrs> ? BaseAttrs : never;
-type BaseIterables<Base> = Base extends ExTagCreator<infer _A, infer B, infer D, infer _D extends Overrides> ? BaseIterables<B> extends never ? D['iterable'] extends unknown ? {} : D['iterable'] : BaseIterables<B> & D['iterable'] : never;
+type BaseIterables<Base> = Base extends ExTagCreator<infer _A, infer B, infer D extends Overrides, infer _D> ? BaseIterables<B> extends never ? D['iterable'] extends unknown ? {} : D['iterable'] : BaseIterables<B> & D['iterable'] : never;
 type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
 type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable'];
 type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = ReadWriteAttributes<IterableProperties<CombinedIterableProperties<Base, D>> & AsyncGeneratedObject<CombinedNonIterableProperties<Base, D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;

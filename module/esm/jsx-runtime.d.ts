@@ -1,6 +1,6 @@
 import { ChildTags, TagCreatorFunction } from "./ai-ui.js";
 type AIUIJSXTag = any;
-type AIUIJSXElement<N extends AIUIJSXTag, C extends ChildTags[]> = any;
+type AIUIJSXElement<N extends AIUIJSXTag, C extends ChildTags[]> = N extends TagCreatorFunction<Element> ? ReturnType<N> : N extends keyof HTMLElementTagNameMap ? ReturnType<TagCreatorFunction<HTMLElementTagNameMap[keyof HTMLElementTagNameMap]>> : N extends AIUIJSX ? C : never;
 type AIUIJSX = <T extends {}, N extends AIUIJSXTag, C extends ChildTags[]>(tagName: N, attrs: T | null, ...children: C) => AIUIJSXElement<N, C>;
 declare const AIUIJSX: AIUIJSX;
 export declare const jsx: <T extends {
