@@ -222,7 +222,7 @@ type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overri
 interface ExtendedTag {
   <
     BaseCreator extends ExTagCreator<any>,
-    Definitions extends Overrides = {}
+    Definitions extends Omit<Overrides,'constructed'> = {}
   >(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<BaseCreator,Definitions>> & Definitions)
   : CheckPropertyClashes<BaseCreator, Definitions,
     ExTagCreator<
@@ -236,8 +236,8 @@ interface ExtendedTag {
 
   <
     BaseCreator extends ExTagCreator<any>,
-    Definitions extends Overrides = {}
-  >(this: BaseCreator, _: ThisType<CombinedThisType<BaseCreator,Definitions>> & Definitions)
+    Definitions extends Omit<Overrides,'constructed'> = {}
+  >(this: BaseCreator, _: Definitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
   : CheckPropertyClashes<BaseCreator, Definitions,
     ExTagCreator< 
     IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
@@ -288,6 +288,7 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {
 
 // const Same = Base.extended({
 //   iterable:{
+//     foo: {},
 //     mat: 0
 //   }
 // });
@@ -339,7 +340,8 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {
 //     this.foo.consume!(b => {});
 //     this.foo.b.consume!(b => {});
 //     this.foo.a.consume!(b => {});
-//       }
+//     this.oncanplay = ()=> this.foo.map!(m => m)
+//   }
 // });
 
 // F().foo.consume!(b => {});
@@ -349,3 +351,66 @@ export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {
 // F().it
 // F().bar
 
+// declare var tr: TagCreator<HTMLTableRowElement>;
+// declare var td: TagCreator<HTMLTableCellElement>;
+
+// export const BaseDevice = tr.extended({
+//   iterable: {
+//     payload: {}
+//   },
+//   declare: {
+//     details(): ChildTags {
+//       return undefined;
+//     }
+//   }
+// });
+
+// export const ZigbeeDevice = BaseDevice.extended({
+//   styles: `#friendly_name {
+//     white-space: break-spaces;
+//     max-height: 3em;
+//     overflow-y: hidden;
+//   }
+
+//   @keyframes flash {
+//     0% { opacity: 0.2; }
+//     40% { opacity: 0.2; }
+//     50% { opacity: 0.8; }
+//     60% { opacity: 0.2; }
+//     100% { opacity: 0.2; }
+//   }
+
+//   .flash {
+//     animation: flash 4s;
+//     animation-iteration-count: infinite;
+//   }`,
+//   iterable: {
+//     payload: {} as {
+//       battery_low?: boolean
+//       linkquality?: number
+//     }
+//   },
+//   constructed() {
+//     const maxLQ = 100;
+
+//     return [
+//       td({
+//         onclick: () => this.nextElementSibling?.className == 'details'
+//           ? this.nextElementSibling.remove()
+//           : this.after(td({ colSpan: 6, className: 'details' }, this.details())),
+//         style: {
+//           opacity: this.payload.map!(p => !maxLQ || p.battery_low ? "1" : String((p.linkquality || 0) / maxLQ))
+//         },
+//         className: this.payload.battery_low!.map!(p => p ? 'flash' : '')
+//       },
+//         this.payload.battery_low!.map!(p => p ? '\uD83D\uDD0B' : '\uD83D\uDCF6')
+//       ),
+//       td({
+//         onclick: () => this.nextElementSibling?.className == 'details'
+//           ? this.nextElementSibling.remove()
+//           : this.after(td({ colSpan: 6, className: 'details' }, this.details())),
+//         id: 'friendly_name'
+//       }, 'friendly_name')
+//     ]
+//   }
+// });

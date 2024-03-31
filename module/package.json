@@ -10,7 +10,7 @@
     "jsdom": "^24.0.0",
     "ts-loader": "^9.5.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.2",
+    "typescript": "^5.4.3",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
   },
@@ -46,7 +46,7 @@
     "prepublishOnly": "npm run build && npm test",
     "test": "tsc -p ../type_tests/tsconfig.json && npm run tests --",
     "tests": "ts-node ../testing/index.ts",
-    "examples":"npx http-server .. -c0 -e js"
+    "examples": "npx http-server .. -c0 -e js"
   },
   "types": "./esm/ai-ui.d.ts",
   "version": "0.10.17"
