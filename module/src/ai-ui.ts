@@ -1,7 +1,7 @@
 import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { ChildTags, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
+import { ChildTags, Constructed, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
 import { DEBUG } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
@@ -503,7 +503,7 @@ export const tag = <TagLoader>function <Tags extends string,
     // (finally) assigning those specified by the instantiation
     const extendTagFn: ExtendTagFunction = (attrs, ...children) => {
       const noAttrs = isChildTag(attrs) ;
-      const newCallStack: Overrides[] = [];
+      const newCallStack: (Constructed & Overrides)[] = [];
       const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack  };
       const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
       e.constructor = extendTag;

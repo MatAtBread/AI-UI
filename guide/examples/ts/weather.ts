@@ -1,4 +1,4 @@
-import { tag } from '../../../module/esm/ai-ui.js';
+import { ChildTags, tag } from '../../../module/esm/ai-ui.js';
 
 const { div, img, input } = tag();
 
@@ -141,6 +141,7 @@ const Location = input.extended({
       this.dispatchEvent(new Event('change'));
   }
 });
+
 
 const App = div.extended({
   constructed() {

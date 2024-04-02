@@ -391,8 +391,8 @@ export const tag = function (_1, _2, _3) {
     }
     ;
     function tagHasInstance(e) {
-        for (let etf = this; etf; etf = etf.super) {
-            if (e.constructor === etf)
+        for (let c = e.constructor; c; c = c.super) {
+            if (c === this)
                 return true;
         }
         return false;
@@ -529,6 +529,11 @@ export const tag = function (_1, _2, _3) {
             super: () => { throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement()."); },
             extended, // How to extend this (base) tag
             valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>`; }
+        });
+        Object.defineProperty(tagCreator, Symbol.hasInstance, {
+            value: tagHasInstance,
+            writable: true,
+            configurable: true
         });
         Object.defineProperty(tagCreator, "name", { value: '<' + k + '>' });
         // @ts-ignore

@@ -28,7 +28,7 @@ export type PossiblyAsync<X> =
 type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
 export const UniqueID = Symbol("Unique ID");
-export type Instance<T extends Record<string, unknown> = {}> = { [UniqueID]: string } & T;
+export type Instance<T = {}> = { [UniqueID]: string } & T;
 
 // Internal types supporting TagCreator
 type AsyncGeneratedObject<X extends object> = {
@@ -175,10 +175,12 @@ export type Overrides = {
   declare?: object;
   iterable?: { [k: string]: OptionalIterablePropertyValue };
   ids?: { [id: string]: ExTagCreator<any>; };
-  constructed?: () => (ChildTags | void | Promise<void | ChildTags>);
   styles?: string;
 }
 
+export type Constructed = {
+  constructed: () => (ChildTags | void | Promise<void | ChildTags>);
+}
 // Infer the effective set of attributes from an ExTagCreator
 export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer BaseAttrs> 
   ? BaseAttrs
@@ -223,32 +225,46 @@ type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overri
 interface ExtendedTag {
   <
     BaseCreator extends ExTagCreator<any>,
-    Definitions extends Omit<Overrides,'constructed'> = {}
-  >(this: BaseCreator, _: (instance: any) => ThisType<CombinedThisType<BaseCreator,Definitions>> & Definitions)
-  : CheckPropertyClashes<BaseCreator, Definitions,
-    ExTagCreator<
-      IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
-      & CombinedNonIterableProperties<BaseCreator,Definitions>,
-      BaseCreator,
-      Definitions,
-      StaticReferences<BaseCreator, Definitions>
+    SuppliedDefinitions,
+    Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {},
+    TagInstance = any
+  >(this: BaseCreator, _: (inst:TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
+  : CheckConstructedReturn<SuppliedDefinitions,
+      CheckPropertyClashes<BaseCreator, Definitions,
+      ExTagCreator< 
+        IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
+        & CombinedNonIterableProperties<BaseCreator,Definitions>,
+        BaseCreator,
+        Definitions,
+        StaticReferences<BaseCreator, Definitions>
+      >
     >
-  >;
+  >
 
   <
     BaseCreator extends ExTagCreator<any>,
-    Definitions extends Omit<Overrides,'constructed'> = {}
-  >(this: BaseCreator, _: Definitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
-  : CheckPropertyClashes<BaseCreator, Definitions,
-    ExTagCreator< 
-    IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
-    & CombinedNonIterableProperties<BaseCreator,Definitions>,
-      BaseCreator,
-      Definitions,
-      StaticReferences<BaseCreator, Definitions>
+    SuppliedDefinitions,
+    Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}
+  >(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
+  : CheckConstructedReturn<SuppliedDefinitions,
+      CheckPropertyClashes<BaseCreator, Definitions,
+      ExTagCreator< 
+        IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
+        & CombinedNonIterableProperties<BaseCreator,Definitions>,
+        BaseCreator,
+        Definitions,
+        StaticReferences<BaseCreator, Definitions>
+      >
     >
-  >;
+  >
 }
+
+type CheckConstructedReturn<SuppliedDefinitions, Result> = 
+SuppliedDefinitions extends { constructed: any }
+? SuppliedDefinitions extends Constructed 
+  ? Result
+  : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
+: Result
 
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
@@ -273,9 +289,48 @@ type ExTagCreator<Base extends object,
   readonly name: string;
   /* Can test if an element was created by this function or a base tag function */
   [Symbol.hasInstance](elt: any): boolean;
+  [UniqueID]: string;
 } & 
 // `Statics` here is that same as StaticReferences<Super, SuperDefs>, but the circular reference breaks TS
 // so we compute the Statics outside this type declaration as pass them as a result
 Statics;
 
 export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {}>;
+
+// declare const div: TagCreator<HTMLDivElement>;
+// const I = div.extended(inst => ({
+//   iterable:{
+//     i: 0
+//   },
+//   constructed(){
+//     const x = this.i.map!(i => i+1);
+//     return Symbol('x');
+//   }
+// }))
+// const J = div.extended(inst => ({
+//   iterable:{
+//     i: 0
+//   },
+//   constructed(){
+//     const x = this.i.map!(i => i+1);
+//     return x;
+//   }
+// }))
+// const K = div.extended(inst => ({
+//   iterable:{
+//     i: 0
+//   },
+//   constructed(){
+//     const x = this.i.map!(i => i+1);
+//   }
+// }))
+// const L = div.extended(inst => ({
+//   iterable:{
+//     i: 0
+//   }
+// }))
+
+// I()
+// J()
+// K()
+// L()

@@ -3,14 +3,17 @@ import { ChildTags, TagCreatorFunction, tag } from "./ai-ui.js"
 /* Support for React.createElement(type, props, ...children) */
 const baseTags = tag();
 
-type AIUIJSXTag = any;//(keyof HTMLElementTagNameMap | TagCreatorFunction<Element> | AIUIJSX);
+type AIUIJSXTag = (keyof HTMLElementTagNameMap | TagCreatorFunction<Element> | AIUIJSX);
 
 type AIUIJSXElement<
   N extends AIUIJSXTag,
   C extends ChildTags[]
-> = N extends TagCreatorFunction<Element> ? ReturnType<N>
-  : N extends keyof HTMLElementTagNameMap ? ReturnType<TagCreatorFunction<HTMLElementTagNameMap[keyof HTMLElementTagNameMap]>>
-  : N extends AIUIJSX ? C
+> = 
+// N extends TagCreatorFunction<Element> ? ReturnType<N>
+//: N extends keyof HTMLElementTagNameMap ? ReturnType<TagCreatorFunction<HTMLElementTagNameMap[keyof HTMLElementTagNameMap]>>
+N extends TagCreatorFunction<Element> ? ReturnType<TagCreatorFunction<Element>>
+: N extends string ? ReturnType<TagCreatorFunction<Element>>
+: N extends AIUIJSX ? C
   : never;
 
 type AIUIJSX = <
