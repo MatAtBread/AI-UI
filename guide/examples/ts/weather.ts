@@ -1,4 +1,4 @@
-import { ChildTags, tag } from '../../../module/esm/ai-ui.js';
+import { tag } from '../../../module/esm/ai-ui.js';
 
 const { div, img, input } = tag();
 
@@ -48,6 +48,7 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 
 const Chart = img.extended({
   override: {
+    className: 'Chart',
     style: {
       transition: 'opacity 0.5s',
       opacity: '0.2'
@@ -85,6 +86,9 @@ that when set, fetches and displays the weather forecast for the specified GeoIn
 const WeatherForecast = Chart.extended({
   iterable: {
     geo: undefined as GeoInfo | undefined
+  },
+  override:{
+    className: 'WeatherForecast'
   },
   constructed() {
     this.geo.consume!(async g => {
