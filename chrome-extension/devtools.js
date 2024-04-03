@@ -75,9 +75,9 @@ const _ = ${rootNode}.extended({
     return typeof o === 'object' && o 
       ? Object.create(null, 
         Object.fromEntries(Object.entries(o).map(([k,v]) => [k,{ 
-          value: typeof v === 'object' && v
-              ? v[Symbol.unscopables] ?? v
-              : v, 
+          value: v?.valueOf() /*typeof v === 'object' && v
+              ? v[Symbol.unscopables] ?? v?.valueOf()
+              : v?.valueOf()*/, 
               enumerable: true }]))
       //Object.getOwnPropertyDescriptors(o)
       ) 

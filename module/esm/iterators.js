@@ -318,9 +318,6 @@ export function defineIterableProperty(obj, name, v) {
                         },
                         // Implement the logic that returns a mapped iterator for the specified field
                         get(target, key, receiver) {
-                            // Only used to determine if this value is a Proxy or not
-                            if (key === Symbol.unscopables)
-                                return target;
                             if (key === 'valueOf')
                                 return () => boxedObject;
                             const targetProp = Reflect.getOwnPropertyDescriptor(target, key);
