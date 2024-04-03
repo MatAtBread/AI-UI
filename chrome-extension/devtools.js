@@ -72,7 +72,16 @@ const _ = ${rootNode}.extended({
   }
 
   function noProto(o) {
-    return typeof o === 'object' && o ? Object.create(null, Object.getOwnPropertyDescriptors(o)) : o;
+    return typeof o === 'object' && o 
+      ? Object.create(null, 
+        Object.fromEntries(Object.entries(o).map(([k,v]) => [k,{ 
+          value: typeof v === 'object' && v
+              ? v[Symbol.unscopables] ?? v
+              : v, 
+              enumerable: true }]))
+      //Object.getOwnPropertyDescriptors(o)
+      ) 
+      : o;
   }
   function explainConstructor(c, code) {
     const props = {
