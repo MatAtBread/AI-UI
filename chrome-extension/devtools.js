@@ -72,18 +72,16 @@ const _ = ${rootNode}.extended({
   }
 
   function noProto(o) {
-    return typeof o === 'object' && o 
-      ? Object.create(null, 
-        Object.fromEntries(Object.entries(o).map(([k,v]) => [k,{ 
-          value: v?.valueOf() /*typeof v === 'object' && v
-              ? v[Symbol.unscopables] ?? v?.valueOf()
-              : v?.valueOf()*/, 
-              enumerable: true }]))
-      //Object.getOwnPropertyDescriptors(o)
-      ) 
+    return typeof o === 'object' && o
+      ? Object.create(null,
+        Object.fromEntries(Object.entries(o).map(([k, v]) => [k, {
+          value: v?.valueOf(),
+          enumerable: true
+        }]))
+      )
       : o;
   }
-  function explainConstructor(c, code) {
+  function explainConstructor(c) {
     const props = {
       [c.name]: {
         enumerable: true,
@@ -96,20 +94,22 @@ const _ = ${rootNode}.extended({
           : Object.getPrototypeOf($0)
       }
     }
-    if (code) {
-      props['AI-UI Code Snippet'] = {
-        value: code
-      };
-
-      // TODO: Find a way to see what attrs aren't the same as the proto values?
-      props['Element properties'] = {
-        // Object.getPrototypeOf($0)[Symbol.toStringTag]
-        value: Object.defineProperty(noProto($0), 'Prototype properties', { value: Object.getPrototypeOf($0) })
-      }
-    }
     return Object.create(null, props);
   }
-  return explainConstructor($0.constructor, codify($0))
+  const props = explainConstructor($0.constructor);
+  Object.defineProperties(props, {
+    'AI-UI Code Snippet': {
+      value: codify($0)
+    },
+
+    'Element properties': {
+      // TODO: Find a way to see what attrs aren't the same as the proto values?
+      // Object.getPrototypeOf($0)[Symbol.toStringTag]
+      value: Object.defineProperty(noProto($0), 'Prototype properties', { value: Object.getPrototypeOf($0) })
+    }
+  });
+
+  return props;
 }
 
 chrome.devtools.panels.elements.createSidebarPane(
