@@ -16,10 +16,13 @@ const getEltInfo = () => {
     const markup = (function codify(n, nest = 0, noPad = false) {
       const pad = noPad ? '' : '\n' + ' '.repeat(nest * 2 + 6);
       const nodeName = n.nodeName.toLowerCase();
+//      if (nodeName === 'script') return 'script()'+pad;
       if (nodeName === '#text') {
         if (n.textContent?.match(/^\s+$/))
           return null;
-        return "`" + n.textContent + "`" + pad.slice(0, -4);
+        if (n.textContent.includes('\n') || n.textContent.includes('\t') || n.textContent.includes('"')  || n.textContent.includes('`') || n.textContent.includes("\""))
+          return "`" + n.textContent + "`"// + pad.slice(0, -4);
+        return "'" + n.textContent + "'"// + pad.slice(0, -4);
       }
       if (nodeName === '#comment')
         return "/*" + n.nodeValue + "*/";
@@ -45,7 +48,7 @@ const getEltInfo = () => {
         rootNode = nodeName;
         if (n.childNodes.length)
           return '[' + pad +
-            [...n.childNodes].map(n => codify(n, nest + 1)).filter(s => s != null).join("," + pad).slice(0, -2) + ']';
+            [...n.childNodes].map(n => codify(n, nest + 1)).filter(s => s != null).join("," + pad)/*.slice(0, -4)*/ + ']';
         return undefined;
       }
       if (!hasAttrs && n.childNodes.length === 0)
@@ -54,16 +57,16 @@ const getEltInfo = () => {
         return nodeName + '(' + (codify(n.childNodes[0], nest, true) || '') + ')';
       return nodeName + '(' +
         attrs +
-        (attrs && (n.childNodes.length > 0) ? ",\n" + pad : '') +
+        (hasAttrs && attrs && (n.childNodes.length > 0) ? "," + pad : '') +
         (nest < 20
           ? [...n.childNodes].map(n => codify(n, nest + 1)).filter(s => s != null).join("," + pad)
           : '...') +
-        ')';
+        pad.slice(0,-2)+')';
     })(n);
     return `import { tag } from '@matatbread/ai-ui';
 const { ${Object.keys(nodeNames)} } = tag();
 const _ = ${rootNode}.extended({
-  ${rootAttrs ? `override:${rootAttrs},` : ''}
+  ${rootAttrs ? `override: ${rootAttrs},` : ''}
   ${markup ? `constructed() {
     return ${markup}
   }` : ''}
