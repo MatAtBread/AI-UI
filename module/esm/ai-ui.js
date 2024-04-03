@@ -485,8 +485,8 @@ export const tag = function (_1, _2, _3) {
             && 'className' in fullProto
             && typeof fullProto.className === 'string'
             ? fullProto.className
-            : '?';
-        const callSite = DEBUG ? ' @' + (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?') : '';
+            : uniqueTagID;
+        const callSite = DEBUG ? (new Error().stack?.split('\n')[2] ?? '') : '';
         Object.defineProperty(extendTag, "name", {
             value: "<ai-" + creatorName.replace(/\s+/g, '-') + callSite + ">"
         });
