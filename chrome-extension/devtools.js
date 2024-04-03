@@ -32,7 +32,7 @@ if (window.location.search) {
           hasAttrs = true;
           attrs = "{";
           if (n.attributes.length === 1) {
-            attrs += ` ${attrName(n.attributes[0].name)}: ${JSON.stringify(n.attributes[0].value)} },` + pad;
+            attrs += ` ${attrName(n.attributes[0].name)}: ${JSON.stringify(n.attributes[0].value)} }`;
           }
           else {
             for (const a of n.attributes) {
@@ -40,15 +40,15 @@ if (window.location.search) {
               attrs += `${attrName(a.name)}: ${JSON.stringify(a.value)},`;
             }
             attrs = attrs.slice(0, -1) + pad + "}";
-            if (n.childNodes.length > 0)
-              attrs += ",\n" + pad;
           }
         }
         if (nest === 0) {
           rootAttrs = hasAttrs ? attrs : '';
           rootNode = nodeName;
-          return '[' + pad +
-            [...n.childNodes].map(n => codify(n, nest + 1)).filter(s => s != null).join("," + pad).slice(0, -2) + ']';
+          if (n.childNodes.length)
+            return '[' + pad +
+              [...n.childNodes].map(n => codify(n, nest + 1)).filter(s => s != null).join("," + pad).slice(0, -2) + ']';
+          return undefined;
         }
         if (!hasAttrs && n.childNodes.length === 0)
           return nodeName + '()';
@@ -56,19 +56,20 @@ if (window.location.search) {
           return nodeName + '(' + (codify(n.childNodes[0], nest, true) || '') + ')';
         return nodeName + '(' +
           attrs +
+          (attrs && (n.childNodes.length > 0) ? ",\n" + pad : '') +
           (nest < 20
             ? [...n.childNodes].map(n => codify(n, nest + 1)).filter(s => s != null).join("," + pad)
             : '...') +
           ')';
       })(n);
-      return `import { tag } from '../module/esm/ai-ui.js';
-    const { ${Object.keys(nodeNames)} } = tag();
-    const _ = ${rootNode}.extended({
-      ${rootAttrs ? `override:${rootAttrs},` : ''}
-      constructed() {
-        return ${markup}
-      }
-    });
+      return `import { tag } from '@matatbread/ai-ui';
+const { ${Object.keys(nodeNames)} } = tag();
+const _ = ${rootNode}.extended({
+  ${rootAttrs ? `override:${rootAttrs},` : ''}
+  ${markup ? `constructed() {
+    return ${markup}
+  }` : ''}
+});
     `;
     }
 
