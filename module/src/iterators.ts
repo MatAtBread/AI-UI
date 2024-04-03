@@ -513,7 +513,7 @@ export function generatorHelpers<G extends (...args: any[]) => R, R extends Asyn
   return function (...args:Parameters<G>): ReturnType<G> {
     const ai = g(...args);
     return iterableHelpers(ai) as ReturnType<G>;
-  } as ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T> ? T : unknown>
+  } as (...args: Parameters<G>) => ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T> ? T : unknown>
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */

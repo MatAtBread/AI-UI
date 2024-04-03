@@ -74,10 +74,13 @@ const _ = ${rootNode}.extended({
   function noProto(o) {
     return typeof o === 'object' && o
       ? Object.create(null,
-        Object.fromEntries(Object.entries(o).map(([k, v]) => [k, {
-          value: v?.valueOf(),
-          enumerable: true
-        }]))
+        Object.fromEntries(Object.entries(o).map(([k, v]) => [
+          v[Symbol.asyncIterator] ? k + ' 💥' : k, 
+          {
+            value: typeof v === 'function' ? v : v?.valueOf(),
+            enumerable: true
+          }
+        ]))
       )
       : o;
   }
