@@ -75,7 +75,7 @@ const _ = ${rootNode}.extended({
     return typeof o === 'object' && o
       ? Object.create(null,
         Object.fromEntries(Object.entries(o).map(([k, v]) => [
-          v[Symbol.asyncIterator] ? k + ' 💥' : k, 
+          (v && v[Symbol.asyncIterator]) ? k + ' 💥' : k,
           {
             value: typeof v === 'function' ? v : v?.valueOf(),
             enumerable: true
