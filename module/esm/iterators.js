@@ -1,5 +1,7 @@
 import { DEBUG } from "./debug.js";
 import { deferred } from "./deferred.js";
+;
+;
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
 }
@@ -16,22 +18,15 @@ export function asyncIterator(o) {
         return o;
     throw new Error("Not as async provider");
 }
-/* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
-  something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
-  the same arguments returns a AsyncExtraIterable<X>
-*/
-function wrapAsyncHelper(fn) {
-    return function (...args) { return iterableHelpers(fn.call(this, ...args)); };
-}
-export const asyncExtras = {
-    map: wrapAsyncHelper(map),
-    filter: wrapAsyncHelper(filter),
-    unique: wrapAsyncHelper(unique),
-    waitFor: wrapAsyncHelper(waitFor),
-    multi: wrapAsyncHelper(multi),
-    broadcast: wrapAsyncHelper(broadcast),
-    initially: wrapAsyncHelper(initially),
-    consume: consume,
+const asyncExtras = {
+    map,
+    filter,
+    unique,
+    waitFor,
+    multi,
+    broadcast,
+    initially,
+    consume,
     merge(...m) {
         return merge(this, ...m);
     }
@@ -94,7 +89,7 @@ export function queueIteratableIterator(stop = () => { }) {
             return true;
         }
     };
-    return q;
+    return iterableHelpers(q);
 }
 /* An AsyncIterable which typed objects can be published to.
   The queue can be read by multiple consumers, who will each receive
@@ -188,7 +183,7 @@ export function defineIterableProperty(obj, name, v) {
         const b = bi[Symbol.asyncIterator]();
         extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
         push = bi.push;
-        Object.keys(asyncHelperFunctions).forEach(k => extras[k] = {
+        Object.keys(asyncExtras).forEach(k => extras[k] = {
             // @ts-ignore - Fix
             value: b[k],
             enumerable: false,
@@ -212,7 +207,7 @@ export function defineIterableProperty(obj, name, v) {
             value: initIterator
         }
     };
-    Object.keys(asyncHelperFunctions).forEach((k) => extras[k] = {
+    Object.keys(asyncExtras).forEach((k) => extras[k] = {
         enumerable: false,
         writable: true,
         // @ts-ignore - Fix
@@ -325,7 +320,16 @@ export function defineIterableProperty(obj, name, v) {
                         get(target, key, receiver) {
                             if (key === 'valueOf')
                                 return () => boxedObject;
-                            if (Reflect.getOwnPropertyDescriptor(target, key)?.enumerable) {
+                            const targetProp = Reflect.getOwnPropertyDescriptor(target, key);
+                            // We include `targetProp === undefined` so we can nested monitor properties that are actually defined (yet)
+                            // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
+                            // defintions like:
+                            //   iterable: { stuff: as Record<string, string | number ... }
+                            if (targetProp === undefined || targetProp.enumerable) {
+                                if (targetProp === undefined) {
+                                    // @ts-ignore - Fix
+                                    target[key] = undefined;
+                                }
                                 const realValue = Reflect.get(boxedObject, key, receiver);
                                 const props = Object.getOwnPropertyDescriptors(boxedObject.map((o, p) => {
                                     const ov = o?.[key]?.valueOf();
@@ -430,22 +434,29 @@ function isExtraIterable(i) {
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
 export function iterableHelpers(ai) {
     if (!isExtraIterable(ai)) {
-        Object.assign(ai, asyncExtras);
+        Object.defineProperties(ai, Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k, v]) => [k, { ...v, enumerable: false }])));
+        //Object.assign(ai, asyncExtras);
     }
     return ai;
 }
 export function generatorHelpers(g) {
-    // @ts-ignore: TS type madness
     return function (...args) {
-        return iterableHelpers(g(...args));
+        const ai = g(...args);
+        return iterableHelpers(ai);
     };
+}
+async function consume(f) {
+    let last = undefined;
+    for await (const u of this)
+        last = f?.(u);
+    await last;
 }
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 export function filterMap(source, fn, initialValue = Ignore) {
     let ai;
     let prev = Ignore;
-    return {
+    const fai = {
         [Symbol.asyncIterator]() {
             return this;
         },
@@ -484,6 +495,7 @@ export function filterMap(source, fn, initialValue = Ignore) {
             return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
         }
     };
+    return iterableHelpers(fai);
 }
 function map(mapper) {
     return filterMap(this, mapper);
@@ -518,7 +530,7 @@ function multi() {
                 .catch(error => current.reject({ done: true, value: error }));
         }
     }
-    return {
+    const mai = {
         [Symbol.asyncIterator]() {
             consumers += 1;
             return this;
@@ -549,6 +561,7 @@ function multi() {
             return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
         }
     };
+    return iterableHelpers(mai);
 }
 function broadcast() {
     const ai = this[Symbol.asyncIterator]();
@@ -565,16 +578,11 @@ function broadcast() {
             }
         }).catch(ex => b.close(ex));
     })();
-    return {
+    const bai = {
         [Symbol.asyncIterator]() {
             return b[Symbol.asyncIterator]();
         }
     };
+    return iterableHelpers(bai);
 }
-async function consume(f) {
-    let last = undefined;
-    for await (const u of this)
-        last = f?.(u);
-    await last;
-}
-export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
+//export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };

@@ -10,22 +10,20 @@ type DeepPartial<X> = [X] extends [object] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;
 export declare const UniqueID: unique symbol;
-export type Instance<T extends Record<string, unknown> = {}> = {
+export type Instance<T = {}> = {
     [UniqueID]: string;
 } & T;
-type RootObj = object;
-type AsyncGeneratedObject<X extends RootObj> = {
+type AsyncGeneratedObject<X extends object> = {
     [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K];
 };
 type IDS<I> = {
     ids: {
-        [J in keyof I]: I[J] extends TagCreator<any, any> ? ReturnType<I[J]> : never;
+        [J in keyof I]: I[J] extends ExTagCreator<any> ? ReturnType<I[J]> : never;
     };
 };
-type TypedEventHandlers<T> = {
-    [K in keyof GlobalEventHandlers]: GlobalEventHandlers[K] extends (null | ((event: infer E) => infer R)) ? null | ((this: T, event: E) => R) : GlobalEventHandlers[K];
+type ReTypedEventHandlers<T> = {
+    [K in keyof T]: K extends keyof GlobalEventHandlers ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E) => any ? (this: T, e: E) => any | null : T[K] : T[K];
 };
-type ReTypedEventHandlers<T> = T extends (GlobalEventHandlers) ? Omit<T, keyof GlobalEventHandlers> & TypedEventHandlers<T> : T;
 type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
     get attributes(): NamedNodeMap;
     set attributes(v: DeepPartial<PossiblyAsync<Base>>);
@@ -35,21 +33,25 @@ export type Flatten<O> = [
         [K in keyof O]: O[K];
     }
 ][number];
-type FlattenOthers<Src, Others = HTMLElement> = Src extends Partial<Others> ? Flatten<Omit<Src, keyof Partial<Others>>> & Pick<Src, keyof Partial<Others>> : Flatten<Src>;
+export type DeepFlatten<O> = [
+    {
+        [K in keyof O]: Flatten<O[K]>;
+    }
+][number];
 type Extends<A, B> = A extends any[] ? B extends any[] ? Extends<A[number], B[number]>[] : never : B extends any[] ? never : B extends A ? B : A extends B ? B & Flatten<Omit<A, keyof B>> : never;
 type MergeBaseTypes<T, Base> = {
     [K in keyof Base | keyof T]: K extends (keyof T & keyof Base) ? Extends<T[K], Base[K]> : K extends keyof T ? T[K] : K extends keyof Base ? Base[K] : never;
 };
+export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
-    [K in keyof Omit<IP, typeof Iterability>]: IP[K] & Partial<AsyncExtraIterable<IP[K]>>;
+    [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>;
 } : {
-    [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & Partial<AsyncExtraIterable<IP[K]>>;
+    [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>;
 };
-type IterablePropertyValue = (string | number | bigint | boolean | object | undefined) & {
+type OptionalIterablePropertyValue = (string | number | bigint | boolean | undefined | null) | (object & {
     splice?: never;
-};
-type OptionalIterablePropertyValue = IterablePropertyValue | undefined | null;
-type NeverEmpty<O extends RootObj> = {} extends O ? never : O;
+});
+type NeverEmpty<O extends object> = {} extends O ? never : O;
 type OmitType<T, V> = [{
     [K in keyof T as T[K] extends V ? never : K]: T[K];
 }][number];
@@ -64,56 +66,57 @@ type ExcessKeys<A, B> = A extends any[] ? B extends any[] ? ExcessKeys<A[number]
     [K in keyof A]: K extends keyof B ? A[K] extends (B[K] extends Function ? B[K] : DeepPartial<B[K]>) ? never : B[K] : _Not_Declared_;
 }, never>>;
 type OverlappingKeys<A, B> = B extends never ? never : A extends never ? never : keyof A & keyof B;
-type CheckPropertyClashes<BaseCreator extends TagCreator<any, any>, P, O extends object, D, IP, Result = never> = (OverlappingKeys<O, D> | OverlappingKeys<IP, D> | OverlappingKeys<IP, O> | OverlappingKeys<IP, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D, P> | OverlappingKeys<O, P> | OverlappingKeys<IP, P>) extends never ? ExcessKeys<O, TagCreatorAttributes<BaseCreator>> extends never ? Result : {
-    '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<O, TagCreatorAttributes<BaseCreator>>;
+type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overrides, Result = never> = (OverlappingKeys<D['override'], D['declare']> | OverlappingKeys<D['iterable'], D['declare']> | OverlappingKeys<D['iterable'], D['override']> | OverlappingKeys<D['iterable'], Omit<TagCreatorAttributes<BaseCreator>, keyof BaseIterables<BaseCreator>>> | OverlappingKeys<D['declare'], TagCreatorAttributes<BaseCreator>> | OverlappingKeys<D['declare'], D['prototype']> | OverlappingKeys<D['override'], D['prototype']> | OverlappingKeys<D['iterable'], D['prototype']>) extends never ? ExcessKeys<D['override'], TagCreatorAttributes<BaseCreator>> extends never ? Result : {
+    '`override` has properties not in the base tag or of the wrong type, and should match': ExcessKeys<D['override'], TagCreatorAttributes<BaseCreator>>;
 } : OmitType<{
-    '`declare` clashes with base properties': OverlappingKeys<D, TagCreatorAttributes<BaseCreator>>;
-    '`iterable` clashes with base properties': OverlappingKeys<IP, TagCreatorAttributes<BaseCreator>>;
-    '`iterable` clashes with `override`': OverlappingKeys<IP, O>;
-    '`iterable` clashes with `declare`': OverlappingKeys<IP, D>;
-    '`override` clashes with `declare`': OverlappingKeys<O, D>;
-    '`prototype` (deprecated) clashes with `declare`': OverlappingKeys<D, P>;
-    '`prototype` (deprecated) clashes with `override`': OverlappingKeys<D, P>;
-    '`prototype` (deprecated) clashes with `iterable`': OverlappingKeys<IP, P>;
+    '`declare` clashes with base properties': OverlappingKeys<D['declare'], TagCreatorAttributes<BaseCreator>>;
+    '`iterable` clashes with base properties': OverlappingKeys<D['iterable'], Omit<TagCreatorAttributes<BaseCreator>, keyof BaseIterables<BaseCreator>>>;
+    '`iterable` clashes with `override`': OverlappingKeys<D['iterable'], D['override']>;
+    '`iterable` clashes with `declare`': OverlappingKeys<D['iterable'], D['declare']>;
+    '`override` clashes with `declare`': OverlappingKeys<D['override'], D['declare']>;
+    '`prototype` (deprecated) clashes with `declare`': OverlappingKeys<D['declare'], D['prototype']>;
+    '`prototype` (deprecated) clashes with `override`': OverlappingKeys<D['declare'], D['prototype']>;
+    '`prototype` (deprecated) clashes with `iterable`': OverlappingKeys<D['iterable'], D['prototype']>;
 }, never>;
-type ExtensionDefinition<P extends RootObj, O extends RootObj, D extends RootObj, IP extends {
-    [k: string]: OptionalIterablePropertyValue;
-}, I extends {
-    [idExt: string]: TagCreator<any, any>;
-}, C extends () => (ChildTags | void | Promise<void | ChildTags>), S extends string | undefined> = {
-    /** @deprecated */ prototype?: P;
-    override?: O;
-    declare?: D;
-    iterable?: IP;
-    ids?: I;
-    constructed?: C;
-    styles?: S;
+export type Overrides = {
+    /** @deprecated */ prototype?: object;
+    override?: object;
+    declare?: object;
+    iterable?: {
+        [k: string]: OptionalIterablePropertyValue;
+    };
+    ids?: {
+        [id: string]: ExTagCreator<any>;
+    };
+    styles?: string;
 };
-export type Overrides = ExtensionDefinition<object, object, object, {
-    [k: string]: OptionalIterablePropertyValue;
-}, {
-    [id: string]: TagCreator<any, any>;
-}, () => (ChildTags | void | Promise<void | ChildTags>), string>;
-export type TagCreatorAttributes<T extends TagCreator<any, any>> = T extends TagCreator<infer B, any> ? B : never;
+export type Constructed = {
+    constructed: () => (ChildTags | void | Promise<void | ChildTags>);
+};
+export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer BaseAttrs> ? BaseAttrs : never;
+type BaseIterables<Base> = Base extends ExTagCreator<infer _A, infer B, infer D extends Overrides, infer _D> ? BaseIterables<B> extends never ? D['iterable'] extends unknown ? {} : D['iterable'] : BaseIterables<B> & D['iterable'] : never;
+type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = D['declare'] & D['override'] & IDS<D['ids']> & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
+type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable'];
+type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = ReadWriteAttributes<IterableProperties<CombinedIterableProperties<Base, D>> & AsyncGeneratedObject<CombinedNonIterableProperties<Base, D>>, D['declare'] & D['override'] & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>>;
+type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<Definitions['declare'] & Definitions['override'] & Definitions['prototype'] & TagCreatorAttributes<Base>, any>;
 interface ExtendedTag {
-    <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void | ChildTags>), S extends string | undefined, P extends RootObj = {}, O extends RootObj = {}, D extends RootObj = {}, I extends {
-        [idExt: string]: TagCreator<any, any>;
-    } = {}, IP extends {
-        [k: string]: OptionalIterablePropertyValue;
-    } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ((instance: any) => (ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>))): CheckPropertyClashes<BaseCreator, P, O, D, IP, TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>>>;
-    <BaseCreator extends TagCreator<any, any>, C extends () => (ChildTags | void | Promise<void | ChildTags>), S extends string | undefined, P extends RootObj = {}, O extends RootObj = {}, D extends RootObj = {}, I extends {
-        [idExt: string]: TagCreator<any, any>;
-    } = {}, IP extends {
-        [k: string]: OptionalIterablePropertyValue;
-    } = {}, CET extends RootObj = D & O & IDS<I> & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>, CTT = ReadWriteAttributes<IterableProperties<IP> & AsyncGeneratedObject<CET>, D & O & MergeBaseTypes<P, TagCreatorAttributes<BaseCreator>>>>(this: BaseCreator, _: ThisType<CTT> & ExtensionDefinition<P, O, D, IP, I, C, S>): CheckPropertyClashes<BaseCreator, P, O, D, IP, TagCreator<FlattenOthers<CET & IterableProperties<IP>>, BaseCreator, PickType<D & O & P & TagCreatorAttributes<BaseCreator>, any>>>;
+    <BaseCreator extends ExTagCreator<any>, SuppliedDefinitions, Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}, TagInstance = any>(this: BaseCreator, _: (inst: TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator, Definitions>>): CheckConstructedReturn<SuppliedDefinitions, CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>> & CombinedNonIterableProperties<BaseCreator, Definitions>, BaseCreator, Definitions, StaticReferences<BaseCreator, Definitions>>>>;
+    <BaseCreator extends ExTagCreator<any>, SuppliedDefinitions, Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}>(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator, Definitions>>): CheckConstructedReturn<SuppliedDefinitions, CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>> & CombinedNonIterableProperties<BaseCreator, Definitions>, BaseCreator, Definitions, StaticReferences<BaseCreator, Definitions>>>>;
 }
+type CheckConstructedReturn<SuppliedDefinitions, Result> = SuppliedDefinitions extends {
+    constructed: any;
+} ? SuppliedDefinitions extends Constructed ? Result : {
+    "constructed` does not return ChildTags": SuppliedDefinitions['constructed'];
+} : Result;
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
-export type TagCreatorFunction<Base extends RootObj> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
-export type TagCreator<Base extends RootObj, Super extends (never | TagCreator<any, any>) = never, Statics = {}> = TagCreatorFunction<Base> & {
+export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+type ExTagCreator<Base extends object, Super extends (unknown | ExTagCreator<any>) = unknown, SuperDefs extends Overrides = {}, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;
     super: Super;
     definition?: Overrides;
     readonly name: string;
     [Symbol.hasInstance](elt: any): boolean;
+    [UniqueID]: string;
 } & Statics;
+export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {}>;
 export {};

@@ -1,6 +1,6 @@
 import { DEBUG } from './debug.js';
 import { isPromiseLike } from './deferred.js';
-import { iterableHelpers, asyncExtras, merge, AsyncExtraIterable, queueIteratableIterator, asyncHelperFunctions } from "./iterators.js";
+import { iterableHelpers, merge, AsyncExtraIterable, queueIteratableIterator } from "./iterators.js";
 
 /*
   `when(....)` is both an AsyncIterable of the events it can generate by observation,
@@ -156,13 +156,13 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   }
 
   const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
-  const multi = asyncHelperFunctions.multi.call(queue);
+  const multi = queue.multi();
 
   const details: EventObservation<keyof GlobalEventHandlersEventMap> /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
     push: queue.push,
-    terminate(ex: Error) { multi.return?.(ex)},
+    terminate(ex: Error) { queue.return?.(ex)},
     container,
-    selector: selector || null
+    selector: selector || null 
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
@@ -178,9 +178,9 @@ async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
 
 /* Syntactic sugar: chainAsync decorates the specified iterator so it can be mapped by
   a following function, or used directly as an iterable */
-function chainAsync<A extends AsyncIterable<X>, X>(src: A): MappableIterable<A> {
-  function mappableAsyncIterable(mapper: Parameters<typeof asyncExtras.map>[0]) {
-    return asyncExtras.map.call(src, mapper) as ReturnType<typeof asyncExtras.map>;
+function chainAsync<A extends AsyncExtraIterable<X>, X>(src: A): MappableIterable<A> {
+  function mappableAsyncIterable(mapper: Parameters<typeof src.map>[0]) {
+    return src.map(mapper);
   }
 
   return Object.assign(iterableHelpers(mappableAsyncIterable as unknown as AsyncIterable<A>), {
@@ -260,7 +260,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
         return { done: true, value: undefined };
       }
     };
-    return chainAsync(ai);
+    return chainAsync(iterableHelpers(ai));
   }
 
   const merged = (iterators.length > 1)
@@ -269,7 +269,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
       ? iterators[0]
       : (neverGonnaHappen<WhenIteratedType<S>>());
 
-  return chainAsync(merged);
+  return chainAsync(iterableHelpers(merged));
 }
 
 function elementIsInDOM(elt: Element): Promise<void> {

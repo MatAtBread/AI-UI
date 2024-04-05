@@ -8,9 +8,12 @@ type AIUIJSXTag = (keyof HTMLElementTagNameMap | TagCreatorFunction<Element> | A
 type AIUIJSXElement<
   N extends AIUIJSXTag,
   C extends ChildTags[]
-> = N extends TagCreatorFunction<Element> ? ReturnType<N>
-  : N extends keyof HTMLElementTagNameMap ? ReturnType<TagCreatorFunction<HTMLElementTagNameMap[keyof HTMLElementTagNameMap]>>
-  : N extends AIUIJSX ? C
+> = 
+// N extends TagCreatorFunction<Element> ? ReturnType<N>
+//: N extends keyof HTMLElementTagNameMap ? ReturnType<TagCreatorFunction<HTMLElementTagNameMap[keyof HTMLElementTagNameMap]>>
+N extends TagCreatorFunction<Element> ? ReturnType<TagCreatorFunction<Element>>
+: N extends string ? ReturnType<TagCreatorFunction<Element>>
+: N extends AIUIJSX ? C
   : never;
 
 type AIUIJSX = <

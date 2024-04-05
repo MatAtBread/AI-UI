@@ -334,7 +334,7 @@ export const tag = function (_1, _2, _3) {
                                         if (s[k] !== undefined)
                                             d[k] = s[k];
                                     }
-                                }, error => console.log("Failed to set attribute", error));
+                                }, error => console.log('(AI-UI)', "Failed to set attribute", error));
                             }
                             else if (!isAsyncIter(value)) {
                                 // This has a real value, which might be an object
@@ -391,8 +391,8 @@ export const tag = function (_1, _2, _3) {
     }
     ;
     function tagHasInstance(e) {
-        for (let etf = this; etf; etf = etf.super) {
-            if (e.constructor === etf)
+        for (let c = e.constructor; c; c = c.super) {
+            if (c === this)
                 return true;
         }
         return false;
@@ -425,7 +425,12 @@ export const tag = function (_1, _2, _3) {
             deepDefine(e, tagDefinition.override);
             deepDefine(e, tagDefinition.declare);
             tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
-                defineIterableProperty(e, k, tagDefinition.iterable[k]);
+                if (k in e) {
+                    if (DEBUG)
+                        console.log('(AI-UI)', `Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
+                }
+                else
+                    defineIterableProperty(e, k, tagDefinition.iterable[k]);
             });
             if (combinedAttrs[callStackSymbol] === newCallStack) {
                 if (!noAttrs)
@@ -439,7 +444,8 @@ export const tag = function (_1, _2, _3) {
                 // so the full hierarchy gets to consume the initial state
                 for (const base of newCallStack) {
                     base.iterable && Object.keys(base.iterable).forEach(
-                    // @ts-ignore
+                    // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if
+                    // k is one of them.
                     k => e[k] = e[k]);
                 }
             }
@@ -479,8 +485,8 @@ export const tag = function (_1, _2, _3) {
             && 'className' in fullProto
             && typeof fullProto.className === 'string'
             ? fullProto.className
-            : '?';
-        const callSite = DEBUG ? ' @' + (new Error().stack?.split('\n')[2]?.match(/\((.*)\)/)?.[1] ?? '?') : '';
+            : uniqueTagID;
+        const callSite = DEBUG ? (new Error().stack?.split('\n')[2] ?? '') : '';
         Object.defineProperty(extendTag, "name", {
             value: "<ai-" + creatorName.replace(/\s+/g, '-') + callSite + ">"
         });
@@ -523,6 +529,11 @@ export const tag = function (_1, _2, _3) {
             super: () => { throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement()."); },
             extended, // How to extend this (base) tag
             valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>`; }
+        });
+        Object.defineProperty(tagCreator, Symbol.hasInstance, {
+            value: tagHasInstance,
+            writable: true,
+            configurable: true
         });
         Object.defineProperty(tagCreator, "name", { value: '<' + k + '>' });
         // @ts-ignore
@@ -586,7 +597,7 @@ export function augmentGlobalAsyncGenerators() {
         g = Object.getPrototypeOf(g);
     }
     if (DEBUG && !g) {
-        console.log("Failed to augment the prototype of `(async function*())()`");
+        console.log('(AI-UI)', "Failed to augment the prototype of `(async function*())()`");
     }
 }
 export let enableOnRemovedFromDOM = function () {

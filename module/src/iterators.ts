@@ -3,16 +3,17 @@ import { DeferredPromise, deferred } from "./deferred.js";
 import { IterableProperties } from "./tags.js";
 
 /* Things to suppliement the JS base AsyncIterable */
-export type QueueIteratableIterator<T> = AsyncIterableIterator<T> & {
+export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
   push(value: T): boolean;
 };
-export type PushIterator<T> = AsyncExtraIterable<T> & {
+export interface PushIterator<T> extends AsyncExtraIterable<T> {
   push(value: T): boolean;
   close(ex?: Error): void;  // Tell the consumer(s) we're done, with an optional error
 };
 export type BroadcastIterator<T> = PushIterator<T>;
 
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers { }
+
 export function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
   return typeof o?.next === 'function';
 }
@@ -31,30 +32,22 @@ export function asyncIterator<T>(o: AsyncProvider<T>) {
   throw new Error("Not as async provider");
 }
 
-/* A function that wraps a "prototypical" AsyncIterator helper, that has `this:AsyncIterable<T>` and returns
-  something that's derived from AsyncIterable<R>, result in a wrapped function that accepts
-  the same arguments returns a AsyncExtraIterable<X>
-*/
-function wrapAsyncHelper<T, Args extends any[], R, X extends AsyncIterable<R>>(fn: (this: AsyncIterable<T>, ...args: Args) => X) {
-  return function (this: Partial<AsyncIterable<T>>, ...args: Args) { return iterableHelpers(fn.call(this as AsyncIterable<T>, ...args)) }
-}
-
 type AsyncIterableHelpers = typeof asyncExtras;
-export const asyncExtras = {
-  map: wrapAsyncHelper(map),
-  filter: wrapAsyncHelper(filter),
-  unique: wrapAsyncHelper(unique),
-  waitFor: wrapAsyncHelper(waitFor),
-  multi: wrapAsyncHelper(multi),
-  broadcast: wrapAsyncHelper(broadcast),
-  initially: wrapAsyncHelper(initially),
-  consume: consume,
+const asyncExtras = {
+  map,
+  filter,
+  unique,
+  waitFor,
+  multi,
+  broadcast,
+  initially,
+  consume,
   merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A) {
     return merge(this, ...m);
   }
 };
 
-export function queueIteratableIterator<T>(stop = () => { }): QueueIteratableIterator<T> {
+export function queueIteratableIterator<T>(stop = () => { }) {
   let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
   let _items = [] as T[] | null;
 
@@ -111,7 +104,7 @@ export function queueIteratableIterator<T>(stop = () => { }): QueueIteratableIte
       return true;
     }
   };
-  return q;
+  return iterableHelpers(q);
 }
 
 /* An AsyncIterable which typed objects can be published to.
@@ -221,7 +214,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
     const b = bi[Symbol.asyncIterator]();
     extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
     push = bi.push;
-    Object.keys(asyncHelperFunctions).forEach(k =>
+    Object.keys(asyncExtras).forEach(k =>
       extras[k as keyof typeof extras] = {
         // @ts-ignore - Fix
         value: b[k as keyof typeof b],
@@ -234,12 +227,12 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
   }
 
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
-  function lazyAsyncMethod<M extends keyof typeof asyncHelperFunctions>(method: M) {
+  function lazyAsyncMethod<M extends keyof typeof asyncExtras>(method: M) {
     return function(this: unknown, ...args: any[]) {
       initIterator();
       // @ts-ignore - Fix
       return a[method].call(this, ...args);
-    } as (typeof asyncHelperFunctions)[M];
+    } as (typeof asyncExtras)[M];
   }
 
   type HelperDescriptors<T> = {
@@ -256,7 +249,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
     }
   } as HelperDescriptors<V>;
 
-  (Object.keys(asyncHelperFunctions) as (keyof typeof asyncHelperFunctions)[]).forEach((k) =>
+  (Object.keys(asyncExtras) as (keyof typeof asyncExtras)[]).forEach((k) =>
     extras[k] = {
       enumerable: false,
       writable: true,
@@ -376,14 +369,23 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
             get(target, key, receiver) {
               if (key === 'valueOf')
                 return ()=>boxedObject;
-              if (Reflect.getOwnPropertyDescriptor(target,key)?.enumerable) {
+              const targetProp = Reflect.getOwnPropertyDescriptor(target,key);
+              // We include `targetProp === undefined` so we can nested monitor properties that are actually defined (yet)
+              // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
+              // defintions like:
+              //   iterable: { stuff: as Record<string, string | number ... }
+              if (targetProp === undefined || targetProp.enumerable) {
+                if (targetProp === undefined) {
+                  // @ts-ignore - Fix
+                  target[key] = undefined;
+                }
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
                 const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
-                  const ov = o?.[key as keyof V]?.valueOf();
+                  const ov = o?.[key as keyof typeof o]?.valueOf();
                   const pv = p?.valueOf();
                   if (typeof ov === typeof pv && ov == pv)
                     return Ignore;
-                  return o?.[key as keyof V]
+                  return o?.[key as keyof typeof o]
                 }));
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
                 // @ts-ignore - Fix
@@ -494,35 +496,58 @@ function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
 }
 
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
-export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never) {
+export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown> {
   if (!isExtraIterable(ai)) {
-    Object.assign(ai, asyncExtras);
+    Object.defineProperties(ai, 
+      Object.fromEntries(
+        Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k,v]) => [k,{...v, enumerable: false}]
+        )
+      )
+    );
+    //Object.assign(ai, asyncExtras);
   }
-  return ai as A & (A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> : never)
+  return ai as A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> : never
 }
 
-export function generatorHelpers<G extends (...args: A) => AsyncGenerator, A extends any[]>(g: G)
-  : (...args: Parameters<G>) => ReturnType<G> & (ReturnType<G> extends AsyncGenerator<infer Y> ? AsyncExtraIterable<Y> : never) {
-  // @ts-ignore: TS type madness
-  return function (...args: A) {
-    return iterableHelpers(g(...args))
-  }
+export function generatorHelpers<G extends (...args: any[]) => R, R extends AsyncGenerator>(g: G) {
+  return function (...args:Parameters<G>): ReturnType<G> {
+    const ai = g(...args);
+    return iterableHelpers(ai) as ReturnType<G>;
+  } as (...args: Parameters<G>) => ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T> ? T : unknown>
 }
 
 /* AsyncIterable helpers, which can be attached to an AsyncIterator with `withHelpers(ai)`, and invoked directly for foreign asyncIterators */
+
+/* types that accept Partials as potentiallu async iterators, since we permit this IN TYPING so
+  iterable properties don't complain on every access as they are declared as V & Partial<AsyncIterable<V>>
+  due to the setters and getters having different types, but undeclarable in TS due to syntax limitations */
+type HelperAsyncIterable<Q extends Partial<AsyncIterable<any>>> = HelperAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
+type HelperAsyncIterator<F, And = {}, Or = never> =
+  F extends ()=>AsyncIterator<infer T>
+  ? T : never;
+
+async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: HelperAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
+  let last: unknown = undefined;
+  for await (const u of this as AsyncIterable<HelperAsyncIterable<U>>)
+    last = f?.(u);
+  await last;
+}
+
 type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => R | PromiseLike<R | typeof Ignore>);
 type MaybePromised<T> = PromiseLike<T> | T;
 
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 
-export function filterMap<U, R>(source: AsyncIterable<U>,
-  fn: (o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
+type PartialIterable = Partial<AsyncIterable<any>>;
+
+export function filterMap<U extends PartialIterable, R>(source: U,
+  fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
   initialValue: R | typeof Ignore = Ignore
-): AsyncIterableIterator<R> {
-  let ai: AsyncIterator<U>;
+): AsyncExtraIterable<R> {
+  let ai: AsyncIterator<HelperAsyncIterable<U>>;
   let prev: R | typeof Ignore = Ignore;
-  return {
+  const fai: AsyncIterableIterator<R> = {
     [Symbol.asyncIterator]() {
       return this;
     },
@@ -536,7 +561,7 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
 
       return new Promise<IteratorResult<R>>(function step(resolve, reject) {
         if (!ai)
-          ai = source[Symbol.asyncIterator]();
+          ai = source[Symbol.asyncIterator]!();
         ai.next(...args).then(
           p => p.done
             ? resolve(p)
@@ -571,32 +596,34 @@ export function filterMap<U, R>(source: AsyncIterable<U>,
       // The consumer told us to return, so we need to terminate the source
       return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
     }
-  }
+  };
+  return iterableHelpers(fai)
 }
 
-function map<U, R>(this: AsyncIterable<U>, mapper: Mapper<U, R>) {
+function map<U extends PartialIterable, R>(this: U, mapper: Mapper<HelperAsyncIterable<U>, R>): AsyncExtraIterable<R> {
   return filterMap(this, mapper);
 }
 
-function filter<U>(this: AsyncIterable<U>, fn: (o: U) => boolean | PromiseLike<boolean>) {
+function filter<U extends PartialIterable>(this: U, fn: (o: HelperAsyncIterable<U>) => boolean | PromiseLike<boolean>): AsyncExtraIterable<HelperAsyncIterable<U>> {
   return filterMap(this, async o => (await fn(o) ? o : Ignore));
 }
 
-function unique<U>(this: AsyncIterable<U>, fn?: (next: U, prev: U) => boolean | PromiseLike<boolean>): AsyncIterableIterator<U> {
+function unique<U extends PartialIterable>(this: U, fn?: (next: HelperAsyncIterable<U>, prev: HelperAsyncIterable<U>) => boolean | PromiseLike<boolean>): AsyncExtraIterable<HelperAsyncIterable<U>> {
   return fn
     ? filterMap(this, async (o, p) => (p === Ignore || await fn(o, p)) ? o : Ignore)
     : filterMap(this, (o, p) => o === p ? Ignore : o);
 }
 
-function initially<U, I = U>(this: AsyncIterable<U>, initValue: I): AsyncIterable<U | I> {
-  return filterMap(this as AsyncIterable<U | I>, o => o, initValue);
+function initially<U extends PartialIterable, I = HelperAsyncIterable<U>>(this: U, initValue: I): AsyncExtraIterable<HelperAsyncIterable<U> | I> {
+  return filterMap(this, o => o, initValue);
 }
 
-function waitFor<U>(this: AsyncIterable<U>, cb: (done: (value: void | PromiseLike<void>) => void) => void) {
-  return filterMap(this, o => new Promise<U>(resolve => { cb(() => resolve(o)); return o }));
+function waitFor<U extends PartialIterable>(this: U, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncExtraIterable<HelperAsyncIterable<U>> {
+  return filterMap(this, o => new Promise<HelperAsyncIterable<U>>(resolve => { cb(() => resolve(o)); return o }));
 }
 
-function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
+function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsyncIterable<U>> {
+  type T = HelperAsyncIterable<U>;
   const source = this;
   let consumers = 0;
   let current: DeferredPromise<IteratorResult<T, any>>;
@@ -613,7 +640,7 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
     }
   }
 
-  return {
+  const mai: AsyncIterableIterator<T> = {
     [Symbol.asyncIterator]() {
       consumers += 1;
       return this;
@@ -621,7 +648,7 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
 
     next() {
       if (!ai) {
-        ai = source[Symbol.asyncIterator]();
+        ai = source[Symbol.asyncIterator]!();
         step();
       }
       return current;
@@ -647,11 +674,13 @@ function multi<T>(this: AsyncIterable<T>): AsyncIterableIterator<T> {
       return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
     }
   };
+  return iterableHelpers(mai);
 }
 
-function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
-  const ai = this[Symbol.asyncIterator]();
-  const b = broadcastIterator<U>(() => ai.return?.());
+function broadcast<U extends PartialIterable>(this: U) {
+  type T = HelperAsyncIterable<U>;
+  const ai = this[Symbol.asyncIterator]!();
+  const b = broadcastIterator<T>(() => ai.return?.());
   (function step() {
     ai.next().then(v => {
       if (v.done) {
@@ -664,18 +693,12 @@ function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U> {
     }).catch(ex => b.close(ex));
   })();
 
-  return {
+  const bai: AsyncIterable<T> = {
     [Symbol.asyncIterator]() {
       return b[Symbol.asyncIterator]();
     }
-  }
+  };
+  return iterableHelpers(bai)
 }
 
-async function consume<U>(this: Partial<AsyncIterable<U>>, f?: (u: U) => void | PromiseLike<void>): Promise<void> {
-  let last: unknown = undefined;
-  for await (const u of this as AsyncIterable<U>)
-    last = f?.(u);
-  await last;
-}
-
-export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
+//export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };

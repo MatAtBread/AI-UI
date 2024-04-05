@@ -47,11 +47,12 @@ async function getWeatherForecast(g: GeoInfo): Promise<Forecast> {
 */
 
 const Chart = img.extended({
+  styles:`.Chart {
+    transition: opacity 0.5s;
+    opacity: 0.2;
+  }`,
   override: {
-    style: {
-      transition: 'opacity 0.5s',
-      opacity: '0.2'
-    },
+    className: 'Chart',
     onload() { this.style.opacity = '1' },
   },
   iterable: {
@@ -63,7 +64,7 @@ const Chart = img.extended({
   constructed() {
     this.data.consume!(data => {
       if (data) {
-        this.style.opacity = '0.2';
+        this.style.opacity = '';
         this.src = `https://quickchart.io/chart?width=${this.width}&height=${this.height}&chart=`
           + encodeURIComponent(JSON.stringify({
             type: 'line',
@@ -86,9 +87,11 @@ const WeatherForecast = Chart.extended({
   iterable: {
     geo: undefined as GeoInfo | undefined
   },
+  override:{
+    className: 'WeatherForecast Chart'
+  },
   constructed() {
     this.geo.consume!(async g => {
-      this.style.opacity = '0.2';
       if (g) {
         const forecast = await getWeatherForecast(g)
         this.label = g.name + ', ' + g.country;
@@ -114,14 +117,15 @@ const WeatherForecast = Chart.extended({
   is contained within the DOM, and without the rest of the DOM knowing about it's internals.
 */
 const Location = input.extended({
+  styles:`.Location {
+    display: block;
+  }`,
   declare: {
     geo: undefined as AsyncIterable<GeoInfo> | undefined
   },
   override: {
+    className: 'Location',
     placeholder: 'Enter a town...',
-    style: {
-      display: 'block'
-    },
     onkeydown() {
       this.style.backgroundColor = '';
     }
@@ -141,6 +145,7 @@ const Location = input.extended({
       this.dispatchEvent(new Event('change'));
   }
 });
+
 
 const App = div.extended({
   constructed() {
