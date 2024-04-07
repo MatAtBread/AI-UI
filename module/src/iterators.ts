@@ -42,8 +42,11 @@ const asyncExtras = {
   broadcast,
   initially,
   consume,
-  merge<T, A extends Partial<AsyncIterable<any>>[]>(this: Partial<AsyncIterable<T>>, ...m: A) {
+  merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A) {
     return merge(this, ...m);
+  },
+  combine<T, S extends CombinedIterable>(this: PartialIterable<T>, others: S) {
+    return combine(Object.assign({ '_this': this }, others));
   }
 };
 
@@ -489,6 +492,77 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
   return iterableHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
 }
 
+type CombinedIterable = { [k: string | number | symbol]: PartialIterable };
+type CombinedIterableType<S extends CombinedIterable> = {
+  [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never
+};
+type CombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+  [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never
+}>;
+
+export interface CombineOptions {
+  ignorePartial?: boolean; // Set to avoid yielding if some sources are absent
+}
+
+export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions = {}): CombinedIterableResult<S> => {
+  const accumulated: CombinedIterableType<S> = {};
+  let pc: Promise<{idx: number, k: string, ir: IteratorResult<any>}>[];
+  let si: AsyncIterator<any>[] = [];
+  let active:number = 0;
+  const forever = new Promise<any>(() => {});
+  const ci = {
+    [Symbol.asyncIterator]() { return this },
+    next(): Promise<IteratorResult<CombinedIterableType<S>>> {
+      if (pc === undefined) {
+        pc = Object.entries(src).map(([k,sit], idx) => {
+          active += 1;
+          si[idx] = sit[Symbol.asyncIterator]!();
+          return si[idx].next().then(ir => ({si,idx,k,ir}));
+        });
+      }
+
+      return (function step(): Promise<IteratorResult<CombinedIterableType<S>>> {
+        return Promise.race(pc).then(({ idx, k, ir }) => {
+          if (ir.done) {
+            pc[idx] = forever;
+            active -= 1;
+            if (!active)
+              return { done: true, value: undefined };
+            return step();
+          } else {
+            // @ts-ignore
+            accumulated[k] = ir.value;
+            pc[idx] = si[idx].next().then(ir => ({ idx, k, ir }));
+          }
+          if (opts.ignorePartial) {
+            if (Object.keys(accumulated).length < Object.keys(src).length)
+              return step();
+          }
+          return { done: false, value: accumulated };
+        })
+      })();
+    },
+    return(v?: any){
+      pc.forEach((p,idx) => {
+        if (p !== forever) {
+          si[idx].return?.(v)
+        }
+      });
+      return Promise.resolve({ done: true, value: v });
+    },
+    throw(ex: any){
+      pc.forEach((p,idx) => {
+        if (p !== forever) {
+          si[idx].throw?.(ex)
+        }
+      });
+      return Promise.reject({ done: true, value: ex });
+    }
+  }
+  return iterableHelpers(ci);
+}
+
+
 function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
   return isAsyncIterable(i)
     && Object.keys(asyncExtras)
@@ -539,7 +613,7 @@ type MaybePromised<T> = PromiseLike<T> | T;
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 
-type PartialIterable = Partial<AsyncIterable<any>>;
+type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
 export function filterMap<U extends PartialIterable, R>(source: U,
   fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
@@ -700,5 +774,3 @@ function broadcast<U extends PartialIterable>(this: U) {
   };
   return iterableHelpers(bai)
 }
-
-//export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };

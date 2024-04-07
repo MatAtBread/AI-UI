@@ -88,6 +88,49 @@ for await (const x of counter3 /* or counter1, or counter2 */) {
 ```
 ...but will now have the following additional methods.
 
+In addition to the _Helper Functions_ that are added to AsyncIterables, two of the functions are available as exports on the Iterators interface, `merge` and `combine` can be used directly:
+
+## merge
+```typescript
+function merge<A extends (AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>)[]>(...ai: A): AsyncExtraIterable<CollapseIterableType<A[number]>>;
+```
+Merges all the specified iterables (or iterators) into one. Every `yield` for any source is yielded to the consumer. `merge` can also be called on a helped AsyncExtraIterator:
+```typescript
+// Merge this.iter with the output of two generators
+this.iter.merge(anotherIter1(), anotherIter2()).consume()
+```
+
+## combine
+```typescript
+type CombinedIterable = {
+    [k: string | number | symbol]: AsyncIterable<any>;
+};
+type CombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+    [K in keyof S]?: S[K] extends AsyncIterable<infer T> ? T : never;
+}>;
+export interface CombineOptions {
+    ignorePartial?: boolean;
+}
+
+function combine<S extends CombinedIterable>(src: S, opts?: CombineOptions): CombinedIterableResult<S>;
+```
+The `combine` function is similar to the `merge` function, but allows you to accumulate a number of sources into specified fields of a named object:
+
+```typescript
+combine({ 
+  pos: mousePosition(),
+  user: fetchUserAccount()
+},{
+  ignorePartial: true
+}).consume(({pos,user}) => console.log(pos, user));
+```
+The optional flag `ignorePartial` (default: false) will only yield only complete objects where every source has yielded at least once. `combine` can also be called on a helped iterator. In this case the original iterator result can be derefrenced as `_this`;
+```typescript
+this.mouse.combine({ user.fetchUserAccount() }).consume(({
+  _this, user
+}) => console.log(_this, user));
+```
+
 Check [here](./iterators-usage.md) to see how these helpers are used in action.
 
 # Helper Functions

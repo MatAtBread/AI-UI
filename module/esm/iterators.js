@@ -29,6 +29,9 @@ const asyncExtras = {
     consume,
     merge(...m) {
         return merge(this, ...m);
+    },
+    combine(others) {
+        return combine(Object.assign({ '_this': this }, others));
     }
 };
 export function queueIteratableIterator(stop = () => { }) {
@@ -426,6 +429,63 @@ export const merge = (...ai) => {
     };
     return iterableHelpers(merged);
 };
+export const combine = (src, opts = {}) => {
+    const accumulated = {};
+    let pc;
+    let si = [];
+    let active = 0;
+    const forever = new Promise(() => { });
+    const ci = {
+        [Symbol.asyncIterator]() { return this; },
+        next() {
+            if (pc === undefined) {
+                pc = Object.entries(src).map(([k, sit], idx) => {
+                    active += 1;
+                    si[idx] = sit[Symbol.asyncIterator]();
+                    return si[idx].next().then(ir => ({ si, idx, k, ir }));
+                });
+            }
+            return (function step() {
+                return Promise.race(pc).then(({ idx, k, ir }) => {
+                    if (ir.done) {
+                        pc[idx] = forever;
+                        active -= 1;
+                        if (!active)
+                            return { done: true, value: undefined };
+                        return step();
+                    }
+                    else {
+                        // @ts-ignore
+                        accumulated[k] = ir.value;
+                        pc[idx] = si[idx].next().then(ir => ({ idx, k, ir }));
+                    }
+                    if (opts.ignorePartial) {
+                        if (Object.keys(accumulated).length < Object.keys(src).length)
+                            return step();
+                    }
+                    return { done: false, value: accumulated };
+                });
+            })();
+        },
+        return(v) {
+            pc.forEach((p, idx) => {
+                if (p !== forever) {
+                    si[idx].return?.(v);
+                }
+            });
+            return Promise.resolve({ done: true, value: v });
+        },
+        throw(ex) {
+            pc.forEach((p, idx) => {
+                if (p !== forever) {
+                    si[idx].throw?.(ex);
+                }
+            });
+            return Promise.reject({ done: true, value: ex });
+        }
+    };
+    return iterableHelpers(ci);
+};
 function isExtraIterable(i) {
     return isAsyncIterable(i)
         && Object.keys(asyncExtras)
@@ -585,4 +645,3 @@ function broadcast() {
     };
     return iterableHelpers(bai);
 }
-//export const asyncHelperFunctions = { map, filter, unique, waitFor, multi, broadcast, initially, consume, merge };
