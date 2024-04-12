@@ -572,7 +572,7 @@ function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
 export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown> {
   if (!isExtraIterable(ai)) {
-    Object.defineProperties(ai, 
+    Object.defineProperties(ai,
       Object.fromEntries(
         Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k,v]) => [k,{...v, enumerable: false}]
         )

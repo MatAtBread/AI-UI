@@ -127,7 +127,8 @@ async function captureLogs(file: string) {
       count: async function* count(n: number = 10) {
         for (let i = 0; i < n; i++)
           yield i;
-      }
+      },
+      response: undefined
     },
     console: {
       log
@@ -137,6 +138,7 @@ async function captureLogs(file: string) {
     eval(`(async function({${Object.keys(env)}}) {\n${fnCode}\n})`)(env),
     noTimeout ? new Promise(() => { }) : sleep(30, new Error(`Timeout running ${file}`))
   ]);
+  await env.Test.response;
   return logs;
 }
 
