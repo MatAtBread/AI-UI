@@ -284,7 +284,7 @@ export const tag = function (_1, _2, _3) {
                             if (isAsyncIter(value)) {
                                 assignIterable(value, k);
                             }
-                            if (isPromiseLike(value)) {
+                            else if (isPromiseLike(value)) {
                                 value.then(value => {
                                     if (value && typeof value === 'object') {
                                         // Special case: this promise resolved to an async iterator

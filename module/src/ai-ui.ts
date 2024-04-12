@@ -349,9 +349,7 @@ export const tag = <TagLoader>function <Tags extends string,
               const value = srcDesc.value;
               if (isAsyncIter<unknown>(value)) {
                 assignIterable(value, k);
-              }
-
-              if (isPromiseLike(value)) {
+              } else if (isPromiseLike(value)) {
                 value.then(value => {
                   if (value && typeof value === 'object') {
                     // Special case: this promise resolved to an async iterator
