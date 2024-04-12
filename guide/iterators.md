@@ -126,7 +126,7 @@ combine({
 ```
 The optional flag `ignorePartial` (default: false) will only yield only complete objects where every source has yielded at least once. `combine` can also be called on a helped iterator. In this case the original iterator result can be derefrenced as `_this`;
 ```typescript
-this.mouse.combine({ user.fetchUserAccount() }).consume(({
+this.mouse.combine({ user: fetchUserAccount() }).consume(({
   _this, user
 }) => console.log(_this, user));
 ```
