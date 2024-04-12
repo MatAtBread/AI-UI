@@ -177,10 +177,11 @@ export const tag = <TagLoader>function <Tags extends string,
       if (isAsyncIter<ChildTags>(c)) {
         const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
         const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
-        const dpm = DomPromiseContainer();
-        appended.push(dpm);
+        // It's possible that this async iterator is a boxed object that also golds a value
+        const dpm = (isAsyncIterable(c.valueOf())) ? [DomPromiseContainer()] : nodes(c.valueOf() as ChildTags)
+        appended.push(...dpm);
 
-        let t: ReturnType<ReturnType<typeof appender>> = [dpm];
+        let t: ReturnType<ReturnType<typeof appender>> = dpm;
 
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode));
@@ -347,55 +348,16 @@ export const tag = <TagLoader>function <Tags extends string,
             if ('value' in srcDesc) {
               const value = srcDesc.value;
               if (isAsyncIter<unknown>(value)) {
-                const ap = asyncIterator(value);
-                const update = (es: IteratorResult<unknown>) => {
-                  if (!base.ownerDocument.contains(base)) {
-                    /* This element has been removed from the doc. Tell the source ap
-                      to stop sending us stuff */
-                    ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
-                    return;
-                  }
-
-                  if (!es.done) {
-                    const value = unbox(es.value);
-                    if (typeof value === 'object' && value !== null) {
-                      /*
-                      THIS IS JUST A HACK: `style` has to be set member by member, eg:
-                        e.style.color = 'blue'        --- works
-                        e.style = { color: 'blue' }   --- doesn't work
-                      whereas in general when assigning to property we let the receiver
-                      do any work necessary to parse the object. This might be better handled
-                      by having a setter for `style` in the PoElementMethods that is sensitive
-                      to the type (string|object) being passed so we can just do a straight
-                      assignment all the time, or making the decsion based on the location of the
-                      property in the prototype chain and assuming anything below "PO" must be
-                      a primitive
-                      */
-                      const destDesc = Object.getOwnPropertyDescriptor(d, k);
-                      if (k === 'style' || !destDesc?.set)
-                        assign(d[k], value);
-                      else
-                        d[k] = value;
-                    } else {
-                      // Src is not an object (or is null) - just assign it, unless it's undefined
-                      if (value !== undefined)
-                        d[k] = value;
-                    }
-                    ap.next().then(update).catch(error);
-                  }
-                };
-                const error = (errorValue: any) => {
-                  ap.return?.(errorValue);
-                  console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
-                  appender(base)(DyamicElementError({error: errorValue}));
-                }
-                ap.next().then(update).catch(error);
-              }
-
-              if (isPromiseLike(value)) {
+                assignIterable(value, k);
+              } else if (isPromiseLike(value)) {
                 value.then(value => {
                   if (value && typeof value === 'object') {
-                    assignObject(value, k);
+                    // Special case: this promise resolved to an async iterator
+                    if (isAsyncIter<unknown>(value)) {
+                      assignIterable(value, k);
+                    } else {
+                      assignObject(value, k);
+                    }
                   } else {
                     if (s[k] !== undefined)
                       d[k] = s[k];
@@ -414,15 +376,59 @@ export const tag = <TagLoader>function <Tags extends string,
               // Copy the definition of the getter/setter
               Object.defineProperty(d, k, srcDesc);
             }
-
           } catch (ex: unknown) {
             console.warn('(AI-UI)', "assignProps", k, s[k], ex);
             throw ex;
           }
         }
 
+        function assignIterable(value: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
+          const ap = asyncIterator(value);
+          const update = (es: IteratorResult<unknown>) => {
+            if (!base.ownerDocument.contains(base)) {
+              /* This element has been removed from the doc. Tell the source ap
+                to stop sending us stuff */
+              ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
+              return;
+            }
+
+            if (!es.done) {
+              const value = unbox(es.value);
+              if (typeof value === 'object' && value !== null) {
+                /*
+                THIS IS JUST A HACK: `style` has to be set member by member, eg:
+                  e.style.color = 'blue'        --- works
+                  e.style = { color: 'blue' }   --- doesn't work
+                whereas in general when assigning to property we let the receiver
+                do any work necessary to parse the object. This might be better handled
+                by having a setter for `style` in the PoElementMethods that is sensitive
+                to the type (string|object) being passed so we can just do a straight
+                assignment all the time, or making the decsion based on the location of the
+                property in the prototype chain and assuming anything below "PO" must be
+                a primitive
+                */
+                const destDesc = Object.getOwnPropertyDescriptor(d, k);
+                if (k === 'style' || !destDesc?.set)
+                  assign(d[k], value);
+                else
+                  d[k] = value;
+              } else {
+                // Src is not an object (or is null) - just assign it, unless it's undefined
+                if (value !== undefined)
+                  d[k] = value;
+              }
+              ap.next().then(update).catch(error);
+            }
+          };
+          const error = (errorValue: any) => {
+            ap.return?.(errorValue);
+            console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
+            appender(base)(DyamicElementError({ error: errorValue }));
+          }
+          ap.next().then(update).catch(error);
+        }
+
         function assignObject(value: any, k: string) {
-          {
             if (value instanceof Node) {
               if (DEBUG)
                 console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
@@ -447,7 +453,6 @@ export const tag = <TagLoader>function <Tags extends string,
                   assign(d[k], value);
               }
             }
-          }
         }
       })(base, props);
     }
