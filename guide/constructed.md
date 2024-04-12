@@ -31,8 +31,8 @@ const RedBlue = RedBox.extended({
 const x = RedBlue("Make me blue");
 /* Returns the DOM tree:
 <div style="background-color: red;">
-  <div>I'm red</div>
   Make me blue!
+  <div>I'm red</div>
 </div>
 */
 ```
