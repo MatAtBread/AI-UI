@@ -6,4 +6,5 @@ declare global {
 declare namespace Test {
     export async function *count(n: number = 10): AsyncGenerator<number>;
     export async function sleep<T>(s: number, v?: T): Promise<T>;
+    export var response: any;
 }

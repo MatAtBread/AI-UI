@@ -1,6 +1,6 @@
 import type { AsyncExtraIterable, AsyncProvider, Ignore, Iterability } from "./iterators.js";
 export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
-type AsyncAttr<X> = AsyncProvider<X> | Promise<X>;
+type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
 export type PossiblyAsync<X> = [
     X
 ] extends [object] ? X extends AsyncAttr<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncAttr<X> : AsyncAttr<Partial<X>> | {
@@ -91,7 +91,7 @@ export type Overrides = {
     styles?: string;
 };
 export type Constructed = {
-    constructed: () => (ChildTags | void | Promise<void | ChildTags>);
+    constructed: () => (ChildTags | void | PromiseLike<void | ChildTags>);
 };
 export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer BaseAttrs> ? BaseAttrs : never;
 type BaseIterables<Base> = Base extends ExTagCreator<infer _A, infer B, infer D extends Overrides, infer _D> ? BaseIterables<B> extends never ? D['iterable'] extends unknown ? {} : D['iterable'] : BaseIterables<B> & D['iterable'] : never;

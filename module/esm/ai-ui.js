@@ -109,9 +109,10 @@ export const tag = function (_1, _2, _3) {
             if (isAsyncIter(c)) {
                 const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
                 const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
-                const dpm = DomPromiseContainer();
-                appended.push(dpm);
-                let t = [dpm];
+                // It's possible that this async iterator is a boxed object that also golds a value
+                const dpm = (isAsyncIterable(c.valueOf())) ? [DomPromiseContainer()] : nodes(c.valueOf());
+                appended.push(...dpm);
+                let t = dpm;
                 const error = (errorValue) => {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
@@ -281,54 +282,18 @@ export const tag = function (_1, _2, _3) {
                         if ('value' in srcDesc) {
                             const value = srcDesc.value;
                             if (isAsyncIter(value)) {
-                                const ap = asyncIterator(value);
-                                const update = (es) => {
-                                    if (!base.ownerDocument.contains(base)) {
-                                        /* This element has been removed from the doc. Tell the source ap
-                                          to stop sending us stuff */
-                                        ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
-                                        return;
-                                    }
-                                    if (!es.done) {
-                                        const value = unbox(es.value);
-                                        if (typeof value === 'object' && value !== null) {
-                                            /*
-                                            THIS IS JUST A HACK: `style` has to be set member by member, eg:
-                                              e.style.color = 'blue'        --- works
-                                              e.style = { color: 'blue' }   --- doesn't work
-                                            whereas in general when assigning to property we let the receiver
-                                            do any work necessary to parse the object. This might be better handled
-                                            by having a setter for `style` in the PoElementMethods that is sensitive
-                                            to the type (string|object) being passed so we can just do a straight
-                                            assignment all the time, or making the decsion based on the location of the
-                                            property in the prototype chain and assuming anything below "PO" must be
-                                            a primitive
-                                            */
-                                            const destDesc = Object.getOwnPropertyDescriptor(d, k);
-                                            if (k === 'style' || !destDesc?.set)
-                                                assign(d[k], value);
-                                            else
-                                                d[k] = value;
-                                        }
-                                        else {
-                                            // Src is not an object (or is null) - just assign it, unless it's undefined
-                                            if (value !== undefined)
-                                                d[k] = value;
-                                        }
-                                        ap.next().then(update).catch(error);
-                                    }
-                                };
-                                const error = (errorValue) => {
-                                    ap.return?.(errorValue);
-                                    console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
-                                    appender(base)(DyamicElementError({ error: errorValue }));
-                                };
-                                ap.next().then(update).catch(error);
+                                assignIterable(value, k);
                             }
                             if (isPromiseLike(value)) {
                                 value.then(value => {
                                     if (value && typeof value === 'object') {
-                                        assignObject(value, k);
+                                        // Special case: this promise resolved to an async iterator
+                                        if (isAsyncIter(value)) {
+                                            assignIterable(value, k);
+                                        }
+                                        else {
+                                            assignObject(value, k);
+                                        }
                                     }
                                     else {
                                         if (s[k] !== undefined)
@@ -356,33 +321,76 @@ export const tag = function (_1, _2, _3) {
                         throw ex;
                     }
                 }
-                function assignObject(value, k) {
-                    {
-                        if (value instanceof Node) {
-                            if (DEBUG)
-                                console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
-                            d[k] = value;
+                function assignIterable(value, k) {
+                    const ap = asyncIterator(value);
+                    const update = (es) => {
+                        if (!base.ownerDocument.contains(base)) {
+                            /* This element has been removed from the doc. Tell the source ap
+                              to stop sending us stuff */
+                            ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
+                            return;
                         }
-                        else {
-                            // Note - if we're copying to ourself (or an array of different length),
-                            // we're decoupling common object references, so we need a clean object to
-                            // assign into
-                            if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
-                                if (value.constructor === Object || value.constructor === Array) {
-                                    d[k] = new (value.constructor);
+                        if (!es.done) {
+                            const value = unbox(es.value);
+                            if (typeof value === 'object' && value !== null) {
+                                /*
+                                THIS IS JUST A HACK: `style` has to be set member by member, eg:
+                                  e.style.color = 'blue'        --- works
+                                  e.style = { color: 'blue' }   --- doesn't work
+                                whereas in general when assigning to property we let the receiver
+                                do any work necessary to parse the object. This might be better handled
+                                by having a setter for `style` in the PoElementMethods that is sensitive
+                                to the type (string|object) being passed so we can just do a straight
+                                assignment all the time, or making the decsion based on the location of the
+                                property in the prototype chain and assuming anything below "PO" must be
+                                a primitive
+                                */
+                                const destDesc = Object.getOwnPropertyDescriptor(d, k);
+                                if (k === 'style' || !destDesc?.set)
                                     assign(d[k], value);
-                                }
-                                else {
-                                    // This is some sort of constructed object, which we can't clone, so we have to copy by reference
+                                else
                                     d[k] = value;
-                                }
                             }
                             else {
-                                if (Object.getOwnPropertyDescriptor(d, k)?.set)
+                                // Src is not an object (or is null) - just assign it, unless it's undefined
+                                if (value !== undefined)
                                     d[k] = value;
-                                else
-                                    assign(d[k], value);
                             }
+                            ap.next().then(update).catch(error);
+                        }
+                    };
+                    const error = (errorValue) => {
+                        ap.return?.(errorValue);
+                        console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
+                        appender(base)(DyamicElementError({ error: errorValue }));
+                    };
+                    ap.next().then(update).catch(error);
+                }
+                function assignObject(value, k) {
+                    if (value instanceof Node) {
+                        if (DEBUG)
+                            console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                        d[k] = value;
+                    }
+                    else {
+                        // Note - if we're copying to ourself (or an array of different length),
+                        // we're decoupling common object references, so we need a clean object to
+                        // assign into
+                        if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
+                            if (value.constructor === Object || value.constructor === Array) {
+                                d[k] = new (value.constructor);
+                                assign(d[k], value);
+                            }
+                            else {
+                                // This is some sort of constructed object, which we can't clone, so we have to copy by reference
+                                d[k] = value;
+                            }
+                        }
+                        else {
+                            if (Object.getOwnPropertyDescriptor(d, k)?.set)
+                                d[k] = value;
+                            else
+                                assign(d[k], value);
                         }
                     }
                 }
