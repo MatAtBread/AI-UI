@@ -177,8 +177,9 @@ export const tag = <TagLoader>function <Tags extends string,
       if (isAsyncIter<ChildTags>(c)) {
         const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
         const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
-        // It's possible that this async iterator is a boxed object that also golds a value
-        const dpm = (isAsyncIterable(c.valueOf())) ? [DomPromiseContainer()] : nodes(c.valueOf() as ChildTags)
+        // It's possible that this async iterator is a boxed object that also holds a value
+        const unboxed = c.valueOf();
+        const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed as ChildTags)
         appended.push(...dpm);
 
         let t: ReturnType<ReturnType<typeof appender>> = dpm;
