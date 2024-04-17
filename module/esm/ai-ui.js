@@ -109,8 +109,9 @@ export const tag = function (_1, _2, _3) {
             if (isAsyncIter(c)) {
                 const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
                 const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
-                // It's possible that this async iterator is a boxed object that also golds a value
-                const dpm = (isAsyncIterable(c.valueOf())) ? [DomPromiseContainer()] : nodes(c.valueOf());
+                // It's possible that this async iterator is a boxed object that also holds a value
+                const unboxed = c.valueOf();
+                const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed);
                 appended.push(...dpm);
                 let t = dpm;
                 const error = (errorValue) => {
