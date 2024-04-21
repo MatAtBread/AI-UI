@@ -112,12 +112,8 @@ export function when(container, ...sources) {
         const start = {
             [Symbol.asyncIterator]: () => start,
             next() {
-                return new Promise(resolve => requestAnimationFrame(() => {
-                    // terminate on the next call to `next()`
-                    start.next = () => Promise.resolve({ done: true, value: undefined });
-                    // Yield a "start" event
-                    resolve({ done: false, value: {} });
-                }));
+                start.next = () => Promise.resolve({ done: true, value: undefined });
+                return Promise.resolve({ done: false, value: {} });
             }
         };
         iterators.push(start);
