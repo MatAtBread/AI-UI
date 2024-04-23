@@ -176,7 +176,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
       if (isAsyncIter<ChildTags>(c)) {
         const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
-        const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
+        const ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
         const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed as ChildTags)
@@ -467,9 +467,10 @@ export const tag = <TagLoader>function <Tags extends string,
   */
 
   type ExtendTagFunction = (attrs:{
-    debugger?: any;
+    debugger?: unknown;
     document?: Document;
     [callStackSymbol]?: Overrides[];
+    [k: string]: unknown;
   } | ChildTags, ...children: ChildTags[]) => Element
 
   interface ExtendTagFunctionInstance extends ExtendTagFunction {
@@ -531,13 +532,15 @@ export const tag = <TagLoader>function <Tags extends string,
             appender(e)(children);
         }
         // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
-        // so the full hierarchy gets to consume the initial state
+        // so the full hierarchy gets to consume the initial state, unless they have been assigned
+        // by assignProps from a future
         for (const base of newCallStack) {
-          base.iterable && Object.keys(base.iterable).forEach(
-            // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if
-            // k is one of them.
-            k => e[k] = e[k]
-          );
+          if (base.iterable) for (const k of Object.keys(base.iterable)) {
+            // We don't self-assign iterables that have themselves been assigned with futures
+            if (!(!noAttrs && k in attrs && (!isPromiseLike(attrs[k]) || !isAsyncIter(attrs[k]))))
+              // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if k is one of them.
+              e[k] = e[k];
+          }
         }
       }
       return e;
