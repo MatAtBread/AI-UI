@@ -64,7 +64,6 @@ function whenEvent(container, what) {
         eventObservations.set(eventName, new Set());
     }
     const queue = queueIteratableIterator(() => eventObservations.get(eventName)?.delete(details));
-    const multi = queue.multi();
     const details /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
@@ -73,7 +72,7 @@ function whenEvent(container, what) {
     };
     containerAndSelectorsMounted(container, selector ? [selector] : undefined)
         .then(_ => eventObservations.get(eventName).add(details));
-    return multi;
+    return queue.multi();
 }
 async function* neverGonnaHappen() {
     await new Promise(() => { });

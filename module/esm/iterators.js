@@ -1,4 +1,4 @@
-import { DEBUG } from "./debug.js";
+import { DEBUG, log } from "./debug.js";
 import { deferred } from "./deferred.js";
 ;
 ;
@@ -36,12 +36,14 @@ const asyncExtras = {
 };
 export function queueIteratableIterator(stop = () => { }) {
     let _pending = [];
-    let _items = [];
+    let _items = null;
     const q = {
         [Symbol.asyncIterator]() {
             return q;
         },
         next() {
+            if (!_items)
+                _items = [];
             if (_items.length) {
                 return Promise.resolve({ done: false, value: _items.shift() });
             }
@@ -87,7 +89,12 @@ export function queueIteratableIterator(stop = () => { }) {
                 _pending.shift().resolve({ done: false, value });
             }
             else {
-                _items.push(value);
+                if (!_items) {
+                    log('Discarding queue push as there are no consumers');
+                }
+                else {
+                    _items.push(value);
+                }
             }
             return true;
         }
@@ -180,10 +187,10 @@ export function defineIterableProperty(obj, name, v) {
     let initIterator = () => {
         initIterator = () => b;
         // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
-        //const bi = pushIterator<V>();
-        //const b = bi.multi()[Symbol.asyncIterator]();
-        const bi = broadcastIterator();
-        const b = bi[Symbol.asyncIterator]();
+        const bi = pushIterator();
+        const b = bi.multi()[Symbol.asyncIterator]();
+        //const bi = broadcastIterator<V>();
+        //const b = bi[Symbol.asyncIterator]();
         extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
         push = bi.push;
         Object.keys(asyncExtras).forEach(k => extras[k] = {
@@ -339,7 +346,7 @@ export function defineIterableProperty(obj, name, v) {
                                     const pv = p?.valueOf();
                                     if (typeof ov === typeof pv && ov == pv)
                                         return Ignore;
-                                    return o?.[key];
+                                    return ov; //o?.[key as keyof typeof o]
                                 }));
                                 Reflect.ownKeys(props).forEach(k => props[k].enumerable = false);
                                 // @ts-ignore - Fix

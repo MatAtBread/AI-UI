@@ -156,7 +156,6 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   }
 
   const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
-  const multi = queue.multi();
 
   const details: EventObservation<keyof GlobalEventHandlersEventMap> /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
     push: queue.push,
@@ -168,7 +167,7 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
     .then(_ => eventObservations.get(eventName)!.add(details));
 
-  return multi ;
+  return queue.multi() ;
 }
 
 async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
