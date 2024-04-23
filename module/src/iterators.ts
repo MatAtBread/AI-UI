@@ -731,7 +731,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
         ai = source[Symbol.asyncIterator]!();
         step();
       }
-      return current;
+      return current//.then(zalgo => zalgo);
     },
 
     throw(ex: any) {

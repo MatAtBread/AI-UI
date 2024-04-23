@@ -607,7 +607,7 @@ function multi() {
                 ai = source[Symbol.asyncIterator]();
                 step();
             }
-            return current;
+            return current; //.then(zalgo => zalgo);
         },
         throw(ex) {
             // The consumer wants us to exit with an exception. Tell the source if we're the final one
