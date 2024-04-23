@@ -7,22 +7,41 @@ const Thing = div.extended({
     thing: { n: "?" }
   },
   constructed() {
-    return span(this.thing.n?.map!(v => ["Thing is ", JSON.stringify(v)]));
+    return span("Thing is ",this.thing.n);
   }
 });
 
-const count = Iterators.generatorHelpers(async function* () { for (let i = 0; i < 10; i++) { yield i; await new Promise(r => setTimeout(r, 1500)) } });
-const thing = (async function* () { for (let i = 0; i < 1000; i++) { yield {n: String(i)}; await new Promise(r => setTimeout(r, 5000)) } })();
-//const thing = count().map(n => ({ n: String(n) }));
+const count = Iterators.generatorHelpers(async function* () { for (let i = 0; i < 10; i++) { yield i; await new Promise(r => setTimeout(r, 500)) } });
+const thing_n = count().map(String);
+const thing_m = count().map(String).multi();
+const thing = (async function* () { for (let i = 0; i < 10; i++) { yield {n: String(i)}; await new Promise(r => setTimeout(r, 500)) } })();
+const thing2 = count().map(n => ({ n: String(n) }));
+const thing3 = thing_m.map(n => ({ n }));
 
 document.body.append(
-  Thing({
-    thing: {
-      n: count().map(String)
-    }
-  }), 
+  // Thing({
+  //   thing: {
+  //     n: thing_n
+  //   }
+  // }), 
+  // Thing({
+  //   thing: {
+  //     n: thing_m
+  //   }
+  // }), 
+  // Thing({
+  //   thing: {
+  //     n: thing_m
+  //   }
+  // }), 
   Thing({
     thing: thing
-  })
+  }),
+  // Thing({
+  //   thing: thing2
+  // }),
+  // Thing({
+  //   thing: thing3
+  // })
 );
 

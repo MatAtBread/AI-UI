@@ -52,7 +52,7 @@ const asyncExtras = {
 
 export function queueIteratableIterator<T>(stop = () => { }) {
   let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
-  let _items: T[] | null = null;
+  let _items: T[] | null = [];
 
   const q: QueueIteratableIterator<T> = {
     [Symbol.asyncIterator]() {
@@ -60,9 +60,7 @@ export function queueIteratableIterator<T>(stop = () => { }) {
     },
 
     next() {
-      if (!_items)
-          _items = [];
-      if (_items.length) {
+      if (_items?.length) {
         return Promise.resolve({ done: false, value: _items.shift()! });
       }
 
