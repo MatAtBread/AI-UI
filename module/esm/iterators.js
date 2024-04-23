@@ -186,12 +186,14 @@ export function defineIterableProperty(obj, name, v) {
     // never referenced, and therefore cannot be consumed and ultimately closed
     let initIterator = () => {
         initIterator = () => b;
-        // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
-        const bi = pushIterator();
-        const b = bi.multi()[Symbol.asyncIterator]();
-        //const bi = broadcastIterator<V>();
-        //const b = bi[Symbol.asyncIterator]();
-        extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
+        const bi = queueIteratableIterator();
+        const mi = bi.multi();
+        const b = mi[Symbol.asyncIterator]();
+        extras[Symbol.asyncIterator] = {
+            value: mi[Symbol.asyncIterator],
+            enumerable: false,
+            writable: false
+        };
         push = bi.push;
         Object.keys(asyncExtras).forEach(k => extras[k] = {
             // @ts-ignore - Fix
@@ -443,7 +445,7 @@ export const combine = (src, opts = {}) => {
     let active = 0;
     const forever = new Promise(() => { });
     const ci = {
-        [Symbol.asyncIterator]() { return this; },
+        [Symbol.asyncIterator]() { return ci; },
         next() {
             if (pc === undefined) {
                 pc = Object.entries(src).map(([k, sit], idx) => {
@@ -525,7 +527,7 @@ export function filterMap(source, fn, initialValue = Ignore) {
     let prev = Ignore;
     const fai = {
         [Symbol.asyncIterator]() {
-            return this;
+            return fai;
         },
         next(...args) {
             if (initialValue !== Ignore) {
@@ -600,7 +602,7 @@ function multi() {
     const mai = {
         [Symbol.asyncIterator]() {
             consumers += 1;
-            return this;
+            return mai;
         },
         next() {
             if (!ai) {
