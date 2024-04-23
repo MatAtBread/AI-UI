@@ -1,4 +1,4 @@
-import { DEBUG } from "./debug.js";
+import { DEBUG, log } from "./debug.js";
 import { DeferredPromise, deferred } from "./deferred.js";
 import { IterableProperties } from "./tags.js";
 
@@ -52,7 +52,7 @@ const asyncExtras = {
 
 export function queueIteratableIterator<T>(stop = () => { }) {
   let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
-  let _items = [] as T[] | null;
+  let _items: T[] | null = [];
 
   const q: QueueIteratableIterator<T> = {
     [Symbol.asyncIterator]() {
@@ -60,8 +60,8 @@ export function queueIteratableIterator<T>(stop = () => { }) {
     },
 
     next() {
-      if (_items!.length) {
-        return Promise.resolve({ done: false, value: _items!.shift()! });
+      if (_items?.length) {
+        return Promise.resolve({ done: false, value: _items.shift()! });
       }
 
       const value = deferred<IteratorResult<T>>();
@@ -102,7 +102,11 @@ export function queueIteratableIterator<T>(stop = () => { }) {
       if (_pending.length) {
         _pending.shift()!.resolve({ done: false, value });
       } else {
-        _items!.push(value);
+        if (!_items) {
+          log('Discarding queue push as there are no consumers');
+        } else { 
+          _items.push(value) 
+        }
       }
       return true;
     }
@@ -210,12 +214,14 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
   // never referenced, and therefore cannot be consumed and ultimately closed
   let initIterator = () => {
     initIterator = () => b;
-    // This *should* work (along with the multi call below, but is defeated by the lazy initialization? &/| unbound methods?)
-    //const bi = pushIterator<V>();
-    //const b = bi.multi()[Symbol.asyncIterator]();
-    const bi = broadcastIterator<V>();
-    const b = bi[Symbol.asyncIterator]();
-    extras[Symbol.asyncIterator] = { value: bi[Symbol.asyncIterator], enumerable: false, writable: false };
+    const bi = queueIteratableIterator<V>();
+    const mi = bi.multi();
+    const b = mi[Symbol.asyncIterator]();
+    extras[Symbol.asyncIterator] = { 
+      value: mi[Symbol.asyncIterator],
+      enumerable: false, 
+      writable: false
+    };
     push = bi.push;
     Object.keys(asyncExtras).forEach(k =>
       extras[k as keyof typeof extras] = {
@@ -388,7 +394,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                   const pv = p?.valueOf();
                   if (typeof ov === typeof pv && ov == pv)
                     return Ignore;
-                  return o?.[key as keyof typeof o]
+                  return ov//o?.[key as keyof typeof o]
                 }));
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
                 // @ts-ignore - Fix
@@ -511,7 +517,7 @@ export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions
   let active:number = 0;
   const forever = new Promise<any>(() => {});
   const ci = {
-    [Symbol.asyncIterator]() { return this },
+    [Symbol.asyncIterator]() { return ci },
     next(): Promise<IteratorResult<CombinedIterableType<S>>> {
       if (pc === undefined) {
         pc = Object.entries(src).map(([k,sit], idx) => {
@@ -623,7 +629,7 @@ export function filterMap<U extends PartialIterable, R>(source: U,
   let prev: R | typeof Ignore = Ignore;
   const fai: AsyncIterableIterator<R> = {
     [Symbol.asyncIterator]() {
-      return this;
+      return fai;
     },
 
     next(...args: [] | [undefined]) {
@@ -717,7 +723,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
   const mai: AsyncIterableIterator<T> = {
     [Symbol.asyncIterator]() {
       consumers += 1;
-      return this;
+      return mai;
     },
 
     next() {
@@ -725,7 +731,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
         ai = source[Symbol.asyncIterator]!();
         step();
       }
-      return current;
+      return current//.then(zalgo => zalgo);
     },
 
     throw(ex: any) {

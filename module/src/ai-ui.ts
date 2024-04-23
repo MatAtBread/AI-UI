@@ -2,7 +2,7 @@ import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Constructed, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
-import { DEBUG } from './debug.js';
+import { DEBUG, log } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
@@ -176,7 +176,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
       if (isAsyncIter<ChildTags>(c)) {
         const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
-        const ap = isAsyncIterable(c) ? c[Symbol.asyncIterator]() : c;
+        const ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
         const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed as ChildTags)
@@ -283,8 +283,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  if (DEBUG)
-                    console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                  log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -363,7 +362,7 @@ export const tag = <TagLoader>function <Tags extends string,
                     if (s[k] !== undefined)
                       d[k] = s[k];
                   }
-                }, error => console.log('(AI-UI)',"Failed to set attribute", error))
+                }, error => log("Failed to set attribute", error))
               } else if (!isAsyncIter<unknown>(value)) {
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value))
@@ -431,8 +430,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
         function assignObject(value: any, k: string) {
             if (value instanceof Node) {
-              if (DEBUG)
-                console.log('(AI-UI)', "Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+              log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
               d[k] = value;
             } else {
               // Note - if we're copying to ourself (or an array of different length),
@@ -469,9 +467,10 @@ export const tag = <TagLoader>function <Tags extends string,
   */
 
   type ExtendTagFunction = (attrs:{
-    debugger?: any;
+    debugger?: unknown;
     document?: Document;
     [callStackSymbol]?: Overrides[];
+    [k: string]: unknown;
   } | ChildTags, ...children: ChildTags[]) => Element
 
   interface ExtendTagFunctionInstance extends ExtendTagFunction {
@@ -520,7 +519,7 @@ export const tag = <TagLoader>function <Tags extends string,
       deepDefine(e, tagDefinition.declare);
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
         if (k in e) {
-          if (DEBUG) console.log('(AI-UI)',`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
+          log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
         } else
           defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
       });
@@ -533,13 +532,15 @@ export const tag = <TagLoader>function <Tags extends string,
             appender(e)(children);
         }
         // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
-        // so the full hierarchy gets to consume the initial state
+        // so the full hierarchy gets to consume the initial state, unless they have been assigned
+        // by assignProps from a future
         for (const base of newCallStack) {
-          base.iterable && Object.keys(base.iterable).forEach(
-            // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if
-            // k is one of them.
-            k => e[k] = e[k]
-          );
+          if (base.iterable) for (const k of Object.keys(base.iterable)) {
+            // We don't self-assign iterables that have themselves been assigned with futures
+            if (!(!noAttrs && k in attrs && (!isPromiseLike(attrs[k]) || !isAsyncIter(attrs[k]))))
+              // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if k is one of them.
+              e[k] = e[k];
+          }
         }
       }
       return e;
@@ -719,8 +720,8 @@ export function augmentGlobalAsyncGenerators() {
     }
     g = Object.getPrototypeOf(g);
   }
-  if (DEBUG && !g) {
-    console.log('(AI-UI)',"Failed to augment the prototype of `(async function*())()`");
+  if (!g) {
+    log("Failed to augment the prototype of `(async function*())()`");
   }
 }
 

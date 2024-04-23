@@ -1,4 +1,4 @@
-import { DEBUG } from "./debug.js";
+import { DEBUG, log } from "./debug.js";
 // Used to suppress TS error about use before initialisation
 const nothing = (v) => { };
 export function deferred() {
@@ -9,7 +9,7 @@ export function deferred() {
     promise.reject = reject;
     if (DEBUG) {
         const initLocation = new Error().stack;
-        promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? console.log('(AI-UI)', "Deferred", ex, initLocation) : undefined);
+        promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? log("Deferred", ex, initLocation) : undefined);
     }
     return promise;
 }

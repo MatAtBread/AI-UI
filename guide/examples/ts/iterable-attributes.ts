@@ -51,7 +51,7 @@ const r = Div({
   id:"MyThing", 
 //  onclick:e => console.log(e)
 },
-  "The count is: ",0//count()
+  "The count is: ",count()
 );
 
 document.body.append(r);
