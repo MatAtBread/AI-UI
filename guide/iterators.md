@@ -241,10 +241,10 @@ Passes each yielded value to the specified function and returns on when the fina
 function multi<U>(this: AsyncIterable<U>): AsyncIterable<U>
 ```
 
-Accept the source iterator, yielding a common value to all current consumers. There is no buffering or queueing - if a consumer takes a long time to handle a value, it might miss some consumed by any other consumers, but will resume receiving values as soon as it calls next(). It is very similar to `broadcast`, except that `broadcast` queues any intermediate values. `multi` is significantly more efficient and is suitable for providing things like mousemove and scroll events, where a slow, asynchronous consumer does not want to process every value in turn, but simply wants to keep up to date when the value changes.
+Accept the source iterator, yielding a common value to all current consumers. There is no buffering or queueing - if am asynchronous consumer takes a long time to handle a value, it might miss some consumed by any other consumers, but will resume receiving values as soon as it calls next(). It is suitable for providing things like mousemove and scroll events, where a slow, asynchronous consumer does not want to process every value in turn, but simply wants to keep up to date when the value changes. If you need to buffer events, consider using a collection of `queueIterableIterator`s.
 
-Note: by default, AsyncIterators, if given more than one consumer, will yield sequential values to each consumer*. Use `multi` or `broadcast` if you need all consumers to receive a value.
-> (* actually, this is entirely dependent on how the async iterator is implemented. It is the default behaviour of an `async function*`, but an iterator is free to produce results in whatever manner it pleases to multiple consumers).
+By default, AsyncGenerators, if given more than one consumer, will yield sequential values to each consumer*. Use `multi` if you need all consumers to receive a value.
+> (* actually, this is entirely dependent on how the async iterator is implemented. It is the default behaviour of an `async function*`, but an iterator is free to produce results in whatever manner it pleases to multiple consumers. Of couse if you call a generator function multiple times, each will return a new iterator that yields all values to it'#s sole consumer).
 
 ```javascript
 const b = counter3.multi();
@@ -261,24 +261,6 @@ c.consume(n => console.log("B",n)); // A1, A3, A5, A7, A9
 // These are evenly distributed by an `async function *` becuase the consumers are synchronous and complete at the same speed
 
 ```
-
-## broadcast
-```typescript
-function broadcast<U>(this: AsyncIterable<U>): AsyncIterable<U>
-```
-
-Queues the incoming yielded values so they can be replayed to multiple consumers. The queue for each consumer commences when the consumer first calls the async iterator `next()` function, and the whole broadcast iterator terminates when either the producer or all consumers terminate.
-
-```javascript
-const b = counter3.broadcast();
-
-// Outputs A0,B0,A1,B1.... note: the synchronisation and order between A and B may differ depending on the timing of functions. The order within "A" or "B" will be maintained.
-
-b.consume(n => console.log("A",n));
-b.consume(n => console.log("B",n));
-
-```
-
 # Chaining iterables and helpers
 
 All the helpers (except consume) themselves return "helped" async iterables, so you can chain them together:

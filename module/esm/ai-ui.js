@@ -453,9 +453,13 @@ export const tag = function (_1, _2, _3) {
                     if (base.iterable)
                         for (const k of Object.keys(base.iterable)) {
                             // We don't self-assign iterables that have themselves been assigned with futures
-                            if (!(!noAttrs && k in attrs && (!isPromiseLike(attrs[k]) || !isAsyncIter(attrs[k]))))
-                                // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if k is one of them.
-                                e[k] = e[k];
+                            if (!(!noAttrs && k in attrs && (!isPromiseLike(attrs[k]) || !isAsyncIter(attrs[k])))) {
+                                const value = e[k];
+                                if (value?.valueOf() !== undefined) {
+                                    // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if k is one of them.
+                                    e[k] = value;
+                                }
+                            }
                         }
                 }
             }

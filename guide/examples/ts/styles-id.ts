@@ -25,5 +25,11 @@ const App2 = App1.extended(inst =>({
   }
 }));
 
+const App3 = App1.extended({
+  override: {
+    className: `${App1.definition![tag.UniqueID]}-App`
+  }
+});
+
 /* Create and add an "App" element to the document so the user can see it! */
-document.body.append(App1(),App2());
+document.body.append(App1(),App2(),App3());

@@ -7,7 +7,7 @@ AI-UI ("Async Iterator User Interface") is a tiny, genuinely functional, UI fram
 * A simple mechanism for defining and using standard DOM elements, encouraging both composition _and_ inheritance
 * A super-cool syntax (`when`) for inter-component communication using standard DOM events, avoiding the spaghetti of event listeners and state management
 * Dynamic DOM attributes and contents via _standard_ JS async constructs - set your styles & content with Promises and async iterables.
-* A set of extensions to the standard browser/JS async iterables & generators, like map, filter, throttle, broadcast...
+* A set of extensions to the standard browser/JS async iterables & generators, like map, filter, multi...
 
 ### Design goals for AI-UI are:
 

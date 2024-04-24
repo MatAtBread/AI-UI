@@ -2,11 +2,6 @@ import { IterableProperties } from "./tags.js";
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
     push(value: T): boolean;
 }
-export interface PushIterator<T> extends AsyncExtraIterable<T> {
-    push(value: T): boolean;
-    close(ex?: Error): void;
-}
-export type BroadcastIterator<T> = PushIterator<T>;
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers {
 }
 export declare function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T>;
@@ -21,7 +16,6 @@ declare const asyncExtras: {
     unique: typeof unique;
     waitFor: typeof waitFor;
     multi: typeof multi;
-    broadcast: typeof broadcast;
     initially: typeof initially;
     consume: typeof consume;
     merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T>>, ...A][number]>>;
@@ -30,8 +24,6 @@ declare const asyncExtras: {
     } & S>;
 };
 export declare function queueIteratableIterator<T>(stop?: () => void): QueueIteratableIterator<T> & AsyncExtraIterable<T>;
-export declare function pushIterator<T>(stop?: () => void, bufferWhenNoConsumers?: boolean): PushIterator<T>;
-export declare function broadcastIterator<T>(stop?: () => void): BroadcastIterator<T>;
 declare global {
     interface ObjectConstructor {
         defineProperties<T, M extends {
@@ -75,5 +67,6 @@ declare function unique<U extends PartialIterable>(this: U, fn?: (next: HelperAs
 declare function initially<U extends PartialIterable, I = HelperAsyncIterable<U>>(this: U, initValue: I): AsyncExtraIterable<HelperAsyncIterable<U> | I>;
 declare function waitFor<U extends PartialIterable>(this: U, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncExtraIterable<HelperAsyncIterable<U>>;
 declare function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsyncIterable<U>>;
-declare function broadcast<U extends PartialIterable>(this: U): AsyncIterable<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator], {}, never>> & AsyncExtraIterable<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator], {}, never>>;
 export {};
+/** This is implemention of pushIterator and broadcastIterator deprecated in favour of
+ * `queueIterableIterator().multi()` as of v0.11.x. It will be removed */

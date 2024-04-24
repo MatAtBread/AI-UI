@@ -284,7 +284,7 @@ type ExTagCreator<Base extends object,
   /* It is based on a "super" TagCreator */
   super: Super
   /* It has a function that exposes the differences between the tags it creates and its super */
-  definition?: Overrides; /* Contains the definitions & UniqueID for an extended tag. undefined for base tags */
+  definition?: Overrides & { [UniqueID]: string }; /* Contains the definitions & UniqueID for an extended tag. undefined for base tags */
   /* It has a name (set to a class or definition location), which is helpful when debugging */
   readonly name: string;
   /* Can test if an element was created by this function or a base tag function */

@@ -1,30 +1,25 @@
-import { DEBUG, log } from "./debug.js";
-import { DeferredPromise, deferred } from "./deferred.js";
-import { IterableProperties } from "./tags.js";
+import { DEBUG, log } from "./debug.js"
+import { DeferredPromise, deferred } from "./deferred.js"
+import { IterableProperties } from "./tags.js"
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
   push(value: T): boolean;
-};
-export interface PushIterator<T> extends AsyncExtraIterable<T> {
-  push(value: T): boolean;
-  close(ex?: Error): void;  // Tell the consumer(s) we're done, with an optional error
-};
-export type BroadcastIterator<T> = PushIterator<T>;
+}
 
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers { }
 
 export function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
-  return typeof o?.next === 'function';
+  return typeof o?.next === 'function'
 }
 export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
-  return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
+  return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function'
 }
 export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T> {
-  return isAsyncIterable(o) || isAsyncIterator(o);
+  return isAsyncIterable(o) || isAsyncIterator(o)
 }
 
-export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
+export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>
 
 export function asyncIterator<T>(o: AsyncProvider<T>) {
   if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
@@ -39,7 +34,6 @@ const asyncExtras = {
   unique,
   waitFor,
   multi,
-  broadcast,
   initially,
   consume,
   merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A) {
@@ -114,89 +108,6 @@ export function queueIteratableIterator<T>(stop = () => { }) {
   return iterableHelpers(q);
 }
 
-/* An AsyncIterable which typed objects can be published to.
-  The queue can be read by multiple consumers, who will each receive
-  unique values from the queue (ie: the queue is SHARED not duplicated)
-*/
-export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false): PushIterator<T> {
-  let consumers = 0;
-  let ai: QueueIteratableIterator<T> = queueIteratableIterator<T>(() => {
-    consumers -= 1;
-    if (consumers === 0 && !bufferWhenNoConsumers) {
-      try { stop() } catch (ex) { }
-      // This should never be referenced again, but if it is, it will throw
-      (ai as any) = null;
-    }
-  });
-
-  return Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
-    [Symbol.asyncIterator]() {
-      consumers += 1;
-      return ai;
-    },
-    push(value: T) {
-      if (!bufferWhenNoConsumers && consumers === 0) {
-        // No one ready to read the results
-        return false;
-      }
-      return ai.push(value);
-    },
-    close(ex?: Error) {
-      ex ? ai.throw?.(ex) : ai.return?.();
-      // This should never be referenced again, but if it is, it will throw
-      (ai as any) = null;
-    }
-  });
-}
-
-/* An AsyncIterable which typed objects can be published to.
-  The queue can be read by multiple consumers, who will each receive
-  a copy of the values from the queue (ie: the queue is BROADCAST not shared).
-
-  The iterators stops running when the number of consumers decreases to zero
-*/
-export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
-  let ai = new Set<QueueIteratableIterator<T>>();
-
-  const b = <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
-    [Symbol.asyncIterator](): AsyncIterableIterator<T> {
-      const added = queueIteratableIterator<T>(() => {
-        ai.delete(added);
-        if (ai.size === 0) {
-          try { stop() } catch (ex) { }
-          // This should never be referenced again, but if it is, it will throw
-          (ai as any) = null;
-        }
-      });
-      ai.add(added);
-      return iterableHelpers(added);
-    },
-    push(value: T) {
-      if (!ai?.size)
-        return false;
-
-      for (const q of ai.values()) {
-        q.push(value);
-      }
-      return true;
-    },
-    close(ex?: Error) {
-      for (const q of ai.values()) {
-        ex ? q.throw?.(ex) : q.return?.();
-      }
-      // This should never be referenced again, but if it is, it will throw
-      (ai as any) = null;
-    }
-  });
-  return b;
-}
-
-/* Define a "iterable property" on `obj`.
-   This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
-   yields when the property is set.
-   This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
-*/
-
 declare global {
   interface ObjectConstructor {
     defineProperties<T, M extends { [K: string | symbol]: TypedPropertyDescriptor<any> }>(o: T, properties: M & ThisType<any>): T & {
@@ -204,6 +115,12 @@ declare global {
     };
   }
 }
+
+/* Define a "iterable property" on `obj`.
+   This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
+   yields when the property is set.
+   This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
+*/
 
 export const Iterability = Symbol("Iterability");
 export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
@@ -757,26 +674,113 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
   return iterableHelpers(mai);
 }
 
-function broadcast<U extends PartialIterable>(this: U) {
-  type T = HelperAsyncIterable<U>;
-  const ai = this[Symbol.asyncIterator]!();
-  const b = broadcastIterator<T>(() => ai.return?.());
-  (function step() {
-    ai.next().then(v => {
-      if (v.done) {
-        // Meh - we throw these away for now.
-        // console.log(".broadcast done");
-      } else {
-        b.push(v.value);
-        step();
-      }
-    }).catch(ex => b.close(ex));
-  })();
+/** This is implemention of pushIterator and broadcastIterator deprecated in favour of 
+ * `queueIterableIterator().multi()` as of v0.11.x. It will be removed */
 
-  const bai: AsyncIterable<T> = {
-    [Symbol.asyncIterator]() {
-      return b[Symbol.asyncIterator]();
-    }
-  };
-  return iterableHelpers(bai)
-}
+// export interface PushIterator<T> extends AsyncExtraIterable<T> {
+//   push(value: T): boolean;
+//   close(ex?: Error): void;  // Tell the consumer(s) we're done, with an optional error
+// };
+// export type BroadcastIterator<T> = PushIterator<T>;
+
+/* An AsyncIterable which typed objects can be published to.
+  The queue can be read by multiple consumers, who will each receive
+  unique values from the queue (ie: the queue is SHARED not duplicated)
+*/
+// export function pushIterator<T>(stop = () => { }, bufferWhenNoConsumers = false): PushIterator<T> {
+//   let consumers = 0;
+//   let ai: QueueIteratableIterator<T> = queueIteratableIterator<T>(() => {
+//     consumers -= 1;
+//     if (consumers === 0 && !bufferWhenNoConsumers) {
+//       try { stop() } catch (ex) { }
+//       // This should never be referenced again, but if it is, it will throw
+//       (ai as any) = null;
+//     }
+//   });
+
+//   return Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
+//     [Symbol.asyncIterator]() {
+//       consumers += 1;
+//       return ai;
+//     },
+//     push(value: T) {
+//       if (!bufferWhenNoConsumers && consumers === 0) {
+//         // No one ready to read the results
+//         return false;
+//       }
+//       return ai.push(value);
+//     },
+//     close(ex?: Error) {
+//       ex ? ai.throw?.(ex) : ai.return?.();
+//       // This should never be referenced again, but if it is, it will throw
+//       (ai as any) = null;
+//     }
+//   });
+// }
+
+/* An AsyncIterable which typed objects can be published to.
+  The queue can be read by multiple consumers, who will each receive
+  a copy of the values from the queue (ie: the queue is BROADCAST not shared).
+
+  The iterators stops running when the number of consumers decreases to zero
+*/
+// export function broadcastIterator<T>(stop = () => { }): BroadcastIterator<T> {
+//   let ai = new Set<QueueIteratableIterator<T>>();
+
+//   const b = <BroadcastIterator<T>>Object.assign(Object.create(asyncExtras) as AsyncExtraIterable<T>, {
+//     [Symbol.asyncIterator](): AsyncIterableIterator<T> {
+//       const added = queueIteratableIterator<T>(() => {
+//         ai.delete(added);
+//         if (ai.size === 0) {
+//           try { stop() } catch (ex) { }
+//           // This should never be referenced again, but if it is, it will throw
+//           (ai as any) = null;
+//         }
+//       });
+//       ai.add(added);
+//       return iterableHelpers(added);
+//     },
+//     push(value: T) {
+//       if (!ai?.size)
+//         return false;
+
+//       for (const q of ai.values()) {
+//         q.push(value);
+//       }
+//       return true;
+//     },
+//     close(ex?: Error) {
+//       for (const q of ai.values()) {
+//         ex ? q.throw?.(ex) : q.return?.();
+//       }
+//       // This should never be referenced again, but if it is, it will throw
+//       (ai as any) = null;
+//     }
+//   });
+//   return b;
+// }
+
+
+// function broadcast<U extends PartialIterable>(this: U) {
+//   type T = HelperAsyncIterable<U>;
+//   const ai = this[Symbol.asyncIterator]!();
+//   const b = broadcastIterator<T>(() => ai.return?.());
+//   (function step() {
+//     ai.next().then(v => {
+//       if (v.done) {
+//         // Meh - we throw these away for now.
+//         // console.log(".broadcast done");
+//       } else {
+//         b.push(v.value);
+//         step();
+//       }
+//     }).catch(ex => b.close(ex));
+//   })();
+
+//   const bai: AsyncIterable<T> = {
+//     [Symbol.asyncIterator]() {
+//       return b[Symbol.asyncIterator]();
+//     }
+//   };
+//   return iterableHelpers(bai)
+// }
