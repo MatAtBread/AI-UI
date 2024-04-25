@@ -11,6 +11,7 @@ export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
 type AsyncIterableHelpers = typeof asyncExtras;
 declare const asyncExtras: {
+    filterMap: typeof filterMap;
     map: typeof map;
     filter: typeof filter;
     unique: typeof unique;
@@ -68,5 +69,3 @@ declare function initially<U extends PartialIterable, I = HelperAsyncIterable<U>
 declare function waitFor<U extends PartialIterable>(this: U, cb: (done: (value: void | PromiseLike<void>) => void) => void): AsyncExtraIterable<HelperAsyncIterable<U>>;
 declare function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsyncIterable<U>>;
 export {};
-/** This is implemention of pushIterator and broadcastIterator deprecated in favour of
- * `queueIterableIterator().multi()` as of v0.11.x. It will be removed */
