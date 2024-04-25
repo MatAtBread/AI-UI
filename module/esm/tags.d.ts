@@ -113,7 +113,9 @@ export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<P
 type ExTagCreator<Base extends object, Super extends (unknown | ExTagCreator<any>) = unknown, SuperDefs extends Overrides = {}, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;
     super: Super;
-    definition?: Overrides;
+    definition?: Overrides & {
+        [UniqueID]: string;
+    };
     readonly name: string;
     [Symbol.hasInstance](elt: any): boolean;
     [UniqueID]: string;

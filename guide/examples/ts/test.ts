@@ -1,5 +1,5 @@
 import { tag } from '../../../module/esm/ai-ui.js';
-import { iterableHelpers, pushIterator } from '../../../module/esm/iterators.js'
+import { iterableHelpers, queueIteratableIterator } from '../../../module/esm/iterators.js'
 import { UniqueID } from '../../../module/esm/tags.js';
 
 const { div, h2, input, span, pre, button } = tag();
@@ -15,7 +15,7 @@ function mousemove(e: MouseEvent) {
     console.log("mousPos closed!!");
   }
 }
-const mousePosPush = pushIterator<{x: number, y: number}>(()=>{
+const mousePosPush = queueIteratableIterator<{x: number, y: number}>(()=>{
   console.log("stop mousePos")
   window.removeEventListener('mousemove', mousemove);
 });

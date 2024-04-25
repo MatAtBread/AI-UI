@@ -1,4 +1,4 @@
-import { tag, Iterators } from '../../../module/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js'
 
 const { div, button, input } = tag();
 

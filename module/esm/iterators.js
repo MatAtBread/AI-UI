@@ -1,7 +1,5 @@
 import { DEBUG, log } from "./debug.js";
 import { deferred } from "./deferred.js";
-;
-;
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
 }
@@ -19,12 +17,12 @@ export function asyncIterator(o) {
     throw new Error("Not as async provider");
 }
 const asyncExtras = {
+    filterMap, // Made available since it DOESM'T clash with proposed async iterator helpers
     map,
     filter,
     unique,
     waitFor,
     multi,
-    broadcast,
     initially,
     consume,
     merge(...m) {
@@ -99,84 +97,11 @@ export function queueIteratableIterator(stop = () => { }) {
     };
     return iterableHelpers(q);
 }
-/* An AsyncIterable which typed objects can be published to.
-  The queue can be read by multiple consumers, who will each receive
-  unique values from the queue (ie: the queue is SHARED not duplicated)
+/* Define a "iterable property" on `obj`.
+   This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
+   yields when the property is set.
+   This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
-export function pushIterator(stop = () => { }, bufferWhenNoConsumers = false) {
-    let consumers = 0;
-    let ai = queueIteratableIterator(() => {
-        consumers -= 1;
-        if (consumers === 0 && !bufferWhenNoConsumers) {
-            try {
-                stop();
-            }
-            catch (ex) { }
-            // This should never be referenced again, but if it is, it will throw
-            ai = null;
-        }
-    });
-    return Object.assign(Object.create(asyncExtras), {
-        [Symbol.asyncIterator]() {
-            consumers += 1;
-            return ai;
-        },
-        push(value) {
-            if (!bufferWhenNoConsumers && consumers === 0) {
-                // No one ready to read the results
-                return false;
-            }
-            return ai.push(value);
-        },
-        close(ex) {
-            ex ? ai.throw?.(ex) : ai.return?.();
-            // This should never be referenced again, but if it is, it will throw
-            ai = null;
-        }
-    });
-}
-/* An AsyncIterable which typed objects can be published to.
-  The queue can be read by multiple consumers, who will each receive
-  a copy of the values from the queue (ie: the queue is BROADCAST not shared).
-
-  The iterators stops running when the number of consumers decreases to zero
-*/
-export function broadcastIterator(stop = () => { }) {
-    let ai = new Set();
-    const b = Object.assign(Object.create(asyncExtras), {
-        [Symbol.asyncIterator]() {
-            const added = queueIteratableIterator(() => {
-                ai.delete(added);
-                if (ai.size === 0) {
-                    try {
-                        stop();
-                    }
-                    catch (ex) { }
-                    // This should never be referenced again, but if it is, it will throw
-                    ai = null;
-                }
-            });
-            ai.add(added);
-            return iterableHelpers(added);
-        },
-        push(value) {
-            if (!ai?.size)
-                return false;
-            for (const q of ai.values()) {
-                q.push(value);
-            }
-            return true;
-        },
-        close(ex) {
-            for (const q of ai.values()) {
-                ex ? q.throw?.(ex) : q.return?.();
-            }
-            // This should never be referenced again, but if it is, it will throw
-            ai = null;
-        }
-    });
-    return b;
-}
 export const Iterability = Symbol("Iterability");
 export function defineIterableProperty(obj, name, v) {
     // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
@@ -331,10 +256,10 @@ export function defineIterableProperty(obj, name, v) {
                             if (key === 'valueOf')
                                 return () => boxedObject;
                             const targetProp = Reflect.getOwnPropertyDescriptor(target, key);
-                            // We include `targetProp === undefined` so we can nested monitor properties that are actually defined (yet)
+                            // We include `targetProp === undefined` so we can monitor nested properties that aren't actually defined (yet)
                             // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
                             // defintions like:
-                            //   iterable: { stuff: as Record<string, string | number ... }
+                            //   iterable: { stuff: {} as Record<string, string | number ... }
                             if (targetProp === undefined || targetProp.enumerable) {
                                 if (targetProp === undefined) {
                                     // @ts-ignore - Fix
@@ -629,26 +554,4 @@ function multi() {
         }
     };
     return iterableHelpers(mai);
-}
-function broadcast() {
-    const ai = this[Symbol.asyncIterator]();
-    const b = broadcastIterator(() => ai.return?.());
-    (function step() {
-        ai.next().then(v => {
-            if (v.done) {
-                // Meh - we throw these away for now.
-                // console.log(".broadcast done");
-            }
-            else {
-                b.push(v.value);
-                step();
-            }
-        }).catch(ex => b.close(ex));
-    })();
-    const bai = {
-        [Symbol.asyncIterator]() {
-            return b[Symbol.asyncIterator]();
-        }
-    };
-    return iterableHelpers(bai);
 }
