@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterable, isAsyncIterator, iterableHelpers } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Constructed, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
 import { DEBUG, log } from './debug.js';
@@ -261,9 +261,21 @@ export const tag = <TagLoader>function <Tags extends string,
     });
   }
 
+  /** Just deep copy an object */
+  const plainObjectPrototype = Object.getPrototypeOf({});
+  function deepCopy<X>(d: X): X {
+    if (!d || typeof d !== 'object') return d;
+    if (Array.isArray(d)) {
+      return d.map(v => deepCopy(v)) as X;
+    }
+    if (Object.getPrototypeOf(d) === plainObjectPrototype || !Object.getPrototypeOf(d))
+      return Object.fromEntries(Object.entries(d).map(([k,v]) => [k,(v && typeof v === 'object') ? deepCopy(v) : v])) as X;
+    log("Declared propety is not a plain object and must be assigned by reference");
+    return d;
+  }
 
   /** Routine to *define* properties on a dest object from a src object **/
-  function deepDefine(d: Record<string | symbol | number, any>, s: any): void {
+  function deepDefine(d: Record<string | symbol | number, any>, s: any, declaration?: true): void {
     if (s === null || s === undefined || typeof s !== 'object' || s === d)
       return;
 
@@ -279,8 +291,15 @@ export const tag = <TagLoader>function <Tags extends string,
             // Promise or a function, in which case we just assign it
             if (value && typeof value === 'object' && !isPromiseLike(value)) {
               if (!(k in d)) {
-                // If this is a new value in the destination, just define it to be the same property as the source
-                Object.defineProperty(d, k, srcDesc);
+                // If this is a new value in the destination, just define it to be the same value as the source
+                // If the source value is an object, and we're declaring it (there it should be a new one), take
+                // a copy so as to not re-use the reference and pollute the declaration. Note: this is probably
+                // a better default for any "objects" in a declaration that are plain and not some class type
+                // which can't be copied
+                if (declaration)
+                  Object.defineProperty(d, k, {...srcDesc, value: deepCopy(value)});
+                else
+                  Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
                   log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
@@ -515,8 +534,8 @@ export const tag = <TagLoader>function <Tags extends string,
       const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
       combinedAttrs[callStackSymbol].push(tagDefinition);
       deepDefine(e, tagDefinition.prototype);
+      deepDefine(e, tagDefinition.declare, true);
       deepDefine(e, tagDefinition.override);
-      deepDefine(e, tagDefinition.declare);
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
         if (k in e) {
           log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
@@ -758,7 +777,7 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
         else if (DEBUG) {
           if (!warned.has(elt.id)) {
             warned.add(elt.id)
-            console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids![elt.id]);
+            log('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids![elt.id]);
           }
         }
       }
