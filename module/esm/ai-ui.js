@@ -189,8 +189,21 @@ export const tag = function (_1, _2, _3) {
             augmentGlobalAsyncGenerators
         });
     }
+    /** Just deep copy an object */
+    const plainObjectPrototype = Object.getPrototypeOf({});
+    function deepCopy(d) {
+        if (!d || typeof d !== 'object')
+            return d;
+        if (Array.isArray(d)) {
+            return d.map(v => deepCopy(v));
+        }
+        if (Object.getPrototypeOf(d) === plainObjectPrototype || !Object.getPrototypeOf(d))
+            return Object.fromEntries(Object.entries(d).map(([k, v]) => [k, (v && typeof v === 'object') ? deepCopy(v) : v]));
+        log("Declared propety is not a plain object and must be assigned by reference");
+        return d;
+    }
     /** Routine to *define* properties on a dest object from a src object **/
-    function deepDefine(d, s) {
+    function deepDefine(d, s, declaration) {
         if (s === null || s === undefined || typeof s !== 'object' || s === d)
             return;
         for (const [k, srcDesc] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
@@ -205,8 +218,15 @@ export const tag = function (_1, _2, _3) {
                         // Promise or a function, in which case we just assign it
                         if (value && typeof value === 'object' && !isPromiseLike(value)) {
                             if (!(k in d)) {
-                                // If this is a new value in the destination, just define it to be the same property as the source
-                                Object.defineProperty(d, k, srcDesc);
+                                // If this is a new value in the destination, just define it to be the same value as the source
+                                // If the source value is an object, and we're declaring it (there it should be a new one), take
+                                // a copy so as to not re-use the reference and pollute the declaration. Note: this is probably
+                                // a better default for any "objects" in a declaration that are plain and not some class type
+                                // which can't be copied
+                                if (declaration)
+                                    Object.defineProperty(d, k, { ...srcDesc, value: deepCopy(value) });
+                                else
+                                    Object.defineProperty(d, k, srcDesc);
                             }
                             else {
                                 if (value instanceof Node) {
@@ -429,8 +449,8 @@ export const tag = function (_1, _2, _3) {
             const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
+            deepDefine(e, tagDefinition.declare, true);
             deepDefine(e, tagDefinition.override);
-            deepDefine(e, tagDefinition.declare);
             tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
                 if (k in e) {
                     log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
@@ -639,7 +659,7 @@ export function getElementIdMap(node, ids) {
                 else if (DEBUG) {
                     if (!warned.has(elt.id)) {
                         warned.add(elt.id);
-                        console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
+                        log('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
                     }
                 }
             }
