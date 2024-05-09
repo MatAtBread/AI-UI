@@ -1,4 +1,4 @@
 [
-  [1,"<div><div><span>1</span> : <span id=\"more\"><ai-ui-container class=\"promise\"><ai-ui-container style=\"display: none;\"></ai-ui-container></ai-ui-container></span></div><div><span>2</span> : <span id=\"more\"><ai-ui-container class=\"promise\"><ai-ui-container style=\"display: none;\"></ai-ui-container></ai-ui-container></span></div><div><span>3</span> : <span id=\"more\"><ai-ui-container class=\"promise\"><ai-ui-container style=\"display: none;\"></ai-ui-container></ai-ui-container></span></div></div>"],
+  [1,"<div><div><span>1</span> : <span id=\"more\"><!--promise--></span></div><div><span>2</span> : <span id=\"more\"><!--promise--></span></div><div><span>3</span> : <span id=\"more\"><!--promise--></span></div></div>"],
   [2,"<div><div><span>1</span> : <span id=\"more\">1</span></div><div><span>2</span> : <span id=\"more\">2</span></div><div><span>3</span> : <span id=\"more\">3</span></div></div>"]
 ]

@@ -4,10 +4,6 @@ import { tag } from '../../module/src/ai-ui';
 
 const { div, span } = tag();
 
-function sleep(ms:number) {
-  return new Promise<void>(resolve => setTimeout(resolve,ms));
-}
-
 const Thing = div.extended({
   declare:{
     page: {
@@ -23,7 +19,7 @@ const Thing = div.extended({
       span(this.page.n),
       " : ",
       span({id:'more'},
-        sleep(200).then(()=>this.page.n) as Promise<string>
+        Test.sleep(.2).then(()=>this.page.n) as Promise<string>
       )
     ]
   }
@@ -41,6 +37,6 @@ const App = div.extended({
 
 document.body.append(App());
 console.log(document.body.innerHTML);
-await sleep(400);
+await Test.sleep(.3);
 console.log(document.body.innerHTML);
-await sleep(50);
+await Test.sleep(.1);
