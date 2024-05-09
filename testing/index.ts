@@ -33,19 +33,6 @@ import { readFileSync, existsSync, writeFileSync, readdirSync, lstatSync } from 
 import path from 'path';
 
 const { JSDOM } = require("../module/node_modules/jsdom");
-// Globals to simulate DOM
-const window = new JSDOM().window;
-Object.assign(globalThis, {
-  document: window.document,
-  Element: window.Element,
-  Node: window.Node,
-  NodeList: window.NodeList,
-  HTMLCollection: window.HTMLCollection,
-  Event: window.Event,
-  MutationObserver: window.MutationObserver,
-});
-
-const AI = require('../module/dist/ai-ui.cjs.js');
 
 // Load, transpile and run all the locally defined tests
 
@@ -115,6 +102,20 @@ async function captureLogs(file: string) {
       console.log("\x1B[2A");
     }
   }
+
+  // Globals to simulate DOM
+  const window = new JSDOM().window;
+  Object.assign(globalThis, {
+    document: window.document,
+    Element: window.Element,
+    Node: window.Node,
+    NodeList: window.NodeList,
+    HTMLCollection: window.HTMLCollection,
+    Event: window.Event,
+    MutationObserver: window.MutationObserver,
+  });
+  const AI = require('../module/dist/ai-ui.cjs.js');
+
   const env = {
     ...AI,
     require(module: string) {

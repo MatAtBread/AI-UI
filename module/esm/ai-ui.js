@@ -191,17 +191,6 @@ export const tag = function (_1, _2, _3) {
     }
     /** Just deep copy an object */
     const plainObjectPrototype = Object.getPrototypeOf({});
-    function deepCopy(d) {
-        if (!d || typeof d !== 'object')
-            return d;
-        if (Array.isArray(d)) {
-            return d.map(v => deepCopy(v));
-        }
-        if (Object.getPrototypeOf(d) === plainObjectPrototype || !Object.getPrototypeOf(d))
-            return Object.fromEntries(Object.entries(d).map(([k, v]) => [k, (v && typeof v === 'object') ? deepCopy(v) : v]));
-        log("Declared propety is not a plain object and must be assigned by reference");
-        return d;
-    }
     /** Routine to *define* properties on a dest object from a src object **/
     function deepDefine(d, s, declaration) {
         if (s === null || s === undefined || typeof s !== 'object' || s === d)
@@ -219,14 +208,19 @@ export const tag = function (_1, _2, _3) {
                         if (value && typeof value === 'object' && !isPromiseLike(value)) {
                             if (!(k in d)) {
                                 // If this is a new value in the destination, just define it to be the same value as the source
-                                // If the source value is an object, and we're declaring it (there it should be a new one), take
+                                // If the source value is an object, and we're declaring it (therefore it should be a new one), take
                                 // a copy so as to not re-use the reference and pollute the declaration. Note: this is probably
                                 // a better default for any "objects" in a declaration that are plain and not some class type
                                 // which can't be copied
-                                if (declaration)
-                                    Object.defineProperty(d, k, { ...srcDesc, value: deepCopy(value) });
-                                else
-                                    Object.defineProperty(d, k, srcDesc);
+                                if (declaration) {
+                                    if (Object.getPrototypeOf(value) === plainObjectPrototype || !Object.getPrototypeOf(value)) {
+                                        deepDefine(srcDesc.value = {}, value);
+                                    }
+                                    else {
+                                        log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
+                                    }
+                                }
+                                Object.defineProperty(d, k, srcDesc);
                             }
                             else {
                                 if (value instanceof Node) {
@@ -416,7 +410,6 @@ export const tag = function (_1, _2, _3) {
             })(base, props);
         }
     }
-    ;
     function tagHasInstance(e) {
         for (let c = e.constructor; c; c = c.super) {
             if (c === this)
@@ -577,49 +570,12 @@ export const tag = function (_1, _2, _3) {
     // @ts-ignore
     return baseTagCreators;
 };
-const { "ai-ui-container": AsyncDOMContainer } = tag('', ["ai-ui-container"]);
-const DomPromiseContainer = AsyncDOMContainer.extended({
-    styles: `
-  ai-ui-container.promise {
-    display: ${DEBUG ? 'inline' : 'none'};
-    color: #888;
-    font-size: 0.75em;
-  }
-  ai-ui-container.promise:after {
-    content: "⋯";
-  }`,
-    override: {
-        className: 'promise'
-    },
-    constructed() {
-        return AsyncDOMContainer({ style: { display: 'none' } }, DEBUG
-            ? new Error("Constructed").stack?.replace(/^Error: /, '')
-            : undefined);
-    }
-});
-const DyamicElementError = AsyncDOMContainer.extended({
-    styles: `
-  ai-ui-container.error {
-    display: block;
-    color: #b33;
-    white-space: pre;
-  }`,
-    override: {
-        className: 'error'
-    },
-    declare: {
-        error: undefined
-    },
-    constructed() {
-        if (!this.error)
-            return "Error";
-        if (this.error instanceof Error)
-            return this.error.stack;
-        if ('value' in this.error && this.error.value instanceof Error)
-            return this.error.value.stack;
-        return this.error.toString();
-    }
-});
+const DomPromiseContainer = (c) => {
+    return document.createComment(DEBUG ? new Error("Constructed").stack?.replace(/^Error: /, '') || "error" : "promise");
+};
+const DyamicElementError = (c) => {
+    return document.createComment(c?.error?.stack || c?.error?.toString() || "error");
+};
 export function augmentGlobalAsyncGenerators() {
     let g = (async function* () { })();
     while (g) {
