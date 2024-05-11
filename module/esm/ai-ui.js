@@ -91,14 +91,16 @@ export const tag = function (_1, _2, _3) {
                 c.then(r => {
                     const n = nodes(r);
                     const old = g;
-                    if (old[0].parentElement) {
-                        appender(old[0].parentElement, old[0])(n);
-                        old.forEach(e => e.parentElement?.removeChild(e));
+                    if (old[0].parentNode) {
+                        appender(old[0].parentNode, old[0])(n);
+                        old.forEach(e => e.parentNode?.removeChild(e));
                     }
                     g = n;
                 }, (x) => {
-                    console.warn('(AI-UI)', x);
-                    appender(g[0])(DyamicElementError({ error: x }));
+                    console.warn('(AI-UI)', x, g);
+                    const errorNode = g[0];
+                    if (errorNode)
+                        errorNode.parentNode?.replaceChild(DyamicElementError({ error: x }), errorNode);
                 });
                 return;
             }
@@ -114,6 +116,7 @@ export const tag = function (_1, _2, _3) {
                 const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed);
                 appended.push(...dpm);
                 let t = dpm;
+                let notYetMounted = true;
                 const error = (errorValue) => {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
@@ -126,10 +129,14 @@ export const tag = function (_1, _2, _3) {
                 const update = (es) => {
                     if (!es.done) {
                         try {
-                            const n = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
+                            const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
+                            const n = notYetMounted ? t : mounted;
+                            if (mounted.length)
+                                notYetMounted = false;
                             if (!n.length) {
                                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                                throw new Error("Element(s) no longer exist in document" + insertionStack);
+                                const msg = "Element(s) do not exist in document" + insertionStack;
+                                throw new Error("Element(s) do not exist in document" + insertionStack);
                             }
                             t = appender(n[0].parentNode, n[0])(unbox(es.value) ?? DomPromiseContainer());
                             n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
@@ -165,7 +172,7 @@ export const tag = function (_1, _2, _3) {
                 }
                 else {
                     // We're a text node - work backwards and insert *after* the preceeding Element
-                    const parent = before.parentElement;
+                    const parent = before.parentNode;
                     if (!parent)
                         throw new Error("Parent is null");
                     if (parent !== container) {
@@ -337,13 +344,8 @@ export const tag = function (_1, _2, _3) {
                 }
                 function assignIterable(value, k) {
                     const ap = asyncIterator(value);
+                    let notYetMounted = true;
                     const update = (es) => {
-                        if (!base.ownerDocument.contains(base)) {
-                            /* This element has been removed from the doc. Tell the source ap
-                              to stop sending us stuff */
-                            ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
-                            return;
-                        }
                         if (!es.done) {
                             const value = unbox(es.value);
                             if (typeof value === 'object' && value !== null) {
@@ -370,6 +372,15 @@ export const tag = function (_1, _2, _3) {
                                 if (value !== undefined)
                                     d[k] = value;
                             }
+                            const mounted = base.ownerDocument.contains(base);
+                            // If we have been mounted before, bit aren't now, remove the consumer
+                            if (!notYetMounted && !mounted) {
+                                const msg = `Element does not exist in document when setting [attr '${k}']`;
+                                ap.return?.(new Error(msg));
+                                return;
+                            }
+                            if (mounted)
+                                notYetMounted = false;
                             ap.next().then(update).catch(error);
                         }
                     };
@@ -391,8 +402,10 @@ export const tag = function (_1, _2, _3) {
                         // assign into
                         if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
                             if (value.constructor === Object || value.constructor === Array) {
-                                d[k] = new (value.constructor);
-                                assign(d[k], value);
+                                const copy = new (value.constructor);
+                                assign(copy, value);
+                                d[k] = copy;
+                                //assign(d[k], value);
                             }
                             else {
                                 // This is some sort of constructed object, which we can't clone, so we have to copy by reference
@@ -570,11 +583,11 @@ export const tag = function (_1, _2, _3) {
     // @ts-ignore
     return baseTagCreators;
 };
-const DomPromiseContainer = (c) => {
+const DomPromiseContainer = () => {
     return document.createComment(DEBUG ? new Error("Constructed").stack?.replace(/^Error: /, '') || "error" : "promise");
 };
-const DyamicElementError = (c) => {
-    return document.createComment(c?.error?.stack || c?.error?.toString() || "error");
+const DyamicElementError = ({ error }) => {
+    return document.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
 };
 export function augmentGlobalAsyncGenerators() {
     let g = (async function* () { })();

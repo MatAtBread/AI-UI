@@ -99,8 +99,8 @@ export function queueIteratableIterator<T>(stop = () => { }) {
       } else {
         if (!_items) {
           log('Discarding queue push as there are no consumers');
-        } else { 
-          _items.push(value) 
+        } else {
+          _items.push(value)
         }
       }
       return true;
@@ -135,9 +135,9 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
     const bi = queueIteratableIterator<V>();
     const mi = bi.multi();
     const b = mi[Symbol.asyncIterator]();
-    extras[Symbol.asyncIterator] = { 
+    extras[Symbol.asyncIterator] = {
       value: mi[Symbol.asyncIterator],
-      enumerable: false, 
+      enumerable: false,
       writable: false
     };
     push = bi.push;
@@ -552,7 +552,7 @@ export function filterMap<U extends PartialIterable, R>(source: U,
 
     next(...args: [] | [undefined]) {
       if (initialValue !== Ignore) {
-        const init = Promise.resolve(initialValue).then(value => ({ done: false, value }));
+        const init = Promise.resolve({ done: false, value: initialValue });
         initialValue = Ignore;
         return init;
       }

@@ -454,7 +454,7 @@ export function filterMap(source, fn, initialValue = Ignore) {
         },
         next(...args) {
             if (initialValue !== Ignore) {
-                const init = Promise.resolve(initialValue).then(value => ({ done: false, value }));
+                const init = Promise.resolve({ done: false, value: initialValue });
                 initialValue = Ignore;
                 return init;
             }

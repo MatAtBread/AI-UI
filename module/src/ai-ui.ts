@@ -148,7 +148,7 @@ export const tag = <TagLoader>function <Tags extends string,
     deepDefine(tagPrototypes, prototypes);
 
   function nodes(...c: ChildTags[]) {
-    const appended: (Node | ReturnType<typeof DomPromiseContainer>)[] = [];
+    const appended: Node[] = [];
     (function children(c: ChildTags) {
       if (c === undefined || c === null || c === Ignore)
         return;
@@ -158,14 +158,16 @@ export const tag = <TagLoader>function <Tags extends string,
         c.then(r => {
           const n = nodes(r);
           const old = g;
-          if (old[0].parentElement) {
-            appender(old[0].parentElement, old[0])(n);
-            old.forEach(e => e.parentElement?.removeChild(e));
+          if (old[0].parentNode) {
+            appender(old[0].parentNode, old[0])(n);
+            old.forEach(e => e.parentNode?.removeChild(e));
           }
           g = n;
         }, (x:any) => {
-          console.warn('(AI-UI)',x);
-          appender(g[0])(DyamicElementError({error: x}));
+          console.warn('(AI-UI)',x,g);
+          const errorNode = g[0];
+          if (errorNode)
+            errorNode.parentNode?.replaceChild(DyamicElementError({error: x}), errorNode);
         });
         return;
       }
@@ -183,6 +185,7 @@ export const tag = <TagLoader>function <Tags extends string,
         appended.push(...dpm);
 
         let t: ReturnType<ReturnType<typeof appender>> = dpm;
+        let notYetMounted = true;
 
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode));
@@ -197,10 +200,14 @@ export const tag = <TagLoader>function <Tags extends string,
         const update = (es: IteratorResult<ChildTags>) => {
           if (!es.done) {
             try {
-              const n = t.filter(e =>  e?.parentNode && e.ownerDocument?.body.contains(e));
+              const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
+              const n = notYetMounted ? t : mounted;
+              if (mounted.length) notYetMounted = false;
+
               if (!n.length) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                throw new Error("Element(s) no longer exist in document" + insertionStack);
+                const msg = "Element(s) do not exist in document" + insertionStack;
+                throw new Error("Element(s) do not exist in document" + insertionStack);
               }
 
               t = appender(n[0].parentNode!, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
@@ -235,7 +242,7 @@ export const tag = <TagLoader>function <Tags extends string,
           Element.prototype.before.call(before, ...children)
         } else {
           // We're a text node - work backwards and insert *after* the preceeding Element
-          const parent = before.parentElement;
+          const parent = before.parentNode;
           if (!parent)
             throw new Error("Parent is null");
 
@@ -396,14 +403,8 @@ export const tag = <TagLoader>function <Tags extends string,
 
         function assignIterable(value: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
           const ap = asyncIterator(value);
+          let notYetMounted = true;
           const update = (es: IteratorResult<unknown>) => {
-            if (!base.ownerDocument.contains(base)) {
-              /* This element has been removed from the doc. Tell the source ap
-                to stop sending us stuff */
-              ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
-              return;
-            }
-
             if (!es.done) {
               const value = unbox(es.value);
               if (typeof value === 'object' && value !== null) {
@@ -429,6 +430,14 @@ export const tag = <TagLoader>function <Tags extends string,
                 if (value !== undefined)
                   d[k] = value;
               }
+              const mounted = base.ownerDocument.contains(base);
+              // If we have been mounted before, bit aren't now, remove the consumer
+              if (!notYetMounted && !mounted) {
+                const msg = `Element does not exist in document when setting [attr '${k}']`;
+                ap.return?.(new Error(msg));
+                return;
+              }
+              if (mounted) notYetMounted = false;
               ap.next().then(update).catch(error);
             }
           }
@@ -441,29 +450,31 @@ export const tag = <TagLoader>function <Tags extends string,
         }
 
         function assignObject(value: any, k: string) {
-            if (value instanceof Node) {
-              log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
-              d[k] = value;
-            } else {
-              // Note - if we're copying to ourself (or an array of different length),
-              // we're decoupling common object references, so we need a clean object to
-              // assign into
-              if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
-                if (value.constructor === Object || value.constructor === Array) {
-                  d[k] = new (value.constructor);
-                  assign(d[k], value);
-                } else {
-                  // This is some sort of constructed object, which we can't clone, so we have to copy by reference
-                  d[k] = value;
-                }
+          if (value instanceof Node) {
+            log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+            d[k] = value;
+          } else {
+            // Note - if we're copying to ourself (or an array of different length),
+            // we're decoupling common object references, so we need a clean object to
+            // assign into
+            if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
+              if (value.constructor === Object || value.constructor === Array) {
+                const copy = new (value.constructor);
+                assign(copy, value);
+                d[k] = copy;
+                //assign(d[k], value);
               } else {
-                if (Object.getOwnPropertyDescriptor(d, k)?.set)
-                  d[k] = value;
-
-                else
-                  assign(d[k], value);
+                // This is some sort of constructed object, which we can't clone, so we have to copy by reference
+                d[k] = value;
               }
+            } else {
+              if (Object.getOwnPropertyDescriptor(d, k)?.set)
+                d[k] = value;
+
+              else
+                assign(d[k], value);
             }
+          }
         }
       })(base, props);
     }
@@ -681,12 +692,12 @@ export const tag = <TagLoader>function <Tags extends string,
   return baseTagCreators;
 }
 
-const DomPromiseContainer = (c?: { error: Error}) => {
+const DomPromiseContainer = () => {
   return document.createComment(DEBUG ? new Error("Constructed").stack?.replace(/^Error: /, '') || "error" : "promise")
 }
 
-const DyamicElementError = (c?: { error: Error}) => {
-  return document.createComment(c?.error?.stack || c?.error?.toString() || "error")
+const DyamicElementError = ({ error }:{ error: Error | IteratorResult<Error>}) => {
+  return document.createComment(error instanceof Error ? error.toString() : 'Error:\n'+JSON.stringify(error,null,2));
 }
 
 export function augmentGlobalAsyncGenerators() {
