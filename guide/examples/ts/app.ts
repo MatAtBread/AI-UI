@@ -3,14 +3,14 @@ import { tag } from '../../../module/esm/ai-ui.js'
 const { h2, div, button } = tag();
 
 /* These "base" tag functions create standard HTML elements. The call signature is:
-    
+
   tagFunction(child1, child2, child3....)
 
 or
 
   tagFunction({ attributes }, child1, child2, child3....)
-  
-A "child" can be another element, primitives (number, boolean, string). This is very similar to the DOM 
+
+A "child" can be another element, primitives (number, boolean, string). This is very similar to the DOM
 API Element.append (https://developer.mozilla.org/en-US/docs/Web/API/Element/append).
 
 */

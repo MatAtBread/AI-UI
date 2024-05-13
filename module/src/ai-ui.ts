@@ -2,7 +2,7 @@ import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Constructed, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
-import { DEBUG, console } from './debug.js';
+import { DEBUG, console, timeOutWarn } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
@@ -187,7 +187,7 @@ export const tag = <TagLoader>function <Tags extends string,
         let t: ReturnType<ReturnType<typeof appender>> = dpm;
         let notYetMounted = true;
         // DEBUG support
-        let createdAt = Date.now();
+        let createdAt = Date.now() + timeOutWarn;
 
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode));
@@ -212,11 +212,13 @@ export const tag = <TagLoader>function <Tags extends string,
                 throw new Error("Element(s) do not exist in document" + insertionStack);
               }
 
-              if (notYetMounted && !mounted && createdAt && createdAt > Date.now() + 5000) {
-                createdAt = 0;
+              if (notYetMounted && createdAt && createdAt < Date.now()) {
+                createdAt = Number.MAX_SAFE_INTEGER;
                 console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,t);
               }
-              t = appender(n[0].parentNode!, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
+              const q = nodes(unbox(es.value) as ChildTags);
+              // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
+              t = appender(n[0].parentNode!, n[0])(q.length ? q : DomPromiseContainer());
               n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
               ap.next().then(update).catch(error);
             } catch (ex) {
@@ -411,7 +413,7 @@ export const tag = <TagLoader>function <Tags extends string,
           const ap = asyncIterator(value);
           let notYetMounted = true;
           // DEBUG support
-          let createdAt = Date.now() ;
+          let createdAt = Date.now() + timeOutWarn;
           const update = (es: IteratorResult<unknown>) => {
             if (!es.done) {
               const value = unbox(es.value);
@@ -441,14 +443,14 @@ export const tag = <TagLoader>function <Tags extends string,
               const mounted = base.ownerDocument.contains(base);
               // If we have been mounted before, bit aren't now, remove the consumer
               if (!notYetMounted && !mounted) {
-                const msg = `Element does not exist in document when setting [attr '${k}']`;
+                const msg = `Element does not exist in document when setting async attribute '${k}'`;
                 ap.return?.(new Error(msg));
                 return;
               }
               if (mounted) notYetMounted = false;
-              if (notYetMounted && !mounted && createdAt && createdAt > Date.now() + 5000) {
-                createdAt = 0;
-                console.log(`Element with async attribute not mounted after 5 seconds. If it is never mounted, it will leak.`,k,d);
+              if (notYetMounted && createdAt && createdAt < Date.now()) {
+                createdAt = Number.MAX_SAFE_INTEGER;
+                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`,d);
               }
 
               ap.next().then(update).catch(error);
@@ -706,7 +708,7 @@ export const tag = <TagLoader>function <Tags extends string,
 }
 
 const DomPromiseContainer = () => {
-  return document.createComment(DEBUG ? new Error("Constructed").stack?.replace(/^Error: /, '') || "error" : "promise")
+  return document.createComment(DEBUG ? new Error("promise").stack?.replace(/^Error: /, '') || "promise" : "promise")
 }
 
 const DyamicElementError = ({ error }:{ error: Error | IteratorResult<Error>}) => {

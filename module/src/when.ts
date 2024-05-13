@@ -1,4 +1,4 @@
-import { DEBUG, console } from './debug.js';
+import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, AsyncExtraIterable, queueIteratableIterator } from "./iterators.js";
 
@@ -315,7 +315,7 @@ function allSelectorsPresent(container: Element, missing: string[]): Promise<voi
     const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
     const warnTimer = setTimeout(() => {
       console.warn('(AI-UI)', stack, missing);
-    }, 5000);
+    }, timeOutWarn);
 
     promise.finally(() => clearTimeout(warnTimer))
   }

@@ -1,5 +1,7 @@
 // @ts-ignore
 export const DEBUG = globalThis.DEBUG == '*' || globalThis.DEBUG == true || globalThis.DEBUG?.match(/(^|\W)AI-UI(\W|$)/) || false;
+export { _console as console };
+export const timeOutWarn = 5000;
 
 const _console = {
   log(...args: any) {
@@ -13,4 +15,3 @@ const _console = {
   }
 }
 
-export { _console as console };
