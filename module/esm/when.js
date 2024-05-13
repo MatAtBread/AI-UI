@@ -1,4 +1,4 @@
-import { DEBUG } from './debug.js';
+import { DEBUG, console } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
 const eventObservations = new Map();
@@ -195,10 +195,10 @@ function allSelectorsPresent(container, missing) {
     /* debugging help: warn if waiting a long time for a selectors to be ready */
     if (DEBUG) {
         const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
-        const warn = setTimeout(() => {
+        const warnTimer = setTimeout(() => {
             console.warn('(AI-UI)', stack, missing);
         }, 5000);
-        promise.finally(() => clearTimeout(warn));
+        promise.finally(() => clearTimeout(warnTimer));
     }
     return promise;
 }

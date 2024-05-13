@@ -2,7 +2,7 @@ import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Constructed, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
-import { DEBUG, log } from './debug.js';
+import { DEBUG, console } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
@@ -186,6 +186,8 @@ export const tag = <TagLoader>function <Tags extends string,
 
         let t: ReturnType<ReturnType<typeof appender>> = dpm;
         let notYetMounted = true;
+        // DEBUG support
+        let createdAt = Date.now();
 
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode));
@@ -194,7 +196,7 @@ export const tag = <TagLoader>function <Tags extends string,
             n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
           }
           else
-            console.warn('(AI-UI)', "Can't report error", errorValue, t);
+          console.warn('(AI-UI)', "Can't report error", errorValue, t);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {
@@ -210,6 +212,10 @@ export const tag = <TagLoader>function <Tags extends string,
                 throw new Error("Element(s) do not exist in document" + insertionStack);
               }
 
+              if (notYetMounted && !mounted && createdAt && createdAt > Date.now() + 5000) {
+                createdAt = 0;
+                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,t);
+              }
               t = appender(n[0].parentNode!, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
               n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
               ap.next().then(update).catch(error);
@@ -296,13 +302,13 @@ export const tag = <TagLoader>function <Tags extends string,
                   if (Object.getPrototypeOf(value) === plainObjectPrototype || !Object.getPrototypeOf(value)) {
                     deepDefine(srcDesc.value = {}, value);
                   } else {
-                    log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
+                    console.log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
                   }
                 }
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                  console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -381,7 +387,7 @@ export const tag = <TagLoader>function <Tags extends string,
                     if (s[k] !== undefined)
                       d[k] = s[k];
                   }
-                }, error => log("Failed to set attribute", error))
+                }, error => console.log("Failed to set attribute", error))
               } else if (!isAsyncIter<unknown>(value)) {
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value))
@@ -404,6 +410,8 @@ export const tag = <TagLoader>function <Tags extends string,
         function assignIterable(value: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
           const ap = asyncIterator(value);
           let notYetMounted = true;
+          // DEBUG support
+          let createdAt = Date.now() ;
           const update = (es: IteratorResult<unknown>) => {
             if (!es.done) {
               const value = unbox(es.value);
@@ -438,6 +446,11 @@ export const tag = <TagLoader>function <Tags extends string,
                 return;
               }
               if (mounted) notYetMounted = false;
+              if (notYetMounted && !mounted && createdAt && createdAt > Date.now() + 5000) {
+                createdAt = 0;
+                console.log(`Element with async attribute not mounted after 5 seconds. If it is never mounted, it will leak.`,k,d);
+              }
+
               ap.next().then(update).catch(error);
             }
           }
@@ -451,7 +464,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
         function assignObject(value: any, k: string) {
           if (value instanceof Node) {
-            log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+            console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes", k, value);
             d[k] = value;
           } else {
             // Note - if we're copying to ourself (or an array of different length),
@@ -542,7 +555,7 @@ export const tag = <TagLoader>function <Tags extends string,
       deepDefine(e, tagDefinition.override);
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
         if (k in e) {
-          log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
+          console.log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
         } else
           defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
       });
@@ -711,7 +724,7 @@ export function augmentGlobalAsyncGenerators() {
     g = Object.getPrototypeOf(g);
   }
   if (!g) {
-    log("Failed to augment the prototype of `(async function*())()`");
+    console.warn("Failed to augment the prototype of `(async function*())()`");
   }
 }
 
@@ -744,7 +757,7 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
         else if (DEBUG) {
           if (!warned.has(elt.id)) {
             warned.add(elt.id)
-            log('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids![elt.id]);
+            console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids![elt.id]);
           }
         }
       }

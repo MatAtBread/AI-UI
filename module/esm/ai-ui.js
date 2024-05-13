@@ -2,7 +2,7 @@ import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { when } from './when.js';
 import { UniqueID } from './tags.js';
-import { DEBUG, log } from './debug.js';
+import { DEBUG, console } from './debug.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
@@ -117,6 +117,8 @@ export const tag = function (_1, _2, _3) {
                 appended.push(...dpm);
                 let t = dpm;
                 let notYetMounted = true;
+                // DEBUG support
+                let createdAt = Date.now();
                 const error = (errorValue) => {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
@@ -137,6 +139,10 @@ export const tag = function (_1, _2, _3) {
                                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
                                 const msg = "Element(s) do not exist in document" + insertionStack;
                                 throw new Error("Element(s) do not exist in document" + insertionStack);
+                            }
+                            if (notYetMounted && !mounted && createdAt && createdAt > Date.now() + 5000) {
+                                createdAt = 0;
+                                console.log(`Future element not mounted after 5 seconds. If it is never mounted, it will leak.`, t);
                             }
                             t = appender(n[0].parentNode, n[0])(unbox(es.value) ?? DomPromiseContainer());
                             n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
@@ -224,14 +230,14 @@ export const tag = function (_1, _2, _3) {
                                         deepDefine(srcDesc.value = {}, value);
                                     }
                                     else {
-                                        log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
+                                        console.log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
                                     }
                                 }
                                 Object.defineProperty(d, k, srcDesc);
                             }
                             else {
                                 if (value instanceof Node) {
-                                    log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                    console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                                     d[k] = value;
                                 }
                                 else {
@@ -320,7 +326,7 @@ export const tag = function (_1, _2, _3) {
                                         if (s[k] !== undefined)
                                             d[k] = s[k];
                                     }
-                                }, error => log("Failed to set attribute", error));
+                                }, error => console.log("Failed to set attribute", error));
                             }
                             else if (!isAsyncIter(value)) {
                                 // This has a real value, which might be an object
@@ -345,6 +351,8 @@ export const tag = function (_1, _2, _3) {
                 function assignIterable(value, k) {
                     const ap = asyncIterator(value);
                     let notYetMounted = true;
+                    // DEBUG support
+                    let createdAt = Date.now();
                     const update = (es) => {
                         if (!es.done) {
                             const value = unbox(es.value);
@@ -381,6 +389,10 @@ export const tag = function (_1, _2, _3) {
                             }
                             if (mounted)
                                 notYetMounted = false;
+                            if (notYetMounted && !mounted && createdAt && createdAt > Date.now() + 5000) {
+                                createdAt = 0;
+                                console.log(`Future element not mounted after 5 seconds. If it is never mounted, it will leak.`, k, d);
+                            }
                             ap.next().then(update).catch(error);
                         }
                     };
@@ -393,7 +405,7 @@ export const tag = function (_1, _2, _3) {
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {
-                        log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                        console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                         d[k] = value;
                     }
                     else {
@@ -459,7 +471,7 @@ export const tag = function (_1, _2, _3) {
             deepDefine(e, tagDefinition.override);
             tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
                 if (k in e) {
-                    log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
+                    console.log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
                 }
                 else
                     defineIterableProperty(e, k, tagDefinition.iterable[k]);
@@ -600,7 +612,7 @@ export function augmentGlobalAsyncGenerators() {
         g = Object.getPrototypeOf(g);
     }
     if (!g) {
-        log("Failed to augment the prototype of `(async function*())()`");
+        console.warn("Failed to augment the prototype of `(async function*())()`");
     }
 }
 export let enableOnRemovedFromDOM = function () {
@@ -628,7 +640,7 @@ export function getElementIdMap(node, ids) {
                 else if (DEBUG) {
                     if (!warned.has(elt.id)) {
                         warned.add(elt.id);
-                        log('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
+                        console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
                     }
                 }
             }

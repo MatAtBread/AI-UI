@@ -1,4 +1,4 @@
-import { DEBUG, log } from "./debug.js";
+import { DEBUG, console } from "./debug.js";
 import { deferred } from "./deferred.js";
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
@@ -86,7 +86,7 @@ export function queueIteratableIterator(stop = () => { }) {
             }
             else {
                 if (!_items) {
-                    log('Discarding queue push as there are no consumers');
+                    console.log('Discarding queue push as there are no consumers');
                 }
                 else {
                     _items.push(value);

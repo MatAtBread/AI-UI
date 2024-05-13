@@ -1,4 +1,4 @@
-import { DEBUG, log } from "./debug.js"
+import { DEBUG, console } from "./debug.js"
 import { DeferredPromise, deferred } from "./deferred.js"
 import { IterableProperties } from "./tags.js"
 
@@ -98,7 +98,7 @@ export function queueIteratableIterator<T>(stop = () => { }) {
         _pending.shift()!.resolve({ done: false, value });
       } else {
         if (!_items) {
-          log('Discarding queue push as there are no consumers');
+          console.log('Discarding queue push as there are no consumers');
         } else {
           _items.push(value)
         }

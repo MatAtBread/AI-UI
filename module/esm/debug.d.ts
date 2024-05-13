@@ -1,2 +1,7 @@
 export declare const DEBUG: any;
-export declare function log(...args: any): void;
+declare const _console: {
+    log(...args: any): void;
+    warn(...args: any): void;
+    info(...args: any): void;
+};
+export { _console as console };
