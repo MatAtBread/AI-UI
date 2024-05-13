@@ -1,4 +1,4 @@
-import { DEBUG } from './debug.js';
+import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, AsyncExtraIterable, queueIteratableIterator } from "./iterators.js";
 
@@ -161,7 +161,7 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
     push: queue.push,
     terminate(ex: Error) { queue.return?.(ex)},
     container,
-    selector: selector || null 
+    selector: selector || null
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
@@ -313,11 +313,11 @@ function allSelectorsPresent(container: Element, missing: string[]): Promise<voi
   /* debugging help: warn if waiting a long time for a selectors to be ready */
   if (DEBUG) {
     const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
-    const warn = setTimeout(() => {
+    const warnTimer = setTimeout(() => {
       console.warn('(AI-UI)', stack, missing);
-    }, 5000);
+    }, timeOutWarn);
 
-    promise.finally(() => clearTimeout(warn))
+    promise.finally(() => clearTimeout(warnTimer))
   }
 
   return promise;

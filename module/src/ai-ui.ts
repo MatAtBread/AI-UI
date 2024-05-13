@@ -2,7 +2,7 @@ import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Constructed, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
-import { DEBUG, log } from './debug.js';
+import { DEBUG, console, timeOutWarn } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
@@ -148,7 +148,7 @@ export const tag = <TagLoader>function <Tags extends string,
     deepDefine(tagPrototypes, prototypes);
 
   function nodes(...c: ChildTags[]) {
-    const appended: (Node | ReturnType<typeof DomPromiseContainer>)[] = [];
+    const appended: Node[] = [];
     (function children(c: ChildTags) {
       if (c === undefined || c === null || c === Ignore)
         return;
@@ -158,14 +158,16 @@ export const tag = <TagLoader>function <Tags extends string,
         c.then(r => {
           const n = nodes(r);
           const old = g;
-          if (old[0].parentElement) {
-            appender(old[0].parentElement, old[0])(n);
-            old.forEach(e => e.parentElement?.removeChild(e));
+          if (old[0].parentNode) {
+            appender(old[0].parentNode, old[0])(n);
+            old.forEach(e => e.parentNode?.removeChild(e));
           }
           g = n;
         }, (x:any) => {
-          console.warn('(AI-UI)',x);
-          appender(g[0])(DyamicElementError({error: x}));
+          console.warn('(AI-UI)',x,g);
+          const errorNode = g[0];
+          if (errorNode)
+            errorNode.parentNode?.replaceChild(DyamicElementError({error: x}), errorNode);
         });
         return;
       }
@@ -183,6 +185,9 @@ export const tag = <TagLoader>function <Tags extends string,
         appended.push(...dpm);
 
         let t: ReturnType<ReturnType<typeof appender>> = dpm;
+        let notYetMounted = true;
+        // DEBUG support
+        let createdAt = Date.now() + timeOutWarn;
 
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode));
@@ -191,19 +196,29 @@ export const tag = <TagLoader>function <Tags extends string,
             n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
           }
           else
-            console.warn('(AI-UI)', "Can't report error", errorValue, t);
+          console.warn('(AI-UI)', "Can't report error", errorValue, t);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {
           if (!es.done) {
             try {
-              const n = t.filter(e =>  e?.parentNode && e.ownerDocument?.body.contains(e));
+              const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
+              const n = notYetMounted ? t : mounted;
+              if (mounted.length) notYetMounted = false;
+
               if (!n.length) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                throw new Error("Element(s) no longer exist in document" + insertionStack);
+                const msg = "Element(s) do not exist in document" + insertionStack;
+                throw new Error("Element(s) do not exist in document" + insertionStack);
               }
 
-              t = appender(n[0].parentNode!, n[0])(unbox(es.value) as ChildTags ?? DomPromiseContainer());
+              if (notYetMounted && createdAt && createdAt < Date.now()) {
+                createdAt = Number.MAX_SAFE_INTEGER;
+                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,t);
+              }
+              const q = nodes(unbox(es.value) as ChildTags);
+              // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
+              t = appender(n[0].parentNode!, n[0])(q.length ? q : DomPromiseContainer());
               n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
               ap.next().then(update).catch(error);
             } catch (ex) {
@@ -235,7 +250,7 @@ export const tag = <TagLoader>function <Tags extends string,
           Element.prototype.before.call(before, ...children)
         } else {
           // We're a text node - work backwards and insert *after* the preceeding Element
-          const parent = before.parentElement;
+          const parent = before.parentNode;
           if (!parent)
             throw new Error("Parent is null");
 
@@ -289,13 +304,13 @@ export const tag = <TagLoader>function <Tags extends string,
                   if (Object.getPrototypeOf(value) === plainObjectPrototype || !Object.getPrototypeOf(value)) {
                     deepDefine(srcDesc.value = {}, value);
                   } else {
-                    log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
+                    console.log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
                   }
                 }
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                  console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -374,7 +389,7 @@ export const tag = <TagLoader>function <Tags extends string,
                     if (s[k] !== undefined)
                       d[k] = s[k];
                   }
-                }, error => log("Failed to set attribute", error))
+                }, error => console.log("Failed to set attribute", error))
               } else if (!isAsyncIter<unknown>(value)) {
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value))
@@ -396,14 +411,10 @@ export const tag = <TagLoader>function <Tags extends string,
 
         function assignIterable(value: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
           const ap = asyncIterator(value);
+          let notYetMounted = true;
+          // DEBUG support
+          let createdAt = Date.now() + timeOutWarn;
           const update = (es: IteratorResult<unknown>) => {
-            if (!base.ownerDocument.contains(base)) {
-              /* This element has been removed from the doc. Tell the source ap
-                to stop sending us stuff */
-              ap.return?.(new Error("Element no longer exists in document (update " + k.toString() + ")"));
-              return;
-            }
-
             if (!es.done) {
               const value = unbox(es.value);
               if (typeof value === 'object' && value !== null) {
@@ -429,6 +440,19 @@ export const tag = <TagLoader>function <Tags extends string,
                 if (value !== undefined)
                   d[k] = value;
               }
+              const mounted = base.ownerDocument.contains(base);
+              // If we have been mounted before, bit aren't now, remove the consumer
+              if (!notYetMounted && !mounted) {
+                const msg = `Element does not exist in document when setting async attribute '${k}'`;
+                ap.return?.(new Error(msg));
+                return;
+              }
+              if (mounted) notYetMounted = false;
+              if (notYetMounted && createdAt && createdAt < Date.now()) {
+                createdAt = Number.MAX_SAFE_INTEGER;
+                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`,d);
+              }
+
               ap.next().then(update).catch(error);
             }
           }
@@ -441,29 +465,31 @@ export const tag = <TagLoader>function <Tags extends string,
         }
 
         function assignObject(value: any, k: string) {
-            if (value instanceof Node) {
-              log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
-              d[k] = value;
-            } else {
-              // Note - if we're copying to ourself (or an array of different length),
-              // we're decoupling common object references, so we need a clean object to
-              // assign into
-              if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
-                if (value.constructor === Object || value.constructor === Array) {
-                  d[k] = new (value.constructor);
-                  assign(d[k], value);
-                } else {
-                  // This is some sort of constructed object, which we can't clone, so we have to copy by reference
-                  d[k] = value;
-                }
+          if (value instanceof Node) {
+            console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes", k, value);
+            d[k] = value;
+          } else {
+            // Note - if we're copying to ourself (or an array of different length),
+            // we're decoupling common object references, so we need a clean object to
+            // assign into
+            if (!(k in d) || d[k] === value || (Array.isArray(d[k]) && d[k].length !== value.length)) {
+              if (value.constructor === Object || value.constructor === Array) {
+                const copy = new (value.constructor);
+                assign(copy, value);
+                d[k] = copy;
+                //assign(d[k], value);
               } else {
-                if (Object.getOwnPropertyDescriptor(d, k)?.set)
-                  d[k] = value;
-
-                else
-                  assign(d[k], value);
+                // This is some sort of constructed object, which we can't clone, so we have to copy by reference
+                d[k] = value;
               }
+            } else {
+              if (Object.getOwnPropertyDescriptor(d, k)?.set)
+                d[k] = value;
+
+              else
+                assign(d[k], value);
             }
+          }
         }
       })(base, props);
     }
@@ -531,7 +557,7 @@ export const tag = <TagLoader>function <Tags extends string,
       deepDefine(e, tagDefinition.override);
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
         if (k in e) {
-          log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
+          console.log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
         } else
           defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
       });
@@ -681,12 +707,12 @@ export const tag = <TagLoader>function <Tags extends string,
   return baseTagCreators;
 }
 
-const DomPromiseContainer = (c?: { error: Error}) => {
-  return document.createComment(DEBUG ? new Error("Constructed").stack?.replace(/^Error: /, '') || "error" : "promise")
+const DomPromiseContainer = () => {
+  return document.createComment(DEBUG ? new Error("promise").stack?.replace(/^Error: /, '') || "promise" : "promise")
 }
 
-const DyamicElementError = (c?: { error: Error}) => {
-  return document.createComment(c?.error?.stack || c?.error?.toString() || "error")
+const DyamicElementError = ({ error }:{ error: Error | IteratorResult<Error>}) => {
+  return document.createComment(error instanceof Error ? error.toString() : 'Error:\n'+JSON.stringify(error,null,2));
 }
 
 export function augmentGlobalAsyncGenerators() {
@@ -700,7 +726,7 @@ export function augmentGlobalAsyncGenerators() {
     g = Object.getPrototypeOf(g);
   }
   if (!g) {
-    log("Failed to augment the prototype of `(async function*())()`");
+    console.warn("Failed to augment the prototype of `(async function*())()`");
   }
 }
 
@@ -733,7 +759,7 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
         else if (DEBUG) {
           if (!warned.has(elt.id)) {
             warned.add(elt.id)
-            log('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids![elt.id]);
+            console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids![elt.id]);
           }
         }
       }
