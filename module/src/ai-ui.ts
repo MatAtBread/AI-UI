@@ -9,7 +9,7 @@ export { when } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags'
 export * as Iterators from './iterators.js';
 
-/* A holder for prototypes specified when `tag(...p)` is invoked, which are always
+/* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
 type OtherMembers = { }
 
@@ -33,7 +33,7 @@ interface TagLoader {
       tag(
           ?nameSpace?: string,  // absent nameSpace implies HTML
           ?tags?: string[],     // absent tags defaults to all common HTML tags
-          ?prototypes?: PrototypeConstraint // absent prototypes implies none are defined
+          ?commonProperties?: CommonPropertiesConstraint // absent implies none are defined
       )
 
       eg:
@@ -43,10 +43,10 @@ interface TagLoader {
   */
   <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> }
   <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> }
-  <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(commonProperties: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], commonProperties: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], commonProperties?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> }
+  <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], commonProperties?: P): Record<string, TagCreator<P & PoElementMethods & Element>>
 }
 
 let idCount = 0;
@@ -109,14 +109,14 @@ export const tag = <TagLoader>function <Tags extends string,
   type NamespacedElementBase = T1 extends string ? T1 extends '' ? HTMLElement : Element : HTMLElement;
 
   /* Work out which parameter is which. There are 6 variations:
-    tag()                                       []
-    tag(prototypes)                             [object]
-    tag(tags[])                                 [string[]]
-    tag(tags[], prototypes)                     [string[], object]
-    tag(namespace | null, tags[])               [string | null, string[]]
-    tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
+    tag()                                           []
+    tag(commonProperties)                           [object]
+    tag(tags[])                                     [string[]]
+    tag(tags[], commonProperties)                   [string[], object]
+    tag(namespace | null, tags[])                   [string | null, string[]]
+    tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
   */
-  const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
+  const [nameSpace, tags, commonProperties] = (typeof _1 === 'string') || _1 === null
     ? [_1, _2 as Tags[], _3 as P]
     : Array.isArray(_1)
       ? [null, _1 as Tags[], _2 as P]
@@ -145,8 +145,8 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   });
 
-  if (prototypes)
-    deepDefine(tagPrototypes, prototypes);
+  if (commonProperties)
+    deepDefine(tagPrototypes, commonProperties);
 
   function nodes(...c: ChildTags[]) {
     const appended: Node[] = [];
@@ -316,7 +316,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                  console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -558,7 +558,6 @@ export const tag = <TagLoader>function <Tags extends string,
       e.constructor = extendTag;
       const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
       combinedAttrs[callStackSymbol].push(tagDefinition);
-      deepDefine(e, tagDefinition.prototype);
       if (DEBUG) {
         // Validate declare and override
         function isAncestral(creator: TagCreator<Element>, d: string) {
@@ -573,7 +572,7 @@ export const tag = <TagLoader>function <Tags extends string,
           }
         }
         if (tagDefinition.override) {
-          const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(prototypes && d in prototypes) && !isAncestral(this,d));
+          const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this,d));
           if (clash.length) {
             console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
           }
@@ -636,12 +635,10 @@ export const tag = <TagLoader>function <Tags extends string,
 
       const proto = creator.definition;
       if (proto) {
-        deepDefine(fullProto, proto?.prototype);
         deepDefine(fullProto, proto?.override);
         deepDefine(fullProto, proto?.declare);
       }
     })(this);
-    deepDefine(fullProto, staticExtensions.prototype);
     deepDefine(fullProto, staticExtensions.override);
     deepDefine(fullProto, staticExtensions.declare);
     Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
@@ -659,14 +656,7 @@ export const tag = <TagLoader>function <Tags extends string,
     });
 
     if (DEBUG) {
-      if (staticExtensions.prototype) {
-        const clash = Object.keys(staticExtensions.prototype);
-        if (clash.length) {
-          console.log(`${extendTag.name} defines keys '${clash}' via 'prototype' which is deprecated`);
-        }
-      }
-
-      const extraUnknownProps = Object.keys(staticExtensions).filter(k => !['styles', 'ids', 'constructed', 'prototype', 'declare', 'override', 'iterable'].includes(k));
+      const extraUnknownProps = Object.keys(staticExtensions).filter(k => !['styles', 'ids', 'constructed', 'declare', 'override', 'iterable'].includes(k));
       if (extraUnknownProps.length) {
         console.log(`${extendTag.name} defines extraneous keys '${extraUnknownProps}', which are unknown`);
       }
@@ -694,7 +684,7 @@ export const tag = <TagLoader>function <Tags extends string,
       let doc = document;
       if (isChildTag(attrs)) {
         children.unshift(attrs);
-        attrs = { prototype: {} } as any;
+        attrs = {} as any;
       }
 
       // This test is always true, but narrows the type of attrs to avoid further errors

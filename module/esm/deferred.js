@@ -9,7 +9,7 @@ export function deferred() {
     promise.reject = reject;
     if (DEBUG) {
         const initLocation = new Error().stack;
-        promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? console.log("Deferred", ex, initLocation) : undefined);
+        promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? console.log("Deferred rejection", ex, "allocated at ", initLocation) : undefined);
     }
     return promise;
 }

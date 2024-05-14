@@ -5,8 +5,10 @@ import { PossiblyAsync, TagCreatorArgs } from '../../../module/esm/tags.js';
 const { div, select, option } = tag(['div','select','option']);
 
 const X = div.extended({
-  prototype: {
-    dir: 1,
+  override:{
+    dir: "1"
+  },
+  declare: {
     xxx: true
   }
 });

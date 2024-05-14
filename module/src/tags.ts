@@ -62,24 +62,6 @@ export type DeepFlatten<O> = [{
   [K in keyof O]: Flatten<O[K]>
 }][number];
 
-type Extends<A, B> =
-  A extends any[]
-  ? B extends any[]
-  ? Extends<A[number], B[number]>[]
-  : never
-  : B extends any[]
-  ? never
-  : B extends A ? B // Overrides don't narrow base
-  : A extends B ? B & Flatten<Omit<A, keyof B>> // Overrides extend base
-  : never;
-
-type MergeBaseTypes<T, Base> = {
-  [K in keyof Base | keyof T]
-  : K extends (keyof T & keyof Base) ? Extends<T[K], Base[K]>
-  : K extends keyof T ? T[K]
-  : K extends keyof Base ? Base[K]
-  : never;
-};
 
 /* IterableProperties can't be correctly typed in TS right now, either the declaratiin
   works for retrieval (the getter), or it works for assignments (the setter), but there's
@@ -151,9 +133,6 @@ type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overr
     | OverlappingKeys<D['iterable'],D['override']>
     | OverlappingKeys<D['iterable'],Omit<TagCreatorAttributes<BaseCreator>, keyof BaseIterables<BaseCreator>>>
     | OverlappingKeys<D['declare'],TagCreatorAttributes<BaseCreator>>
-    | OverlappingKeys<D['declare'],D['prototype']>
-    | OverlappingKeys<D['override'],D['prototype']>
-    | OverlappingKeys<D['iterable'],D['prototype']>
   ) extends never
   ? ExcessKeys<D['override'], TagCreatorAttributes<BaseCreator>> extends never
     ? Result
@@ -163,14 +142,10 @@ type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overr
     '`iterable` clashes with base properties': OverlappingKeys<D['iterable'],Omit<TagCreatorAttributes<BaseCreator>, keyof BaseIterables<BaseCreator>>>,
     '`iterable` clashes with `override`': OverlappingKeys<D['iterable'],D['override']>,
     '`iterable` clashes with `declare`': OverlappingKeys<D['iterable'],D['declare']>,
-    '`override` clashes with `declare`': OverlappingKeys<D['override'],D['declare']>,
-    '`prototype` (deprecated) clashes with `declare`': OverlappingKeys<D['declare'],D['prototype']>,
-    '`prototype` (deprecated) clashes with `override`': OverlappingKeys<D['declare'],D['prototype']>,
-    '`prototype` (deprecated) clashes with `iterable`': OverlappingKeys<D['iterable'],D['prototype']>
+    '`override` clashes with `declare`': OverlappingKeys<D['override'],D['declare']>
   }, never>
 
 export type Overrides = {
-  /** @deprecated */ prototype?: object;
   override?: object;
   declare?: object;
   iterable?: { [k: string]: OptionalIterablePropertyValue };
@@ -200,7 +175,7 @@ type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Ove
   D['declare']
   & D['override']
   & IDS<D['ids']>
-  & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>;
+  & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>;
 
 type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable'];
 
@@ -210,13 +185,12 @@ type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> =
     & AsyncGeneratedObject<CombinedNonIterableProperties<Base,D>>,
     D['declare']
     & D['override']
-    & MergeBaseTypes<D['prototype'], Omit<TagCreatorAttributes<Base>, keyof D['iterable']>>
+    & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>
   >;
 
 type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<
   Definitions['declare']
   & Definitions['override']
-  & Definitions['prototype']
   & TagCreatorAttributes<Base>,
   any
   >;

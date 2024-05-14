@@ -20,16 +20,16 @@ interface TagLoader {
     <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): {
         [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]>;
     };
-    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes: P): {
+    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(commonProperties: P): {
         [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]>;
     };
-    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes: P): {
+    <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], commonProperties: P): {
         [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]>;
     };
-    <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): {
+    <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], commonProperties?: P): {
         [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement>;
     };
-    <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>;
+    <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], commonProperties?: P): Record<string, TagCreator<P & PoElementMethods & Element>>;
 }
 export declare const tag: TagLoader;
 export declare function augmentGlobalAsyncGenerators(): void;

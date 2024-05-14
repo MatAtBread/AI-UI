@@ -50,14 +50,14 @@ function isChildTag(x) {
 const callStackSymbol = Symbol('callStack');
 export const tag = function (_1, _2, _3) {
     /* Work out which parameter is which. There are 6 variations:
-      tag()                                       []
-      tag(prototypes)                             [object]
-      tag(tags[])                                 [string[]]
-      tag(tags[], prototypes)                     [string[], object]
-      tag(namespace | null, tags[])               [string | null, string[]]
-      tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
+      tag()                                           []
+      tag(commonProperties)                           [object]
+      tag(tags[])                                     [string[]]
+      tag(tags[], commonProperties)                   [string[], object]
+      tag(namespace | null, tags[])                   [string | null, string[]]
+      tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
     */
-    const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
+    const [nameSpace, tags, commonProperties] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
         : Array.isArray(_1)
             ? [null, _1, _2]
@@ -79,8 +79,8 @@ export const tag = function (_1, _2, _3) {
                 assignProps(this, a);
         }
     });
-    if (prototypes)
-        deepDefine(tagPrototypes, prototypes);
+    if (commonProperties)
+        deepDefine(tagPrototypes, commonProperties);
     function nodes(...c) {
         const appended = [];
         (function children(c) {
@@ -246,7 +246,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             else {
                                 if (value instanceof Node) {
-                                    console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                    console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                                     d[k] = value;
                                 }
                                 else {
@@ -475,7 +475,6 @@ export const tag = function (_1, _2, _3) {
             e.constructor = extendTag;
             const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
             combinedAttrs[callStackSymbol].push(tagDefinition);
-            deepDefine(e, tagDefinition.prototype);
             if (DEBUG) {
                 // Validate declare and override
                 function isAncestral(creator, d) {
@@ -491,7 +490,7 @@ export const tag = function (_1, _2, _3) {
                     }
                 }
                 if (tagDefinition.override) {
-                    const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(prototypes && d in prototypes) && !isAncestral(this, d));
+                    const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this, d));
                     if (clash.length) {
                         console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
                     }
@@ -553,12 +552,10 @@ export const tag = function (_1, _2, _3) {
                 walkProto(creator.super);
             const proto = creator.definition;
             if (proto) {
-                deepDefine(fullProto, proto?.prototype);
                 deepDefine(fullProto, proto?.override);
                 deepDefine(fullProto, proto?.declare);
             }
         })(this);
-        deepDefine(fullProto, staticExtensions.prototype);
         deepDefine(fullProto, staticExtensions.override);
         deepDefine(fullProto, staticExtensions.declare);
         Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
@@ -573,13 +570,7 @@ export const tag = function (_1, _2, _3) {
             value: "<ai-" + creatorName.replace(/\s+/g, '-') + callSite + ">"
         });
         if (DEBUG) {
-            if (staticExtensions.prototype) {
-                const clash = Object.keys(staticExtensions.prototype);
-                if (clash.length) {
-                    console.log(`${extendTag.name} defines keys '${clash}' via 'prototype' which is deprecated`);
-                }
-            }
-            const extraUnknownProps = Object.keys(staticExtensions).filter(k => !['styles', 'ids', 'constructed', 'prototype', 'declare', 'override', 'iterable'].includes(k));
+            const extraUnknownProps = Object.keys(staticExtensions).filter(k => !['styles', 'ids', 'constructed', 'declare', 'override', 'iterable'].includes(k));
             if (extraUnknownProps.length) {
                 console.log(`${extendTag.name} defines extraneous keys '${extraUnknownProps}', which are unknown`);
             }
@@ -595,7 +586,7 @@ export const tag = function (_1, _2, _3) {
             let doc = document;
             if (isChildTag(attrs)) {
                 children.unshift(attrs);
-                attrs = { prototype: {} };
+                attrs = {};
             }
             // This test is always true, but narrows the type of attrs to avoid further errors
             if (!isChildTag(attrs)) {
