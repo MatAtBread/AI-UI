@@ -106,6 +106,7 @@ async function captureLogs(file: string) {
   // Globals to simulate DOM
   const window = new JSDOM().window;
   Object.assign(globalThis, {
+//    DEBUG: true,
     document: window.document,
     Element: window.Element,
     Node: window.Node,

@@ -11,7 +11,7 @@ const _console = {
     if (DEBUG) console.warn('(AI-UI) WARN:', ...args)
   },
   info(...args: any) {
-    if (DEBUG) console.info('(AI-UI) INFO:', ...args)
+    if (DEBUG) console.debug('(AI-UI) INFO:', ...args)
   }
 }
 

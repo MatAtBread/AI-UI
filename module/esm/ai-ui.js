@@ -33,6 +33,7 @@ poStyleElt.id = "--ai-ui-extended-tag-styles";
 function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
+        || typeof x === 'boolean'
         || typeof x === 'function'
         || x instanceof Node
         || x instanceof NodeList
@@ -229,10 +230,16 @@ export const tag = function (_1, _2, _3) {
                                 // which can't be copied
                                 if (declaration) {
                                     if (Object.getPrototypeOf(value) === plainObjectPrototype || !Object.getPrototypeOf(value)) {
+                                        // A plain object can be deep-copied by field
                                         deepDefine(srcDesc.value = {}, value);
                                     }
+                                    else if (Array.isArray(value)) {
+                                        // An array can be deep copied by index
+                                        deepDefine(srcDesc.value = [], value);
+                                    }
                                     else {
-                                        console.log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
+                                        // Other object like things (regexps, dates, classes, etc) can't be deep-copied reliably
+                                        console.warn(`Declared propety '${k}' is not a plain object and must be assigned by reference, possibly polluting other instances of this tag`, d, value);
                                     }
                                 }
                                 Object.defineProperty(d, k, srcDesc);
@@ -393,7 +400,7 @@ export const tag = function (_1, _2, _3) {
                                 notYetMounted = false;
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, d);
+                                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, base);
                             }
                             ap.next().then(update).catch(error);
                         }
@@ -469,6 +476,27 @@ export const tag = function (_1, _2, _3) {
             const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
             combinedAttrs[callStackSymbol].push(tagDefinition);
             deepDefine(e, tagDefinition.prototype);
+            if (DEBUG) {
+                // Validate declare and override
+                function isAncestral(creator, d) {
+                    for (let f = creator; f; f = f.super)
+                        if (f.definition?.declare && d in f.definition.declare)
+                            return true;
+                    return false;
+                }
+                if (tagDefinition.declare) {
+                    const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this, d));
+                    if (clash.length) {
+                        console.log(`Declared keys '${clash}' in ${extendTag.name} already exist in base '${this.valueOf()}'`);
+                    }
+                }
+                if (tagDefinition.override) {
+                    const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(prototypes && d in prototypes) && !isAncestral(this, d));
+                    if (clash.length) {
+                        console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
+                    }
+                }
+            }
             deepDefine(e, tagDefinition.declare, true);
             deepDefine(e, tagDefinition.override);
             tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
@@ -544,6 +572,18 @@ export const tag = function (_1, _2, _3) {
         Object.defineProperty(extendTag, "name", {
             value: "<ai-" + creatorName.replace(/\s+/g, '-') + callSite + ">"
         });
+        if (DEBUG) {
+            if (staticExtensions.prototype) {
+                const clash = Object.keys(staticExtensions.prototype);
+                if (clash.length) {
+                    console.log(`${extendTag.name} defines keys '${clash}' via 'prototype' which is deprecated`);
+                }
+            }
+            const extraUnknownProps = Object.keys(staticExtensions).filter(k => !['styles', 'ids', 'constructed', 'prototype', 'declare', 'override', 'iterable'].includes(k));
+            if (extraUnknownProps.length) {
+                console.log(`${extendTag.name} defines extraneous keys '${extraUnknownProps}', which are unknown`);
+            }
+        }
         return extendTag;
     }
     const baseTagCreators = {};
