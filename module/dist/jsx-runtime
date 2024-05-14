@@ -1,0 +1,17 @@
+"use strict";
+import { tag } from "./ai-ui.js";
+const baseTags = tag();
+const AIUIJSX = (tagName, attrs, ...children) => {
+  return tagName === AIUIJSX ? children : tagName instanceof Function ? tagName(attrs, ...children) : baseTags[tagName](attrs, ...children);
+};
+function sterilise(attrs) {
+  const childless = { ...attrs };
+  delete childless.children;
+  return childless;
+}
+export const jsx = (tagName, attrs) => AIUIJSX(tagName, sterilise(attrs), attrs.children);
+export const jsxs = jsx;
+export const Fragment = AIUIJSX;
+export default {
+  AIUIJSX
+};
