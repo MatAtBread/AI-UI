@@ -26,7 +26,8 @@
   "exports": {
     ".": {
       "require": "./dist/ai-ui.cjs.js",
-      "browser": "./dist/ai-ui.cjs.min.js",
+      "browser": "./esm/ai-ui.cjs.min.js",
+      "development": "./esm/ai-ui.js",
       "default": "./esm/ai-ui.js"
     }
   },
@@ -37,16 +38,16 @@
   },
   "scripts": {
     "clean": "rm -rf dist/* esm/*",
-    "build": "npm run clean && (npm run build-esm & npm run build-dev-esm & npm run build-min-esm & npm run build-dev-cjs & npm run build-min-cjs & npm run build-dev-script & npm run build-min-script & npm run build-jsx)",
+    "build": "npm run clean && (npm run build-esm & npm run build-dev-mjs & npm run build-min-mjs & npm run build-dev-cjs & npm run build-min-cjs & npm run build-dev-script & npm run build-min-script & npm run build-jsx)",
 
     "build-esm": "tsc -p tsconfig.json",
-    "build-dev-esm": "esbuild src/ai-ui.ts --outfile=esm/ai-ui.mjs --bundle --platform=neutral --target=es2020 --sourcemap=inline",
-    "build-min-esm": "esbuild src/ai-ui.ts --outfile=esm/ai-ui.min.mjs --bundle --platform=neutral --target=es2020 --minify",
+    "build-dev-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.mjs --bundle --platform=neutral --target=es2020 --sourcemap=inline",
+    "build-min-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.min.mjs --bundle --platform=neutral --target=es2020 --minify",
     "build-dev-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.cjs.js --bundle --target=es2018 --sourcemap=inline",
     "build-min-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.cjs.min.js --bundle --target=es2018 --minify",
     "build-dev-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.js --bundle --target=es2018 --sourcemap=inline",
     "build-min-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.min.js --bundle --target=es2018 --minify",
-    "build-jsx": "esbuild src/jsx-runtime.ts --outfile=esm/jsx-runtime --platform=neutral --target=es2020",
+    "build-jsx": "esbuild src/jsx-runtime.ts --outfile=esm/jsx-runtime --platform=neutral --target=es2020 && cp esm/jsx-runtime dist/jsx-runtime",
 
     "prepublishOnly": "npm run build && npm test",
     "test": "tsc -p ../type_tests/tsconfig.json && npm run tests --",

@@ -54,11 +54,13 @@ AI-UI comes with a core set of functions & methods to turn DOM events into async
 
 ## Use in a browser
 
+Distibution files are included in the package for ESM (.mjs), CommonJS (.cjs.js) and HTML script tags. Debug versions with inline sourcemaps and minified versions are placed in the /dist directory. The /esm direction contains unbundled ESM files with inline sourcemaps and TypeScript .d.ts definitions.
+
 ### ES6 import
 ```
-  import * as AIUI from 'https://www.unpkg.com/@matatbread/ai-ui/esm/ai-ui.js';
+  import * as AIUI from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs';
   // You can, of course, just import the members you need...
-  import { tag } from 'https://www.unpkg.com/@matatbread/ai-ui/esm/ai-ui.js';
+  import { tag } from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs';
 ```
 
 ### HTML `<script>` tag
