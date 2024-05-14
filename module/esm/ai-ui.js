@@ -29,7 +29,7 @@ const elementProtype = {
     }
 };
 const poStyleElt = document.createElement("STYLE");
-poStyleElt.id = "--ai-ui-extended-tag-styles";
+poStyleElt.id = "--ai-ui-extended-tag-styles-";
 function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'

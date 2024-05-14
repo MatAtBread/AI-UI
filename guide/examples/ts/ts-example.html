@@ -1,39 +1,14 @@
 <html>
 <!--
-
   This is a minimal loader to demonstrate Typescript examples in the AI-UI guide.
 
   It is NOT recommended you do this in production code - it's simply so we can load,
   transpile and execute basic examples in the browser. It is slow.
-
   -->
-
 <head></head>
 
 <body>Loading Typescript...</body>
 
-<!--
-React <= v16
-  .tsx source file reference:
-    import React from '../../../module/esm/jsx-runtime.js';
-
-  tsconfig fields
-    "jsxFactory": "React.AIUIJSX",
-    "jsxFragmentFactory": "React.AIUIJSX",
-    "jsx": "react"
-
-React >= v17
-  .tsx source file reference:
-    (none)
-
-  tsconfig fields
-    "jsx": "react-jsx",
-    "jsxImportSource": "../../../module/esm"
-
-
-
--->
-<!--script src="https://unpkg.com/typescript@5.4.2/lib/typescript.js"></script-->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.4.2/typescript.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
   window.exports = {};

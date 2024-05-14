@@ -44,15 +44,13 @@ That's what AI-UI does. Child elements and attributes can be living, changing ex
     }
   }
 
-  ...
-
   div(
     "The time is:", now()
   )
 ```
 That's it! A working clock, just by changing the second child in the `<div>` to an async iterator! [See for yourself](https://raw.githack.com/MatAtBread/AI-UI/main/guide/examples/readme.html)
 
-AI-UI comes with a core set of functions & methods to turn DOM events into async iterators (via [`when`](https://github.com/MatAtBread/AI-UI/blob/main/guide/when.md)), so your content can be derived from other elements, and a toolkit for mapping, filtering and processing async [iterators](https://github.com/MatAtBread/AI-UI/blob/main/guide/iterators.md) in a natural way so your data flows throughout you system, filtered down to do the most minimal, performant DOM updates possible.
+AI-UI comes with a core set of functions & methods to turn DOM events into async iterators (via [`when`](https://github.com/MatAtBread/AI-UI/blob/main/guide/when.md)), so your content can be derived from other elements, and a toolkit for mapping, filtering and processing async [iterators](https://github.com/MatAtBread/AI-UI/blob/main/guide/iterators.md) in a natural way so your data flows throughout your system, filtered down to do the most minimal, performant DOM updates possible.
 
 ## Use in a browser
 

@@ -74,7 +74,7 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
 }
 
 const poStyleElt = document.createElement("STYLE");
-poStyleElt.id = "--ai-ui-extended-tag-styles";
+poStyleElt.id = "--ai-ui-extended-tag-styles-";
 
 function isChildTag(x: any): x is ChildTags {
   return typeof x === 'string'
