@@ -54,7 +54,16 @@ AI-UI comes with a core set of functions & methods to turn DOM events into async
 
 ## Use in a browser
 
-Distibution files are included in the package as ESM (.mjs) and HTML script tags. Debug versions with inline sourcemaps and minified versions are placed in the /dist directory. The /esm direction contains unbundled ESM files with inline sourcemaps and TypeScript .d.ts definitions.
+Distibution files are included in the package as ESM (.mjs), CommonJS (.cjs) and HTML script tags (.js). Debug versions with inline sourcemaps and minified versions are placed in the /dist directory.
+
+The naming convention is:
+```
+  /dist/ai-ui(.min).mjs   // ESM format
+  /dist/ai-ui(.min).js    // <script> format
+  /dist/ai-ui(.min).cjs   // CommonJS format
+```
+
+The /esm directory contains unbundled ESM files with inline sourcemaps and TypeScript .d.ts definitions for development.
 
 ### ES6 import
 ```
@@ -74,6 +83,9 @@ Distibution files are included in the package as ESM (.mjs) and HTML script tags
 ```
 
 ### CommonJS (for bundling or other environments)
+```
+  npm i @matatbread/ai-ui
+```
 ```
   const { tag } = require('@matatbread/ai-ui');
 ```
