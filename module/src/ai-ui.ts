@@ -6,7 +6,7 @@ import { DEBUG, console, timeOutWarn } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
-export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags'
+export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js'
 export * as Iterators from './iterators.js';
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
@@ -189,6 +189,7 @@ export const tag = <TagLoader>function <Tags extends string,
         let notYetMounted = true;
         // DEBUG support
         let createdAt = Date.now() + timeOutWarn;
+        const createdBy = DEBUG && new Error("Created by").stack;
 
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode));
@@ -197,7 +198,7 @@ export const tag = <TagLoader>function <Tags extends string,
             n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
           }
           else
-          console.warn('(AI-UI)', "Can't report error", errorValue, t);
+          console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {
@@ -215,7 +216,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
-                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,t);
+                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,createdBy, t);
               }
               const q = nodes(unbox(es.value) as ChildTags);
               // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
@@ -420,6 +421,7 @@ export const tag = <TagLoader>function <Tags extends string,
           let notYetMounted = true;
           // DEBUG support
           let createdAt = Date.now() + timeOutWarn;
+          const createdBy = DEBUG && new Error("Created by").stack;
           const update = (es: IteratorResult<unknown>) => {
             if (!es.done) {
               const value = unbox(es.value);
@@ -456,7 +458,7 @@ export const tag = <TagLoader>function <Tags extends string,
               if (mounted) notYetMounted = false;
               if (notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
-                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`,base);
+                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, base);
               }
 
               ap.next().then(update).catch(error);
@@ -464,7 +466,7 @@ export const tag = <TagLoader>function <Tags extends string,
           }
           const error = (errorValue: any) => {
             ap.return?.(errorValue);
-            console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
+            console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, createdBy, base);
             base.appendChild(DyamicElementError({ error: errorValue }));
           }
           ap.next().then(update).catch(error);

@@ -120,6 +120,7 @@ export const tag = function (_1, _2, _3) {
                 let notYetMounted = true;
                 // DEBUG support
                 let createdAt = Date.now() + timeOutWarn;
+                const createdBy = DEBUG && new Error("Created by").stack;
                 const error = (errorValue) => {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
@@ -127,7 +128,7 @@ export const tag = function (_1, _2, _3) {
                         n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
                     }
                     else
-                        console.warn('(AI-UI)', "Can't report error", errorValue, t);
+                        console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
                 };
                 const update = (es) => {
                     if (!es.done) {
@@ -143,7 +144,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, t);
+                                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t);
                             }
                             const q = nodes(unbox(es.value));
                             // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
@@ -362,6 +363,7 @@ export const tag = function (_1, _2, _3) {
                     let notYetMounted = true;
                     // DEBUG support
                     let createdAt = Date.now() + timeOutWarn;
+                    const createdBy = DEBUG && new Error("Created by").stack;
                     const update = (es) => {
                         if (!es.done) {
                             const value = unbox(es.value);
@@ -400,14 +402,14 @@ export const tag = function (_1, _2, _3) {
                                 notYetMounted = false;
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, base);
+                                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, base);
                             }
                             ap.next().then(update).catch(error);
                         }
                     };
                     const error = (errorValue) => {
                         ap.return?.(errorValue);
-                        console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
+                        console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, createdBy, base);
                         base.appendChild(DyamicElementError({ error: errorValue }));
                     };
                     ap.next().then(update).catch(error);

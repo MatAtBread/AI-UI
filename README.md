@@ -73,10 +73,10 @@ Distibution files are included in the package as ESM (.mjs) and HTML script tags
   </script>
 ```
 
-#### CommonJS (for bundling or other environments)
-> Since there are no browsers that support async iterators but not ECMAScript modules, the .cjs bundles have been removed
-> as of au-ui@0.12.0. You should import the module, which all modern bundlers will correctly bundle. If you really
-> want CommonJS format for some reason, the legacy `npm run build-dev-cjs` and  `npm run build-min-cjs` will create them.
+### CommonJS (for bundling or other environments)
+```
+  const { tag } = require('@matatbread/ai-ui');
+```
 
 ## Get Started
 
