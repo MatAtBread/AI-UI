@@ -1,3 +1,14 @@
 {
-    "typescript.tsdk": "module/node_modules/typescript/lib"
+    "typescript.tsdk": "module/node_modules/typescript/lib",
+    "runOnSave.statusMessageTimeout": 3000,
+    "runOnSave.commands": [
+        {
+            // Match scss files except names start with `_`.
+            "match": "module\/.*\\.ts$",
+            "command": "cd module && npm run build && cd ..",
+            "runIn": "terminal",
+            "runningStatusMessage": "Building...",
+            "finishStatusMessage": "Build complete"
+        }
+    ]
 }

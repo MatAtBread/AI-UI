@@ -12,9 +12,9 @@
   /* Specify what base tags you reference in your UI */
   const { h2, div } = AIUI.tag();
 
-  /* Define a _new_ tag type, called `App`, based on the standard "<div>" tag, 
+  /* Define a _new_ tag type, called `App`, based on the standard "<div>" tag,
     that is composed of an h2 and div elements. It will generate markup like:
-  
+
   <div>
       <h2>Hello World</h2>
       <div>Dunno</div>
@@ -26,8 +26,8 @@
     constructed() {
       /* When constructed, this "div" tag contains some other tags: */
       return [
-        h2("Hello World"),  // h2(...) is "tag function". I generates an "h2" DOM element with the specified children
-        div(clock())        // div(...) is also "tag function". I generates an "div" DOM element with the specified children
+        h2("Hello World"),  // h2(...) is "tag function". It generates an "h2" DOM element with the specified children
+        div(clock())        // div(...) is also "tag function". It generates an "div" DOM element with the specified children
       ]
     }
   });

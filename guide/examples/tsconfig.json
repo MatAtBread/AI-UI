@@ -1,6 +1,7 @@
 {
   /* NB: This folder is NOT compiled. This tsconfig is just so the VSCode provides intellisense help in the files */
   "compilerOptions": {
+    "isolatedModules": true,
     "noErrorTruncation": true,
     "noEmit": true,
     "declaration": false,
@@ -15,6 +16,6 @@
     "jsx": "react"
     // "jsx": "react-jsx",
     // "jsxImportSource": "../../../module/esm"
-},
+  },
   "include": [ "ts/*.ts" ]
 }

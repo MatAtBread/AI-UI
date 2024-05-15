@@ -13,6 +13,6 @@ const _console = {
     },
     info(...args) {
         if (DEBUG)
-            console.info('(AI-UI) INFO:', ...args);
+            console.debug('(AI-UI) INFO:', ...args);
     }
 };

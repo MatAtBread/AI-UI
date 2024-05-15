@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "isolatedModules": true,
     "noErrorTruncation": true,
     "declaration": true,
     "target": "ES2020",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
@@ -10,7 +11,7 @@
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
     "outDir": "./esm",
     "lib": ["DOM","DOM.Iterable","ES2020"],
-    "typeRoots": []
+    "typeRoots": ["./esm"],
   },
   "include": [ "src/*.ts"]
 }

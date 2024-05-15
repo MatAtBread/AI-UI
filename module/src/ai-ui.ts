@@ -6,10 +6,10 @@ import { DEBUG, console, timeOutWarn } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
-export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags'
+export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js'
 export * as Iterators from './iterators.js';
 
-/* A holder for prototypes specified when `tag(...p)` is invoked, which are always
+/* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
 type OtherMembers = { }
 
@@ -33,7 +33,7 @@ interface TagLoader {
       tag(
           ?nameSpace?: string,  // absent nameSpace implies HTML
           ?tags?: string[],     // absent tags defaults to all common HTML tags
-          ?prototypes?: PrototypeConstraint // absent prototypes implies none are defined
+          ?commonProperties?: CommonPropertiesConstraint // absent implies none are defined
       )
 
       eg:
@@ -43,10 +43,10 @@ interface TagLoader {
   */
   <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> }
   <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], prototypes: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], prototypes?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> }
-  <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], prototypes?: P): Record<string, TagCreator<P & PoElementMethods & Element>>
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(commonProperties: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], commonProperties: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], commonProperties?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> }
+  <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], commonProperties?: P): Record<string, TagCreator<P & PoElementMethods & Element>>
 }
 
 let idCount = 0;
@@ -74,11 +74,12 @@ const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = 
 }
 
 const poStyleElt = document.createElement("STYLE");
-poStyleElt.id = "--ai-ui-extended-tag-styles";
+poStyleElt.id = "--ai-ui-extended-tag-styles-";
 
 function isChildTag(x: any): x is ChildTags {
   return typeof x === 'string'
     || typeof x === 'number'
+    || typeof x === 'boolean'
     || typeof x === 'function'
     || x instanceof Node
     || x instanceof NodeList
@@ -108,14 +109,14 @@ export const tag = <TagLoader>function <Tags extends string,
   type NamespacedElementBase = T1 extends string ? T1 extends '' ? HTMLElement : Element : HTMLElement;
 
   /* Work out which parameter is which. There are 6 variations:
-    tag()                                       []
-    tag(prototypes)                             [object]
-    tag(tags[])                                 [string[]]
-    tag(tags[], prototypes)                     [string[], object]
-    tag(namespace | null, tags[])               [string | null, string[]]
-    tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
+    tag()                                           []
+    tag(commonProperties)                           [object]
+    tag(tags[])                                     [string[]]
+    tag(tags[], commonProperties)                   [string[], object]
+    tag(namespace | null, tags[])                   [string | null, string[]]
+    tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
   */
-  const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
+  const [nameSpace, tags, commonProperties] = (typeof _1 === 'string') || _1 === null
     ? [_1, _2 as Tags[], _3 as P]
     : Array.isArray(_1)
       ? [null, _1 as Tags[], _2 as P]
@@ -144,8 +145,8 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   });
 
-  if (prototypes)
-    deepDefine(tagPrototypes, prototypes);
+  if (commonProperties)
+    deepDefine(tagPrototypes, commonProperties);
 
   function nodes(...c: ChildTags[]) {
     const appended: Node[] = [];
@@ -188,6 +189,7 @@ export const tag = <TagLoader>function <Tags extends string,
         let notYetMounted = true;
         // DEBUG support
         let createdAt = Date.now() + timeOutWarn;
+        const createdBy = DEBUG && new Error("Created by").stack;
 
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode));
@@ -196,7 +198,7 @@ export const tag = <TagLoader>function <Tags extends string,
             n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
           }
           else
-          console.warn('(AI-UI)', "Can't report error", errorValue, t);
+          console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {
@@ -214,7 +216,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
-                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,t);
+                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,createdBy, t);
               }
               const q = nodes(unbox(es.value) as ChildTags);
               // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
@@ -302,15 +304,20 @@ export const tag = <TagLoader>function <Tags extends string,
                 // which can't be copied
                 if (declaration) {
                   if (Object.getPrototypeOf(value) === plainObjectPrototype || !Object.getPrototypeOf(value)) {
+                    // A plain object can be deep-copied by field
                     deepDefine(srcDesc.value = {}, value);
+                  } else if (Array.isArray(value)) {
+                    // An array can be deep copied by index
+                    deepDefine(srcDesc.value = [], value);
                   } else {
-                    console.log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
+                    // Other object like things (regexps, dates, classes, etc) can't be deep-copied reliably
+                    console.warn(`Declared propety '${k}' is not a plain object and must be assigned by reference, possibly polluting other instances of this tag`, d, value);
                   }
                 }
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                  console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -414,6 +421,7 @@ export const tag = <TagLoader>function <Tags extends string,
           let notYetMounted = true;
           // DEBUG support
           let createdAt = Date.now() + timeOutWarn;
+          const createdBy = DEBUG && new Error("Created by").stack;
           const update = (es: IteratorResult<unknown>) => {
             if (!es.done) {
               const value = unbox(es.value);
@@ -450,7 +458,7 @@ export const tag = <TagLoader>function <Tags extends string,
               if (mounted) notYetMounted = false;
               if (notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
-                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`,d);
+                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, base);
               }
 
               ap.next().then(update).catch(error);
@@ -458,8 +466,8 @@ export const tag = <TagLoader>function <Tags extends string,
           }
           const error = (errorValue: any) => {
             ap.return?.(errorValue);
-            console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
-            appender(base)(DyamicElementError({ error: errorValue }));
+            console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, createdBy, base);
+            base.appendChild(DyamicElementError({ error: errorValue }));
           }
           ap.next().then(update).catch(error);
         }
@@ -552,7 +560,26 @@ export const tag = <TagLoader>function <Tags extends string,
       e.constructor = extendTag;
       const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
       combinedAttrs[callStackSymbol].push(tagDefinition);
-      deepDefine(e, tagDefinition.prototype);
+      if (DEBUG) {
+        // Validate declare and override
+        function isAncestral(creator: TagCreator<Element>, d: string) {
+          for (let f = creator; f; f = f.super)
+            if (f.definition?.declare && d in f.definition.declare) return true;
+          return false;
+        }
+        if (tagDefinition.declare) {
+          const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this,d));
+          if (clash.length) {
+            console.log(`Declared keys '${clash}' in ${extendTag.name} already exist in base '${this.valueOf()}'`);
+          }
+        }
+        if (tagDefinition.override) {
+          const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this,d));
+          if (clash.length) {
+            console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
+          }
+        }
+      }
       deepDefine(e, tagDefinition.declare, true);
       deepDefine(e, tagDefinition.override);
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
@@ -610,12 +637,10 @@ export const tag = <TagLoader>function <Tags extends string,
 
       const proto = creator.definition;
       if (proto) {
-        deepDefine(fullProto, proto?.prototype);
         deepDefine(fullProto, proto?.override);
         deepDefine(fullProto, proto?.declare);
       }
     })(this);
-    deepDefine(fullProto, staticExtensions.prototype);
     deepDefine(fullProto, staticExtensions.override);
     deepDefine(fullProto, staticExtensions.declare);
     Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
@@ -632,6 +657,12 @@ export const tag = <TagLoader>function <Tags extends string,
       value: "<ai-" + creatorName.replace(/\s+/g,'-') + callSite+">"
     });
 
+    if (DEBUG) {
+      const extraUnknownProps = Object.keys(staticExtensions).filter(k => !['styles', 'ids', 'constructed', 'declare', 'override', 'iterable'].includes(k));
+      if (extraUnknownProps.length) {
+        console.log(`${extendTag.name} defines extraneous keys '${extraUnknownProps}', which are unknown`);
+      }
+    }
     return extendTag;
   }
 
@@ -655,7 +686,7 @@ export const tag = <TagLoader>function <Tags extends string,
       let doc = document;
       if (isChildTag(attrs)) {
         children.unshift(attrs);
-        attrs = { prototype: {} } as any;
+        attrs = {} as any;
       }
 
       // This test is always true, but narrows the type of attrs to avoid further errors

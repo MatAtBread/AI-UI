@@ -29,10 +29,11 @@ const elementProtype = {
     }
 };
 const poStyleElt = document.createElement("STYLE");
-poStyleElt.id = "--ai-ui-extended-tag-styles";
+poStyleElt.id = "--ai-ui-extended-tag-styles-";
 function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
+        || typeof x === 'boolean'
         || typeof x === 'function'
         || x instanceof Node
         || x instanceof NodeList
@@ -49,14 +50,14 @@ function isChildTag(x) {
 const callStackSymbol = Symbol('callStack');
 export const tag = function (_1, _2, _3) {
     /* Work out which parameter is which. There are 6 variations:
-      tag()                                       []
-      tag(prototypes)                             [object]
-      tag(tags[])                                 [string[]]
-      tag(tags[], prototypes)                     [string[], object]
-      tag(namespace | null, tags[])               [string | null, string[]]
-      tag(namespace | null, tags[], prototypes)   [string | null, string[], object]
+      tag()                                           []
+      tag(commonProperties)                           [object]
+      tag(tags[])                                     [string[]]
+      tag(tags[], commonProperties)                   [string[], object]
+      tag(namespace | null, tags[])                   [string | null, string[]]
+      tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
     */
-    const [nameSpace, tags, prototypes] = (typeof _1 === 'string') || _1 === null
+    const [nameSpace, tags, commonProperties] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
         : Array.isArray(_1)
             ? [null, _1, _2]
@@ -78,8 +79,8 @@ export const tag = function (_1, _2, _3) {
                 assignProps(this, a);
         }
     });
-    if (prototypes)
-        deepDefine(tagPrototypes, prototypes);
+    if (commonProperties)
+        deepDefine(tagPrototypes, commonProperties);
     function nodes(...c) {
         const appended = [];
         (function children(c) {
@@ -119,6 +120,7 @@ export const tag = function (_1, _2, _3) {
                 let notYetMounted = true;
                 // DEBUG support
                 let createdAt = Date.now() + timeOutWarn;
+                const createdBy = DEBUG && new Error("Created by").stack;
                 const error = (errorValue) => {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
@@ -126,7 +128,7 @@ export const tag = function (_1, _2, _3) {
                         n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
                     }
                     else
-                        console.warn('(AI-UI)', "Can't report error", errorValue, t);
+                        console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
                 };
                 const update = (es) => {
                     if (!es.done) {
@@ -142,7 +144,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, t);
+                                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t);
                             }
                             const q = nodes(unbox(es.value));
                             // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
@@ -229,17 +231,23 @@ export const tag = function (_1, _2, _3) {
                                 // which can't be copied
                                 if (declaration) {
                                     if (Object.getPrototypeOf(value) === plainObjectPrototype || !Object.getPrototypeOf(value)) {
+                                        // A plain object can be deep-copied by field
                                         deepDefine(srcDesc.value = {}, value);
                                     }
+                                    else if (Array.isArray(value)) {
+                                        // An array can be deep copied by index
+                                        deepDefine(srcDesc.value = [], value);
+                                    }
                                     else {
-                                        console.log(`Declared propety ${k} is not a plain object and must be assigned by reference`);
+                                        // Other object like things (regexps, dates, classes, etc) can't be deep-copied reliably
+                                        console.warn(`Declared propety '${k}' is not a plain object and must be assigned by reference, possibly polluting other instances of this tag`, d, value);
                                     }
                                 }
                                 Object.defineProperty(d, k, srcDesc);
                             }
                             else {
                                 if (value instanceof Node) {
-                                    console.log("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                    console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
                                     d[k] = value;
                                 }
                                 else {
@@ -355,6 +363,7 @@ export const tag = function (_1, _2, _3) {
                     let notYetMounted = true;
                     // DEBUG support
                     let createdAt = Date.now() + timeOutWarn;
+                    const createdBy = DEBUG && new Error("Created by").stack;
                     const update = (es) => {
                         if (!es.done) {
                             const value = unbox(es.value);
@@ -393,15 +402,15 @@ export const tag = function (_1, _2, _3) {
                                 notYetMounted = false;
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, d);
+                                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, base);
                             }
                             ap.next().then(update).catch(error);
                         }
                     };
                     const error = (errorValue) => {
                         ap.return?.(errorValue);
-                        console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
-                        appender(base)(DyamicElementError({ error: errorValue }));
+                        console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, createdBy, base);
+                        base.appendChild(DyamicElementError({ error: errorValue }));
                     };
                     ap.next().then(update).catch(error);
                 }
@@ -468,7 +477,27 @@ export const tag = function (_1, _2, _3) {
             e.constructor = extendTag;
             const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
             combinedAttrs[callStackSymbol].push(tagDefinition);
-            deepDefine(e, tagDefinition.prototype);
+            if (DEBUG) {
+                // Validate declare and override
+                function isAncestral(creator, d) {
+                    for (let f = creator; f; f = f.super)
+                        if (f.definition?.declare && d in f.definition.declare)
+                            return true;
+                    return false;
+                }
+                if (tagDefinition.declare) {
+                    const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this, d));
+                    if (clash.length) {
+                        console.log(`Declared keys '${clash}' in ${extendTag.name} already exist in base '${this.valueOf()}'`);
+                    }
+                }
+                if (tagDefinition.override) {
+                    const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this, d));
+                    if (clash.length) {
+                        console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
+                    }
+                }
+            }
             deepDefine(e, tagDefinition.declare, true);
             deepDefine(e, tagDefinition.override);
             tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
@@ -525,12 +554,10 @@ export const tag = function (_1, _2, _3) {
                 walkProto(creator.super);
             const proto = creator.definition;
             if (proto) {
-                deepDefine(fullProto, proto?.prototype);
                 deepDefine(fullProto, proto?.override);
                 deepDefine(fullProto, proto?.declare);
             }
         })(this);
-        deepDefine(fullProto, staticExtensions.prototype);
         deepDefine(fullProto, staticExtensions.override);
         deepDefine(fullProto, staticExtensions.declare);
         Object.defineProperties(extendTag, Object.getOwnPropertyDescriptors(fullProto));
@@ -544,6 +571,12 @@ export const tag = function (_1, _2, _3) {
         Object.defineProperty(extendTag, "name", {
             value: "<ai-" + creatorName.replace(/\s+/g, '-') + callSite + ">"
         });
+        if (DEBUG) {
+            const extraUnknownProps = Object.keys(staticExtensions).filter(k => !['styles', 'ids', 'constructed', 'declare', 'override', 'iterable'].includes(k));
+            if (extraUnknownProps.length) {
+                console.log(`${extendTag.name} defines extraneous keys '${extraUnknownProps}', which are unknown`);
+            }
+        }
         return extendTag;
     }
     const baseTagCreators = {};
@@ -555,7 +588,7 @@ export const tag = function (_1, _2, _3) {
             let doc = document;
             if (isChildTag(attrs)) {
                 children.unshift(attrs);
-                attrs = { prototype: {} };
+                attrs = {};
             }
             // This test is always true, but narrows the type of attrs to avoid further errors
             if (!isChildTag(attrs)) {

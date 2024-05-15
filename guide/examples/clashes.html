@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+    <script>window.DEBUG = true;</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="../../module/dist/ai-ui.js"></script>
+</head>
+
+<body>
+</body>
+<script>
+  /* Specify what base tags you reference in your UI */
+  const { div } = AIUI.tag();
+
+  const Good = div.extended({
+    declare:{
+      thing: 0
+    },
+    override: {
+      className: 'Good'
+    }
+  });
+
+  const Bad = div.extended({
+    declare:{
+      align: 0
+    },
+    override: {
+      className: 'Bad'
+    }
+  });
+
+  const Ugly = div.extended({
+    declare:{
+      thing: 0
+    },
+    override: {
+      className: 'Ugly',
+      classNames: "Other classes"
+    }
+  });
+
+document.body.append(Good(),Bad(),Ugly());
+</script>
+
