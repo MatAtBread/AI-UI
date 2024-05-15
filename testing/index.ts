@@ -115,7 +115,8 @@ async function captureLogs(file: string) {
     Event: window.Event,
     MutationObserver: window.MutationObserver,
   });
-  const AI = require('../module/dist/ai-ui.cjs.js');
+  // @ts-ignore
+  const AI = await import('../module/dist/ai-ui.mjs');
 
   const env = {
     ...AI,

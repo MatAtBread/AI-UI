@@ -54,27 +54,31 @@ AI-UI comes with a core set of functions & methods to turn DOM events into async
 
 ## Use in a browser
 
-Distibution files are included in the package for ESM (.mjs), CommonJS (.cjs.js) and HTML script tags. Debug versions with inline sourcemaps and minified versions are placed in the /dist directory. The /esm direction contains unbundled ESM files with inline sourcemaps and TypeScript .d.ts definitions.
+Distibution files are included in the package as ESM (.mjs) and HTML script tags. Debug versions with inline sourcemaps and minified versions are placed in the /dist directory. The /esm direction contains unbundled ESM files with inline sourcemaps and TypeScript .d.ts definitions.
 
 ### ES6 import
 ```
-  import * as AIUI from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs';
+  import * as AIUI from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs'; // or .min.mjs
   // You can, of course, just import the members you need...
-  import { tag } from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs';
+  import { tag } from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs'; // or .min.mjs
 ```
 
 ### HTML `<script>` tag
 ```
-  <script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.min.js"></script>
+  <script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.js"></script>
   <!-- defines global AIUI -->
+  <script>
+    const { tag } = AIUI;
+    ...
+  </script>
 ```
 
-### CommonJS (for bundling or other environments)
+#### CommonJS (for bundling or other environments)
+> Since there are no browsers that support async iterators but not ECMAScript modules, the .cjs bundles have been removed
+> as of au-ui@0.12.0. You should either import the module which all modern bundlers will correctly reference. If you really
+> want CommonJS format for some reason, the legacy `npm run build-dev-cjs` and  `npm run build-min-cjs` will create them.
 
-Bundle source: `npm i @matatbread/ai-ui`
-```
-  const { tag } = require('@matatbread/ai-ui');
-```
+## Get Started
 
 Get started with simple, easy to maintain web pages that work seamlessly with user-input, remote data sources and other dynamic sources of data and interaction without the complexity of a bespoke build or execution framework.
 

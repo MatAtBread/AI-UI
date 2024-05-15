@@ -6,7 +6,7 @@
             // Match scss files except names start with `_`.
             "match": "module\/.*\\.ts$",
             "command": "cd module && npm run build && cd ..",
-            "runIn": "backend",
+            "runIn": "terminal",
             "runningStatusMessage": "Building...",
             "finishStatusMessage": "Build complete"
         }

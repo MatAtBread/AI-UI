@@ -465,7 +465,7 @@ export const tag = <TagLoader>function <Tags extends string,
           const error = (errorValue: any) => {
             ap.return?.(errorValue);
             console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, base);
-            appender(base)(DyamicElementError({ error: errorValue }));
+            base.appendChild(DyamicElementError({ error: errorValue }));
           }
           ap.next().then(update).catch(error);
         }
