@@ -302,18 +302,20 @@ export const tag = function (_1, _2, _3) {
                     return;
                 // static props before getters/setters
                 const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
-                sourceEntries.sort((a, b) => {
-                    const desc = Object.getOwnPropertyDescriptor(d, a[0]);
-                    if (desc) {
-                        if ('value' in desc)
-                            return -1;
-                        if ('set' in desc)
-                            return 1;
-                        if ('get' in desc)
-                            return 0.5;
-                    }
-                    return 0;
-                });
+                if (!Array.isArray(s)) {
+                    sourceEntries.sort((a, b) => {
+                        const desc = Object.getOwnPropertyDescriptor(d, a[0]);
+                        if (desc) {
+                            if ('value' in desc)
+                                return -1;
+                            if ('set' in desc)
+                                return 1;
+                            if ('get' in desc)
+                                return 0.5;
+                        }
+                        return 0;
+                    });
+                }
                 for (const [k, srcDesc] of sourceEntries) {
                     try {
                         if ('value' in srcDesc) {

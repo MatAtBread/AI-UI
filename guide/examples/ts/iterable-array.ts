@@ -4,13 +4,18 @@ const { div, span } = tag();
 
 const Thing = div.extended({
   iterable: {
-    thing: { n: "?" }
+    thing: { a: ['abc','def'] /* as string[] */ }
   },
   constructed() {
-    return span("Thing is ",this.thing.n);
+    return span("Thing is ",this.thing.a);
   }
 });
 
+const t = Thing();
+document.body.append(t);
+// @ts-ignore
+window.t = t;
+/*
 const count = Iterators.generatorHelpers(async function* () {
   for (let i = 0; i < 10; i++) {
     yield i;
@@ -57,4 +62,4 @@ document.body.append(
     thing: thing3
   })
 );
-
+*/

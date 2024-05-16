@@ -58,5 +58,5 @@
     "examples": "npx http-server .. -c0 -e js"
   },
   "types": "./esm/ai-ui.d.ts",
-  "version": "0.12.0"
+  "version": "0.12.1"
 }
