@@ -325,8 +325,8 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                   target[key] = undefined;
                 }
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
-                const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
-//                const props = Object.getOwnPropertyDescriptors(
+                const props = Object.getOwnPropertyDescriptors(
+                    boxedObject.map((o,p) => {
 //                  extraBoxed.map((o,p) => {
                     const ov = o?.[key as keyof typeof o]?.valueOf();
                     const pv = p?.valueOf();

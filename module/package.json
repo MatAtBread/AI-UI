@@ -42,7 +42,7 @@
     "clean": "rm -rf dist/* esm/*",
     "build": "npm run clean && (npm run build-esm & npm run build-dev-mjs & npm run build-min-mjs & npm run build-dev-cjs & npm run build-min-cjs & npm run build-dev-script & npm run build-min-script & npm run build-jsx)",
 
-    "build-esm": "tsc -p tsconfig.json",
+    "build-esm": "tsc -p tsconfig.json && printf '\\nFinished building .d.ts files\\n'",
     "build-dev-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.mjs --bundle --platform=neutral --target=es2020 --sourcemap=inline",
     "build-min-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.min.mjs --bundle --platform=neutral --target=es2020 --minify",
     "build-dev-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.js --bundle --target=es2020 --sourcemap=inline",

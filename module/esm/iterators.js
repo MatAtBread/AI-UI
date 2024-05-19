@@ -282,7 +282,6 @@ export function defineIterableProperty(obj, name, v) {
                                 }
                                 const realValue = Reflect.get(boxedObject, key, receiver);
                                 const props = Object.getOwnPropertyDescriptors(boxedObject.map((o, p) => {
-                                    //                const props = Object.getOwnPropertyDescriptors(
                                     //                  extraBoxed.map((o,p) => {
                                     const ov = o?.[key]?.valueOf();
                                     const pv = p?.valueOf();
