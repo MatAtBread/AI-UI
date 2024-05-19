@@ -11,7 +11,9 @@ export * as Iterators from './iterators.js';
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
-type OtherMembers = { }
+type TagFunctionOptions<OtherMembers extends {} = {}> = { 
+  commonProperties: OtherMembers
+}
 
 /* Members applied to EVERY tag created, even base tags */
 interface PoElementMethods {
@@ -41,12 +43,12 @@ interface TagLoader {
         tags(['div','button'], { myThing() {} })
         tags('http://namespace',['Foreign'], { isForeign: true })
   */
-  <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<OtherMembers & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(commonProperties: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, P extends OtherMembers>(tags: Tags[], commonProperties: P): { [k in Lowercase<Tags>]: TagCreator<P & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends string, P extends (Partial<HTMLElement> & OtherMembers)>(nameSpace: null | undefined | '', tags: Tags[], commonProperties?: P): { [k in Tags]: TagCreator<P & PoElementMethods & HTMLUnknownElement> }
-  <Tags extends string, P extends (Partial<Element> & OtherMembers)>(nameSpace: string, tags: Tags[], commonProperties?: P): Record<string, TagCreator<P & PoElementMethods & Element>>
+  <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(tags: Tags[], options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> }
+  <Tags extends string, Q extends {}>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): { [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement> }
+  <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>>
 }
 
 let idCount = 0;
@@ -97,15 +99,14 @@ function isChildTag(x: any): x is ChildTags {
 const callStackSymbol = Symbol('callStack');
 
 export const tag = <TagLoader>function <Tags extends string,
-  E extends Element,
-  P extends (Partial<E> & OtherMembers),
-  T1 extends (string | Tags[] | P),
-  T2 extends (Tags[] | P)
+  T1 extends (string | Tags[] | TagFunctionOptions<Q>),
+  T2 extends (Tags[] | TagFunctionOptions<Q>),
+  Q extends {}
 >(
   _1: T1,
   _2: T2,
-  _3?: P
-): Record<string, TagCreator<P & Element>> {
+  _3?: TagFunctionOptions<Q>
+): Record<string, TagCreator<Q & Element>> {
   type NamespacedElementBase = T1 extends string ? T1 extends '' ? HTMLElement : Element : HTMLElement;
 
   /* Work out which parameter is which. There are 6 variations:
@@ -116,11 +117,13 @@ export const tag = <TagLoader>function <Tags extends string,
     tag(namespace | null, tags[])                   [string | null, string[]]
     tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
   */
-  const [nameSpace, tags, commonProperties] = (typeof _1 === 'string') || _1 === null
-    ? [_1, _2 as Tags[], _3 as P]
+  const [nameSpace, tags, options] = (typeof _1 === 'string') || _1 === null
+    ? [_1, _2 as Tags[], _3 as TagFunctionOptions<Q>]
     : Array.isArray(_1)
-      ? [null, _1 as Tags[], _2 as P]
-      : [null, standandTags, _1 as P];
+      ? [null, _1 as Tags[], _2 as TagFunctionOptions<Q>]
+      : [null, standandTags, _1 as TagFunctionOptions<Q>];
+
+  const commonProperties = options?.commonProperties;
 
   /* Note: we use property defintion (and not object spread) so getters (like `ids`)
     are not evaluated until called */
@@ -669,19 +672,19 @@ export const tag = <TagLoader>function <Tags extends string,
   }
 
   const baseTagCreators: {
-    [K in keyof HTMLElementTagNameMap]?: TagCreator<P & HTMLElementTagNameMap[K] & PoElementMethods>
+    [K in keyof HTMLElementTagNameMap]?: TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>
   } & {
-    [n: string]: TagCreator<P & Element & P & PoElementMethods>
+    [n: string]: TagCreator<Q & Element & PoElementMethods>
   } = {}
 
-  function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<P & HTMLElementTagNameMap[K] & PoElementMethods>;
-  function createTag<E extends Element>(k: string): TagCreator<P & E & PoElementMethods>;
-  function createTag(k: string): TagCreator<P & NamespacedElementBase & PoElementMethods> {
+  function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>;
+  function createTag<E extends Element>(k: string): TagCreator<Q & E & PoElementMethods>;
+  function createTag(k: string): TagCreator<Q & NamespacedElementBase & PoElementMethods> {
     if (baseTagCreators[k])
       // @ts-ignore
       return baseTagCreators[k];
 
-    const tagCreator = (attrs: P & PoElementMethods & Partial<{
+    const tagCreator = (attrs: Q & PoElementMethods & Partial<{
       debugger?: any;
       document?: Document;
     }> | ChildTags, ...children: ChildTags[]) => {

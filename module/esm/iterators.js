@@ -17,7 +17,9 @@ export function asyncIterator(o) {
     throw new Error("Not as async provider");
 }
 const asyncExtras = {
-    filterMap, // Made available since it DOESM'T clash with proposed async iterator helpers
+    filterMap(fn, initialValue = Ignore) {
+        return filterMap(this, fn, initialValue);
+    },
     map,
     filter,
     unique,

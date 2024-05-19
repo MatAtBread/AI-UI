@@ -57,11 +57,12 @@ export const tag = function (_1, _2, _3) {
       tag(namespace | null, tags[])                   [string | null, string[]]
       tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
     */
-    const [nameSpace, tags, commonProperties] = (typeof _1 === 'string') || _1 === null
+    const [nameSpace, tags, options] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
+    const commonProperties = options?.commonProperties;
     /* Note: we use property defintion (and not object spread) so getters (like `ids`)
       are not evaluated until called */
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));

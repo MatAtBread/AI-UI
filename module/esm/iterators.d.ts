@@ -11,7 +11,7 @@ export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
 type AsyncIterableHelpers = typeof asyncExtras;
 declare const asyncExtras: {
-    filterMap: typeof filterMap;
+    filterMap<U extends Partial<AsyncIterable<any>>, R>(this: U, fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;
     map: typeof map;
     filter: typeof filter;
     unique: typeof unique;

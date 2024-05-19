@@ -29,7 +29,12 @@ export function asyncIterator<T>(o: AsyncProvider<T>) {
 
 type AsyncIterableHelpers = typeof asyncExtras;
 const asyncExtras = {
-  filterMap,  // Made available since it DOESM'T clash with proposed async iterator helpers
+  filterMap<U extends PartialIterable, R>(this: U,
+    fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
+    initialValue: R | typeof Ignore = Ignore
+  ) {
+    return filterMap(this, fn, initialValue)
+  },
   map,
   filter,
   unique,
