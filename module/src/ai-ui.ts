@@ -360,7 +360,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
   function unbox(a: unknown): unknown {
     const v = a?.valueOf();
-    return Array.isArray(v) ? v.map(unbox) : v;
+    return Array.isArray(v) ? Array.prototype.map.call(v,unbox) : v;
   }
 
   function assignProps(base: Element, props: Record<string, any>) {

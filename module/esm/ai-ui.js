@@ -293,7 +293,7 @@ export const tag = function (_1, _2, _3) {
     }
     function unbox(a) {
         const v = a?.valueOf();
-        return Array.isArray(v) ? v.map(unbox) : v;
+        return Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v;
     }
     function assignProps(base, props) {
         // Copy prop hierarchy onto the element via the asssignment operator in order to run setters

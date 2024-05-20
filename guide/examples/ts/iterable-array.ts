@@ -1,65 +1,27 @@
-import { tag, Iterators } from '../../../module/esm/ai-ui.js'
+import { tag } from '../../../module/esm/ai-ui.js'
 
-const { div, span } = tag();
+const { div, span, button } = tag();
 
 const Thing = div.extended({
   iterable: {
-    thing: { a: ['abc','def'] /* as string[] */ }
+    thing: {} as {
+      a?: string[]
+      b?: string
+    }
   },
   constructed() {
-    return span("Thing is ",this.thing.a);
+    return span("Thing is ",this.thing.a,this.thing.b);
   }
 });
 
 const t = Thing();
-document.body.append(t);
+const z = t.thing.a
+document.body.append(t,
+  button({ onclick:()=> t.thing = { a:['xyz','uvw'] }},"set thing{a}"),
+  button({ onclick:()=> t.thing.a = ['pqr','stu'] },"set thing.a"),
+
+  button({ onclick:()=> t.thing = { b:'mmm' }},"set thing{b}"),
+  button({ onclick:()=> t.thing.b = 'nnn' },"set thing.b")
+);
 // @ts-ignore
 window.t = t;
-/*
-const count = Iterators.generatorHelpers(async function* () {
-  for (let i = 0; i < 10; i++) {
-    yield i;
-    await new Promise(r => setTimeout(r, 500))
-  }
-});
-const thing_n = count().map(String);
-const thing_m = count().map(String).multi();
-const thing = (async function* () {
-  for (let i = 0; i < 10; i++) {
-    yield {n: i.toString()};
-    await new Promise(r => setTimeout(r, 500))
-  }
-})();
-const thing2 = count().map(n => ({ n: String(n) }));
-const thing3 = thing_m.map(n => ({ n }));
-
-document.body.append(
-  Thing({
-    thing: {
-      n: thing_n
-    }
-  }),
-  Thing({
-    thing: {
-      n: thing_m
-    }
-  }),
-  Thing({
-    thing: {
-      n: thing_m
-    }
-  }),
-  Thing({
-    thing: thing
-  }),
-  Thing({
-    thing: thing2
-  }),
-  Thing({
-    thing: thing3
-  }),
-  Thing({
-    thing: thing3
-  })
-);
-*/
