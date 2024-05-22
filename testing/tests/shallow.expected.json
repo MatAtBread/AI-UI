@@ -1,0 +1,11 @@
+[
+  [1,"deep","consume"],
+  [2,"deep","consume"],
+  [3,"deep","consume"],
+  [4,"both","consume"],
+  [5,"both","consume"],
+  [6,"both",null],
+  [7,"shallow","consume"],
+  [8,"shallow",null],
+  [9,"shallow",null]
+]

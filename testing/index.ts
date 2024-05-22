@@ -55,7 +55,7 @@ function transpile(tsFile: string) {
 
 const dateRegex = '^\\d{4}-[01]\\d-[0-3]\\dT[0-2]\\d:[0-5]\\d:[0-5]\\d\\.\\d+([+-][0-2]\\d:[0-5]\\d|Z)$';
 
-const exclusions = (file: string) => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && file.endsWith('.ts');
+const exclusions = (file: string) => file !== 'index.ts' && !file.startsWith('-') && !file.endsWith('.d.ts') && !file.endsWith('.json');
 const options = process.argv.slice(2).filter(file => file.startsWith('-'));
 const update = (options.includes('--update') || options.includes('-U'));
 const logRun = (options.includes('--log') || options.includes('-l'));
@@ -171,8 +171,15 @@ function stringify(v: any) {
 }
 
 async function compareResults(file: string, updateResults: boolean) {
-  const resultFile = file.replace(/\.ts$/, '.expected.json');
-  const lines = await captureLogs(file);
+  let resultFile: string;
+  let lines: unknown[][];
+  if (file.endsWith('.mjs')) {
+    resultFile = file.replace(/\.mjs$/, '.expected.json');
+    lines = await import(file).then(({result}) => result.map((line:unknown, i: number) => [i+1,line]));
+  } else {
+    resultFile = file.replace(/\.ts$/, '.expected.json');
+    lines = await captureLogs(file);
+  }
   if (updateResults || !existsSync(resultFile)) {
     console.log("Updating ", resultFile.magenta);
     writeFileSync(resultFile, "[\n  " + lines.map(stringify).join(",\n  ") + "\n]");

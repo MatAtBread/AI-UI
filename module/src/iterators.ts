@@ -1,6 +1,42 @@
 import { DEBUG, console } from "./debug.js"
 import { DeferredPromise, deferred } from "./deferred.js"
-import { IterableProperties } from "./tags.js"
+
+/* IterableProperties can't be correctly typed in TS right now, either the declaratiin
+  works for retrieval (the getter), or it works for assignments (the setter), but there's
+  no TS syntax that permits correct type-checking at present.
+
+  Ideally, it would be:
+
+  type IterableProperties<IP> = {
+    get [K in keyof IP](): AsyncExtraIterable<IP[K]> & IP[K]
+    set [K in keyof IP](v: IP[K])
+  }
+  See https://github.com/microsoft/TypeScript/issues/43826
+
+  We choose the following type description to avoid the issues above. Because the AsyncExtraIterable
+  is Partial it can be omitted from assignments:
+    this.prop = value;  // Valid, as long as valus has the same type as the prop
+  ...and when retrieved it will be the value type, and optionally the async iterator:
+    Div(this.prop) ; // the value
+    this.prop.map!(....)  // the iterator (not the trailing '!' to assert non-null value)
+
+  This relies on a hack to `wrapAsyncHelper` in iterators.ts when *accepts* a Partial<AsyncIterator>
+  but casts it to a AsyncIterator before use.
+
+  The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
+  By default, the currently implementation does a one-level deep mapping, so an iterable property 'obj' is itself
+  iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
+  iterable, but it's membetrs are just POJS values.
+*/
+
+export const Iterability = Symbol("Iterability");
+export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
+export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
+export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
+  [K in keyof Omit<IP,typeof Iterability>]: IterableType<IP[K]>
+} : {
+  [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>
+}
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
@@ -130,9 +166,6 @@ declare global {
    This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
 
-export const Iterability = Symbol("Iterability");
-export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
-
 export function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
@@ -162,11 +195,13 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
 
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
   function lazyAsyncMethod<M extends keyof typeof asyncExtras>(method: M) {
-    return function(this: unknown, ...args: any[]) {
+    return {
+      [method]:function (this: unknown, ...args: any[]) {
       initIterator();
       // @ts-ignore - Fix
       return a[method].apply(this, args);
-    } as (typeof asyncExtras)[M];
+      } as (typeof asyncExtras)[M]
+    }[method];
   }
 
   type HelperDescriptors<T> = {
