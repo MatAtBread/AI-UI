@@ -274,7 +274,7 @@ const files = new Set(process.argv.slice(2).filter(exclusions));
 let dirs = process.argv.slice(2).filter(p => !p.startsWith('-') && existsSync(p) && lstatSync(p).isDirectory());
 if (dirs.length + files.size === 0) dirs = ['../testing/tests'];
 const foundFiles = dirs.map(dir => readdirSync(path.join(__dirname, dir)).map(file => path.join(__dirname, dir, file))).flat().filter(exclusions);
-foundFiles.forEach(file => files.add(file));
+foundFiles.forEach(file => files.add(path.relative(process.cwd(),file).split('\\').join('\/')));
 
 (async () => {
   let failed: string[] = [];
