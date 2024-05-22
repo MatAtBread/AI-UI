@@ -1,9 +1,9 @@
 /// <reference path="../test.env.d.ts"/>
 
 import { Iterators } from '../../module/src/ai-ui';
-export {};
+export { };
 
-const o = Iterators.defineIterableProperty({ o:'obj' }, 'it', { n: 1, s: 'a' });
+let o = Iterators.defineIterableProperty({ o: 'obj' }, 'it', { n: 1, s: 'a' });
 o.it.consume!(x => console.log("o", x));
 o.it.n.consume!(x => console.log("n", x));
 o.it.s.consume!(x => console.log("s", x));

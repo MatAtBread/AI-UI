@@ -1,4 +1,13 @@
-import { IterableProperties } from "./tags.js";
+export declare const Iterability: unique symbol;
+export type Iterability<Depth extends 'shallow' = 'shallow'> = {
+    [Iterability]: Depth;
+};
+export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
+export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
+    [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>;
+} : {
+    [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>;
+};
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
     push(value: T): boolean;
 }
@@ -11,7 +20,7 @@ export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
 type AsyncIterableHelpers = typeof asyncExtras;
 declare const asyncExtras: {
-    filterMap: typeof filterMap;
+    filterMap<U extends Partial<AsyncIterable<any>>, R>(this: U, fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;
     map: typeof map;
     filter: typeof filter;
     unique: typeof unique;
@@ -34,10 +43,6 @@ declare global {
         };
     }
 }
-export declare const Iterability: unique symbol;
-export type Iterability<Depth extends 'shallow' = 'shallow'> = {
-    [Iterability]: Depth;
-};
 export declare function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>>;
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;

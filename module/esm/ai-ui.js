@@ -57,11 +57,12 @@ export const tag = function (_1, _2, _3) {
       tag(namespace | null, tags[])                   [string | null, string[]]
       tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
     */
-    const [nameSpace, tags, commonProperties] = (typeof _1 === 'string') || _1 === null
+    const [nameSpace, tags, options] = (typeof _1 === 'string') || _1 === null
         ? [_1, _2, _3]
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
+    const commonProperties = options?.commonProperties;
     /* Note: we use property defintion (and not object spread) so getters (like `ids`)
       are not evaluated until called */
     const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
@@ -292,7 +293,7 @@ export const tag = function (_1, _2, _3) {
     }
     function unbox(a) {
         const v = a?.valueOf();
-        return Array.isArray(v) ? v.map(unbox) : v;
+        return Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v;
     }
     function assignProps(base, props) {
         // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
@@ -302,18 +303,20 @@ export const tag = function (_1, _2, _3) {
                     return;
                 // static props before getters/setters
                 const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
-                sourceEntries.sort((a, b) => {
-                    const desc = Object.getOwnPropertyDescriptor(d, a[0]);
-                    if (desc) {
-                        if ('value' in desc)
-                            return -1;
-                        if ('set' in desc)
-                            return 1;
-                        if ('get' in desc)
-                            return 0.5;
-                    }
-                    return 0;
-                });
+                if (!Array.isArray(s)) {
+                    sourceEntries.sort((a, b) => {
+                        const desc = Object.getOwnPropertyDescriptor(d, a[0]);
+                        if (desc) {
+                            if ('value' in desc)
+                                return -1;
+                            if ('set' in desc)
+                                return 1;
+                            if ('get' in desc)
+                                return 0.5;
+                        }
+                        return 0;
+                    });
+                }
                 for (const [k, srcDesc] of sourceEntries) {
                     try {
                         if ('value' in srcDesc) {

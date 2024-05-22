@@ -1,5 +1,5 @@
 import type { TagCreator } from '../module/src/ai-ui';
-import { IterableType } from '../module/src/tags';
+import { IterableType } from '../module/src/iterators';
 
 export type AssertEqual<T, Expected> = [T] extends [Expected]
   ? [Expected] extends [T]
