@@ -360,7 +360,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
   function unbox(a: unknown): unknown {
     const v = a?.valueOf();
-    return Array.isArray(v) ? v.map(unbox) : v;
+    return Array.isArray(v) ? Array.prototype.map.call(v,unbox) : v;
   }
 
   function assignProps(base: Element, props: Record<string, any>) {
@@ -371,15 +371,17 @@ export const tag = <TagLoader>function <Tags extends string,
           return;
         // static props before getters/setters
         const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
-        sourceEntries.sort((a,b) => {
-          const desc = Object.getOwnPropertyDescriptor(d,a[0]);
-          if (desc) {
-            if ('value' in desc) return -1;
-            if ('set' in desc) return 1;
-            if ('get' in desc) return 0.5;
-          }
-          return 0;
-        });
+        if (!Array.isArray(s)) {
+          sourceEntries.sort((a,b) => {
+            const desc = Object.getOwnPropertyDescriptor(d,a[0]);
+            if (desc) {
+              if ('value' in desc) return -1;
+              if ('set' in desc) return 1;
+              if ('get' in desc) return 0.5;
+            }
+            return 0;
+          });
+        }
         for (const [k, srcDesc] of sourceEntries) {
           try {
             if ('value' in srcDesc) {

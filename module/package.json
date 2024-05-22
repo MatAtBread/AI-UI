@@ -13,6 +13,17 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   },
+  "engines": {
+    "node": ">=16.13.2"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/ai-ui.mjs",
+      "require": "./dist/ai-ui.cjs",
+      "types": "./esm/ai-ui.d.ts",
+      "default": "./esm/ai-ui.js"
+    }
+  },
   "homepage": "https://github.com/MatAtBread/AI-UI#readme",
   "keywords": [
     "UI",
@@ -25,14 +36,6 @@
   ],
   "license": "MIT",
   "main": "./esm/ai-ui.js",
-  "exports": {
-    ".": {
-      "types": "./esm/ai-ui.d.ts",
-      "import": "./dist/ai-ui.mjs",
-      "require": "./dist/ai-ui.cjs",
-      "default": "./esm/ai-ui.js"
-    }
-  },
   "name": "@matatbread/ai-ui",
   "repository": {
     "type": "git",
@@ -42,7 +45,7 @@
     "clean": "rm -rf dist/* esm/*",
     "build": "npm run clean && (npm run build-esm & npm run build-dev-mjs & npm run build-min-mjs & npm run build-dev-cjs & npm run build-min-cjs & npm run build-dev-script & npm run build-min-script & npm run build-jsx)",
 
-    "build-esm": "tsc -p tsconfig.json",
+    "build-esm": "tsc -p tsconfig.json && printf '\\nFinished building .d.ts files\\n'",
     "build-dev-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.mjs --bundle --platform=neutral --target=es2020 --sourcemap=inline",
     "build-min-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.min.mjs --bundle --platform=neutral --target=es2020 --minify",
     "build-dev-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.js --bundle --target=es2020 --sourcemap=inline",
@@ -57,6 +60,7 @@
     "tests": "ts-node ../testing/index.ts",
     "examples": "npx http-server .. -c0 -e js"
   },
+  "type": "module",
   "types": "./esm/ai-ui.d.ts",
   "version": "0.12.1"
 }

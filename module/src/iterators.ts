@@ -1,6 +1,42 @@
 import { DEBUG, console } from "./debug.js"
 import { DeferredPromise, deferred } from "./deferred.js"
-import { IterableProperties } from "./tags.js"
+
+/* IterableProperties can't be correctly typed in TS right now, either the declaratiin
+  works for retrieval (the getter), or it works for assignments (the setter), but there's
+  no TS syntax that permits correct type-checking at present.
+
+  Ideally, it would be:
+
+  type IterableProperties<IP> = {
+    get [K in keyof IP](): AsyncExtraIterable<IP[K]> & IP[K]
+    set [K in keyof IP](v: IP[K])
+  }
+  See https://github.com/microsoft/TypeScript/issues/43826
+
+  We choose the following type description to avoid the issues above. Because the AsyncExtraIterable
+  is Partial it can be omitted from assignments:
+    this.prop = value;  // Valid, as long as valus has the same type as the prop
+  ...and when retrieved it will be the value type, and optionally the async iterator:
+    Div(this.prop) ; // the value
+    this.prop.map!(....)  // the iterator (not the trailing '!' to assert non-null value)
+
+  This relies on a hack to `wrapAsyncHelper` in iterators.ts when *accepts* a Partial<AsyncIterator>
+  but casts it to a AsyncIterator before use.
+
+  The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
+  By default, the currently implementation does a one-level deep mapping, so an iterable property 'obj' is itself
+  iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
+  iterable, but it's membetrs are just POJS values.
+*/
+
+export const Iterability = Symbol("Iterability");
+export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
+export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
+export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
+  [K in keyof Omit<IP,typeof Iterability>]: IterableType<IP[K]>
+} : {
+  [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>
+}
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
@@ -49,6 +85,8 @@ const asyncExtras = {
     return combine(Object.assign({ '_this': this }, others));
   }
 };
+
+const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)] as (keyof typeof asyncExtras)[];
 
 export function queueIteratableIterator<T>(stop = () => { }) {
   let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
@@ -128,9 +166,6 @@ declare global {
    This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
 
-export const Iterability = Symbol("Iterability");
-export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
-
 export function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
@@ -146,8 +181,8 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
       writable: false
     };
     push = bi.push;
-    Object.keys(asyncExtras).forEach(k =>
-      extras[k as keyof typeof extras] = {
+    extraKeys.forEach(k =>
+      extras[k] = {
         // @ts-ignore - Fix
         value: b[k as keyof typeof b],
         enumerable: false,
@@ -160,11 +195,13 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
 
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
   function lazyAsyncMethod<M extends keyof typeof asyncExtras>(method: M) {
-    return function(this: unknown, ...args: any[]) {
+    return {
+      [method]:function (this: unknown, ...args: any[]) {
       initIterator();
       // @ts-ignore - Fix
-      return a[method].call(this, ...args);
-    } as (typeof asyncExtras)[M];
+      return a[method].apply(this, args);
+      } as (typeof asyncExtras)[M]
+    }[method];
   }
 
   type HelperDescriptors<T> = {
@@ -181,7 +218,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
     }
   } as HelperDescriptors<V>;
 
-  (Object.keys(asyncExtras) as (keyof typeof asyncExtras)[]).forEach((k) =>
+  extraKeys.forEach((k) =>
     extras[k] = {
       enumerable: false,
       writable: true,
@@ -268,12 +305,17 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
               console.info('(AI-UI)', `The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
             if (Array.isArray(a))
               boxedObject = Object.defineProperties([...a] as V, pds);
+              // @ts-ignore
+              // boxedObject = [...a] as V;
             else
               boxedObject = Object.defineProperties({ ...(a as V) }, pds);
+            // @ts-ignore
+              // boxedObject = { ...(a as V) };
           } else {
             Object.assign(boxedObject, a);
           }
           if (boxedObject[Iterability] === 'shallow') {
+            boxedObject = Object.defineProperties(boxedObject, pds);
             /*
             BROKEN: fails nested properties
             Object.defineProperty(boxedObject, 'valueOf', {
@@ -287,7 +329,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
           }
           // else proxy the result so we can track members of the iterable object
 
-          return new Proxy(boxedObject, {
+          const extraBoxed: typeof boxedObject = new Proxy(boxedObject, {
             // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
             set(target, key, value, receiver) {
               if (Reflect.set(target, key, value, receiver)) {
@@ -301,6 +343,17 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
             get(target, key, receiver) {
               if (key === 'valueOf')
                 return ()=>boxedObject;
+
+// @ts-ignore
+//const targetValue = key in target ? (target[key] as unknown) : Ignore;
+// @ts-ignore
+// window.console.log("***",key,targetValue,pds[key]);
+//               if (targetValue !== Ignore)
+//                   return targetValue;
+//               if (key in pds)
+//                 // @ts-ignore
+//                 return pds[key].value;
+
               const targetProp = Reflect.getOwnPropertyDescriptor(target,key);
               // We include `targetProp === undefined` so we can monitor nested properties that aren't actually defined (yet)
               // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
@@ -312,13 +365,16 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                   target[key] = undefined;
                 }
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
-                const props = Object.getOwnPropertyDescriptors(boxedObject.map((o,p) => {
-                  const ov = o?.[key as keyof typeof o]?.valueOf();
-                  const pv = p?.valueOf();
-                  if (typeof ov === typeof pv && ov == pv)
-                    return Ignore;
-                  return ov//o?.[key as keyof typeof o]
-                }));
+                const props = Object.getOwnPropertyDescriptors(
+                    boxedObject.map((o,p) => {
+//                  extraBoxed.map((o,p) => {
+                    const ov = o?.[key as keyof typeof o]?.valueOf();
+                    const pv = p?.valueOf();
+                    if (typeof ov === typeof pv && ov == pv)
+                      return Ignore;
+                    return ov//o?.[key as keyof typeof o]
+                  })
+                );
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
                 // @ts-ignore - Fix
                 return box(realValue, props);
@@ -326,6 +382,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
               return Reflect.get(target, key, receiver);
             },
           });
+          return extraBoxed;
         }
         return a as (V & AsyncExtraIterable<V>);
       case 'bigint':
@@ -494,8 +551,7 @@ export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions
 
 function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
   return isAsyncIterable(i)
-    && Object.keys(asyncExtras)
-      .every(k => (k in i) && (i as any)[k] === asyncExtras[k as keyof AsyncIterableHelpers]);
+    && extraKeys.every(k => (k in i) && (i as any)[k] === asyncExtras[k]);
 }
 
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
@@ -507,7 +563,6 @@ export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncE
         )
       )
     );
-    //Object.assign(ai, asyncExtras);
   }
   return ai as A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> : never
 }

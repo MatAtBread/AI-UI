@@ -1,4 +1,4 @@
-import type { AsyncExtraIterable, AsyncProvider, Ignore, Iterability } from "./iterators.js";
+import type { AsyncProvider, Ignore, IterableProperties } from "./iterators.js";
 export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
 export type PossiblyAsync<X> = [
@@ -38,12 +38,6 @@ export type DeepFlatten<O> = [
         [K in keyof O]: Flatten<O[K]>;
     }
 ][number];
-export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
-export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
-    [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>;
-} : {
-    [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>;
-};
 type OptionalIterablePropertyValue = (string | number | bigint | boolean | undefined | null) | (object & {
     splice?: never;
 });

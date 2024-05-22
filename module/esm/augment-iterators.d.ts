@@ -1,4 +1,4 @@
-import { AsyncExtraIterable } from './iterators.js';
+import type { AsyncExtraIterable } from './iterators.js';
 export * from './iterators.js';
 export {};
 declare global {
