@@ -1,7 +1,7 @@
 import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { ChildTags, Constructed, Instance, Overrides, TagCreator, UniqueID } from './tags.js'
+import { ChildTags, Constructed, Instance, Overrides, TagCreator, TagCreatorFunction, UniqueID } from './tags.js'
 import { DEBUG, console, timeOutWarn } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
@@ -11,7 +11,7 @@ export * as Iterators from './iterators.js';
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
-type TagFunctionOptions<OtherMembers extends {} = {}> = { 
+type TagFunctionOptions<OtherMembers extends {} = {}> = {
   commonProperties: OtherMembers
 }
 
@@ -19,6 +19,19 @@ type TagFunctionOptions<OtherMembers extends {} = {}> = {
 interface PoElementMethods {
   get ids(): {}
   when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
+}
+
+// Support for https://www.npmjs.com/package/htm (or import htm from 'https://unpkg.com/htm/dist/htm.module.js')
+// Note: same signature as React.createElement
+export interface CreateElement {
+  // Support for htm, JSX, etc
+  createElement(
+    // "name" can a HTML tag string, an existing node (just returns itself), or a tag function
+    name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap,
+    // The attributes used to initialise the node (if a string or function - ignore if it's already a node)
+    attrs: any,
+    // The children
+    ...children: ChildTags[]): Node;
 }
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
@@ -43,12 +56,13 @@ interface TagLoader {
         tags(['div','button'], { myThing() {} })
         tags('http://namespace',['Foreign'], { isForeign: true })
   */
-  <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(tags: Tags[], options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> }
-  <Tags extends string, Q extends {}>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): { [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement> }
-  <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>>
+
+  <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(tags: Tags[], options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends string, Q extends {}>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): { [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement> } & CreateElement
+  <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement
 }
 
 let idCount = 0;
@@ -671,11 +685,25 @@ export const tag = <TagLoader>function <Tags extends string,
     return extendTag;
   }
 
-  const baseTagCreators: {
+  // @ts-ignore
+  const baseTagCreators: CreateElement & {
     [K in keyof HTMLElementTagNameMap]?: TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>
   } & {
     [n: string]: TagCreator<Q & Element & PoElementMethods>
-  } = {}
+  } = {
+    createElement(
+      name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap,
+      attrs: any,
+      ...children: ChildTags[]): Node {
+        return (name === baseTagCreators.createElement ? nodes(...children)
+          : typeof name === 'function' ? name(attrs, children)
+          : typeof name === 'string' && name in baseTagCreators ?
+          // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
+          baseTagCreators[name](attrs, children)
+          : name instanceof Node ? name
+          : DyamicElementError({ error: new Error("Illegal type in createElement:" + name)})) as Node
+      }
+  }
 
   function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>;
   function createTag<E extends Element>(k: string): TagCreator<Q & E & PoElementMethods>;
@@ -803,5 +831,3 @@ export function getElementIdMap(node?: Element | Document, ids?: Record<string, 
   }
   return ids;
 }
-
-

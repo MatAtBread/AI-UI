@@ -1,9 +1,7 @@
 "use strict";
 import { tag } from "./ai-ui.js";
 const baseTags = tag();
-const AIUIJSX = (tagName, attrs, ...children) => {
-  return tagName === AIUIJSX ? children : tagName instanceof Function ? tagName(attrs, ...children) : baseTags[tagName](attrs, ...children);
-};
+const AIUIJSX = baseTags.createElement;
 function sterilise(attrs) {
   const childless = { ...attrs };
   delete childless.children;
