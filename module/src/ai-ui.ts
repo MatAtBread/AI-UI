@@ -1,13 +1,15 @@
 import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { ChildTags, Constructed, Instance, Overrides, TagCreator, TagCreatorFunction, UniqueID } from './tags.js'
+import { ChildTags, Constructed, Instance, Overrides, TagCreator, TagCreatorFunction } from './tags.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js'
 export * as Iterators from './iterators.js';
+
+export const UniqueID = Symbol("Unique ID");
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */

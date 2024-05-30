@@ -1,5 +1,4 @@
-import type { Instance, TagCreator } from '../module/src/ai-ui';
-import { UniqueID } from '../module/src/tags';
+import { type Instance, type TagCreator, UniqueID } from '../module/src/ai-ui';
 
 export type AssertEqual<T, Expected> = [T] extends [Expected]
     ? [Expected] extends [T]

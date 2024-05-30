@@ -5,11 +5,11 @@
   },
   "description": "A tiny, genuinely functional UI framework for building dynamic HTML pages",
   "devDependencies": {
-    "@types/node": "^20.11.24",
+    "@types/node": "^20.12.13",
     "colors": "^1.4.0",
-    "esbuild": "^0.21.2",
-    "jsdom": "^24.0.0",
-    "ts-loader": "^9.5.0",
+    "esbuild": "^0.21.4",
+    "jsdom": "^24.1.0",
+    "ts-loader": "^9.5.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   },
@@ -44,7 +44,6 @@
   "scripts": {
     "clean": "rm -rf dist/* esm/*",
     "build": "npm run clean && (npm run build-esm & npm run build-dev-mjs & npm run build-min-mjs & npm run build-dev-cjs & npm run build-min-cjs & npm run build-dev-script & npm run build-min-script & npm run build-jsx)",
-
     "build-esm": "tsc -p tsconfig.json && printf '\\nFinished building .d.ts files\\n'",
     "build-dev-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.mjs --bundle --platform=neutral --target=es2020 --sourcemap=inline",
     "build-min-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.min.mjs --bundle --platform=neutral --target=es2020 --minify",
@@ -53,8 +52,6 @@
     "build-dev-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.cjs --bundle --target=es2020 --sourcemap=inline",
     "build-min-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.min.cjs --bundle --target=es2020 --minify",
     "build-jsx": "esbuild src/jsx-runtime.ts --outfile=esm/jsx-runtime --platform=neutral --target=es2020 && cp esm/jsx-runtime dist/jsx-runtime",
-
-
     "prepublishOnly": "npm run build && npm test",
     "test": "tsc -p ../type_tests/tsconfig.json && npm run tests --",
     "tests": "ts-node ../testing/index.ts",
@@ -62,5 +59,5 @@
   },
   "type": "module",
   "types": "./esm/ai-ui.d.ts",
-  "version": "0.13.0"
+  "version": "0.13.1"
 }

@@ -14,5 +14,5 @@ export function deferred() {
     return promise;
 }
 export function isPromiseLike(x) {
-    return x !== null && x !== undefined && typeof x.then === 'function';
+    return x && typeof x === 'object' && ('then' in x) && typeof x.then === 'function';
 }

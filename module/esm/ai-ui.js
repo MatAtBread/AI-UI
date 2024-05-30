@@ -1,11 +1,11 @@
 import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
 import { when } from './when.js';
-import { UniqueID } from './tags.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
+export const UniqueID = Symbol("Unique ID");
 let idCount = 0;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
