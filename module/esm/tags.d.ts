@@ -1,4 +1,5 @@
 import type { AsyncProvider, Ignore, IterableProperties } from "./iterators.js";
+import type { UniqueID } from "./ai-ui.js";
 export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
 export type PossiblyAsync<X> = [
@@ -9,7 +10,6 @@ export type PossiblyAsync<X> = [
 type DeepPartial<X> = [X] extends [object] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;
-export declare const UniqueID: unique symbol;
 export type Instance<T = {}> = {
     [UniqueID]: string;
 } & T;

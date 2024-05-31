@@ -1,8 +1,9 @@
 import { WhenParameters, WhenReturn } from './when.js';
-import { ChildTags, TagCreator, TagCreatorFunction, UniqueID } from './tags.js';
+import { ChildTags, TagCreator, TagCreatorFunction } from './tags.js';
 export { when } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js';
 export * as Iterators from './iterators.js';
+export declare const UniqueID: unique symbol;
 type TagFunctionOptions<OtherMembers extends {} = {}> = {
     commonProperties: OtherMembers;
 };

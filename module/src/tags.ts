@@ -3,6 +3,7 @@
 */
 
 import type { AsyncProvider, Ignore, IterableProperties } from "./iterators.js";
+import type { UniqueID } from "./ai-ui.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
@@ -27,7 +28,6 @@ export type PossiblyAsync<X> =
 
 type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
-export const UniqueID = Symbol("Unique ID");
 export type Instance<T = {}> = { [UniqueID]: string } & T;
 
 // Internal types supporting TagCreator
