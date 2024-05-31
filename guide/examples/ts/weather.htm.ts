@@ -155,7 +155,7 @@ const App = div.extended({
       The WeatherForecast is a Chart plus a `geo` attribute that is updated automatically
       from the Location.geo AsyncIterable.
     */
-    const location = Location();
+    const location = html`<${Location} />`;
     return html`
       <!-- Just a reference to the local Location element: no angle brackets -->
       ${location}
