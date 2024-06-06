@@ -1,5 +1,5 @@
 import { DEBUG, console } from "./debug.js";
-import { deferred } from "./deferred.js";
+import { deferred, isPromiseLike } from "./deferred.js";
 /* IterableProperties can't be correctly typed in TS right now, either the declaratiin
   works for retrieval (the getter), or it works for assignments (the setter), but there's
   no TS syntax that permits correct type-checking at present.
@@ -491,6 +491,21 @@ async function consume(f) {
 }
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
+function resolveSync(v, then, except) {
+    if (except) {
+        if (isPromiseLike(v))
+            return v.then(then, except);
+        try {
+            return then(v);
+        }
+        catch (ex) {
+            throw ex;
+        }
+    }
+    if (isPromiseLike(v))
+        return v.then(then);
+    return then(v);
+}
 export function filterMap(source, fn, initialValue = Ignore) {
     let ai;
     let prev = Ignore;
@@ -509,7 +524,7 @@ export function filterMap(source, fn, initialValue = Ignore) {
                     ai = source[Symbol.asyncIterator]();
                 ai.next(...args).then(p => p.done
                     ? resolve(p)
-                    : Promise.resolve(fn(p.value, prev)).then(f => f === Ignore
+                    : resolveSync(fn(p.value, prev), f => f === Ignore
                         ? step(resolve, reject)
                         : resolve({ done: false, value: prev = f }), ex => {
                         // The filter function failed...

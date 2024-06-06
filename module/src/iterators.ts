@@ -1,5 +1,5 @@
 import { DEBUG, console } from "./debug.js"
-import { DeferredPromise, deferred } from "./deferred.js"
+import { DeferredPromise, deferred, isPromiseLike } from "./deferred.js"
 
 /* IterableProperties can't be correctly typed in TS right now, either the declaratiin
   works for retrieval (the getter), or it works for assignments (the setter), but there's
@@ -591,7 +591,7 @@ async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: H
   await last;
 }
 
-type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => R | PromiseLike<R | typeof Ignore>);
+type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>);
 type MaybePromised<T> = PromiseLike<T> | T;
 
 /* A general filter & mapper that can handle exceptions & returns */
@@ -599,8 +599,19 @@ export const Ignore = Symbol("Ignore");
 
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
+function resolveSync<Z,R>(v: MaybePromised<Z>, then:(v:Z)=>R, except?:(x:any)=>any): MaybePromised<R> {
+  if (except) {
+    if (isPromiseLike(v))
+      return v.then(then,except);
+    try { return then(v) } catch (ex) { throw ex }
+  }
+  if (isPromiseLike(v))
+    return v.then(then);
+  return then(v);
+}
+
 export function filterMap<U extends PartialIterable, R>(source: U,
-  fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
+  fn: Mapper<HelperAsyncIterable<U>, R>,
   initialValue: R | typeof Ignore = Ignore
 ): AsyncExtraIterable<R> {
   let ai: AsyncIterator<HelperAsyncIterable<U>>;
@@ -623,7 +634,7 @@ export function filterMap<U extends PartialIterable, R>(source: U,
         ai.next(...args).then(
           p => p.done
             ? resolve(p)
-            : Promise.resolve(fn(p.value, prev)).then(
+            : resolveSync(fn(p.value, prev),
               f => f === Ignore
                 ? step(resolve, reject)
                 : resolve({ done: false, value: prev = f }),
