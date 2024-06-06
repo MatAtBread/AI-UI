@@ -599,9 +599,14 @@ export const Ignore = Symbol("Ignore");
 
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
-function resolveSync<Z,R>(v: MaybePromised<Z>, then:(v:Z)=>R, except:(x:any)=>any) {
+function resolveSync<Z,R>(v: MaybePromised<Z>, then:(v:Z)=>R, except?:(x:any)=>any): MaybePromised<R> {
+  if (except) {
+    if (isPromiseLike(v))
+      return v.then(then,except);
+    try { return then(v) } catch (ex) { throw ex }
+  }
   if (isPromiseLike(v))
-    return v.then(then,except);
+    return v.then(then);
   return then(v);
 }
 
@@ -629,7 +634,7 @@ export function filterMap<U extends PartialIterable, R>(source: U,
         ai.next(...args).then(
           p => p.done
             ? resolve(p)
-            : resolveSync(fn(p.value, prev), 
+            : resolveSync(fn(p.value, prev),
               f => f === Ignore
                 ? step(resolve, reject)
                 : resolve({ done: false, value: prev = f }),

@@ -492,8 +492,18 @@ async function consume(f) {
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 function resolveSync(v, then, except) {
+    if (except) {
+        if (isPromiseLike(v))
+            return v.then(then, except);
+        try {
+            return then(v);
+        }
+        catch (ex) {
+            throw ex;
+        }
+    }
     if (isPromiseLike(v))
-        return v.then(then, except);
+        return v.then(then);
     return then(v);
 }
 export function filterMap(source, fn, initialValue = Ignore) {
