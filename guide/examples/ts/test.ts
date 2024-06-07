@@ -1,6 +1,5 @@
-import { tag } from '../../../module/esm/ai-ui.js';
+import { UniqueID, tag } from '../../../module/esm/ai-ui.js';
 import { iterableHelpers, queueIteratableIterator } from '../../../module/esm/iterators.js'
-import { UniqueID } from '../../../module/esm/tags.js';
 
 const { div, h2, input, span, pre, button } = tag();
 
