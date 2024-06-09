@@ -34,7 +34,6 @@ function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
         || typeof x === 'boolean'
-        || typeof x === 'function'
         || x instanceof Node
         || x instanceof NodeList
         || x instanceof HTMLCollection
@@ -44,7 +43,7 @@ function isChildTag(x) {
         || Array.isArray(x)
         || isPromiseLike(x)
         || isAsyncIter(x)
-        || typeof x[Symbol.iterator] === 'function';
+        || (typeof x === 'object' && Symbol.iterator in x && typeof x[Symbol.iterator] === 'function');
 }
 /* tag */
 const callStackSymbol = Symbol('callStack');
@@ -110,6 +109,11 @@ export const tag = function (_1, _2, _3) {
                 appended.push(c);
                 return;
             }
+            if (c && typeof c === 'object' && Symbol.iterator in c && c[Symbol.iterator]) {
+                for (const d of c)
+                    children(d);
+                return;
+            }
             if (isAsyncIter(c)) {
                 const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
                 const ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
@@ -160,11 +164,6 @@ export const tag = function (_1, _2, _3) {
                     }
                 };
                 ap.next().then(update).catch(error);
-                return;
-            }
-            if (typeof c === 'object' && c?.[Symbol.iterator]) {
-                for (const d of c)
-                    children(d);
                 return;
             }
             appended.push(document.createTextNode(c.toString()));

@@ -28,6 +28,7 @@ import { deferred, isPromiseLike } from "./deferred.js";
   iterable, but it's membetrs are just POJS values.
 */
 export const Iterability = Symbol("Iterability");
+// NB: This also (incorrectly) passes sync iterators, as the protocol names are the same
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
 }

@@ -45,6 +45,7 @@ export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
 
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers { }
 
+// NB: This also (incorrectly) passes sync iterators, as the protocol names are the same
 export function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
   return typeof o?.next === 'function'
 }
