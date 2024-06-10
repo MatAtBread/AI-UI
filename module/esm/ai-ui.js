@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
+import { Ignore, asyncIterator, augmentGlobalAsyncGenerators, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 /* Export useful stuff for users of the bundled code */
@@ -109,7 +109,12 @@ export const tag = function (_1, _2, _3) {
                 appended.push(c);
                 return;
             }
-            if (c && typeof c === 'object' && Symbol.iterator in c && c[Symbol.iterator]) {
+            // We have an interesting case here where an iterable String is an object with both Symbol.iterator
+            // (inherited from the String prototype) and Symbol.asyncIterator (as it's been augmented by boxed())
+            // but we're only interested in cases like HTMLCollection, NodeList, array, etc., not the fukny ones
+            // It used to be after the isAsyncIter() test, but a non-AsyncIterator *may* also be a sync iterable
+            // For now, we exclude (Symbol.asyncIterator in c) in this case.
+            if (c && typeof c === 'object' && Symbol.iterator in c && !(Symbol.asyncIterator in c) && c[Symbol.iterator]) {
                 for (const d of c)
                     children(d);
                 return;
@@ -203,7 +208,7 @@ export const tag = function (_1, _2, _3) {
             appender, // Legacy RTA support
             nodes, // Preferred interface instead of `appender`
             UniqueID,
-            augmentGlobalAsyncGenerators
+            augmentGlobalAsyncGenerators // We should probably deprecate this from this location. It should be referenced directly.
         });
     }
     /** Just deep copy an object */
@@ -649,20 +654,6 @@ const DomPromiseContainer = () => {
 const DyamicElementError = ({ error }) => {
     return document.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
 };
-export function augmentGlobalAsyncGenerators() {
-    let g = (async function* () { })();
-    while (g) {
-        const desc = Object.getOwnPropertyDescriptor(g, Symbol.asyncIterator);
-        if (desc) {
-            iterableHelpers(g);
-            break;
-        }
-        g = Object.getPrototypeOf(g);
-    }
-    if (!g) {
-        console.warn("Failed to augment the prototype of `(async function*())()`");
-    }
-}
 export let enableOnRemovedFromDOM = function () {
     enableOnRemovedFromDOM = function () { }; // Only create the observer once
     new MutationObserver(function (mutations) {

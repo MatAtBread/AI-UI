@@ -1,4 +1,4 @@
-import { augmentGlobalAsyncGenerators } from './ai-ui.js';
+import { augmentGlobalAsyncGenerators } from './iterators.js';
 import type { AsyncExtraIterable } from './iterators.js';
 export * from './iterators.js';
 

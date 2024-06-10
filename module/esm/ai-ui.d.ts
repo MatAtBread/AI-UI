@@ -38,6 +38,5 @@ interface TagLoader {
     <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement;
 }
 export declare const tag: TagLoader;
-export declare function augmentGlobalAsyncGenerators(): void;
 export declare let enableOnRemovedFromDOM: () => void;
 export declare function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>): Record<string, Element>;

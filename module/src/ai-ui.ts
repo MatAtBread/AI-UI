@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
+import { Ignore, asyncIterator, augmentGlobalAsyncGenerators, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Constructed, Instance, Overrides, TagCreator, TagCreatorFunction } from './tags.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
@@ -195,7 +195,12 @@ export const tag = <TagLoader>function <Tags extends string,
         return;
       }
 
-      if (c && typeof c === 'object' && Symbol.iterator in c && c[Symbol.iterator]) {
+      // We have an interesting case here where an iterable String is an object with both Symbol.iterator
+      // (inherited from the String prototype) and Symbol.asyncIterator (as it's been augmented by boxed())
+      // but we're only interested in cases like HTMLCollection, NodeList, array, etc., not the fukny ones
+      // It used to be after the isAsyncIter() test, but a non-AsyncIterator *may* also be a sync iterable
+      // For now, we exclude (Symbol.asyncIterator in c) in this case.
+      if (c && typeof c === 'object' && Symbol.iterator in c && !(Symbol.asyncIterator in c) && c[Symbol.iterator]) {
         for (const d of c) children(d);
         return;
       }
@@ -293,7 +298,7 @@ export const tag = <TagLoader>function <Tags extends string,
       appender, // Legacy RTA support
       nodes,    // Preferred interface instead of `appender`
       UniqueID,
-      augmentGlobalAsyncGenerators
+      augmentGlobalAsyncGenerators // We should probably deprecate this from this location. It should be referenced directly.
     });
   }
 
@@ -779,21 +784,6 @@ const DomPromiseContainer = () => {
 
 const DyamicElementError = ({ error }:{ error: Error | IteratorResult<Error>}) => {
   return document.createComment(error instanceof Error ? error.toString() : 'Error:\n'+JSON.stringify(error,null,2));
-}
-
-export function augmentGlobalAsyncGenerators() {
-  let g = (async function *(){})();
-  while (g) {
-    const desc = Object.getOwnPropertyDescriptor(g, Symbol.asyncIterator);
-    if (desc) {
-      iterableHelpers(g);
-      break;
-    }
-    g = Object.getPrototypeOf(g);
-  }
-  if (!g) {
-    console.warn("Failed to augment the prototype of `(async function*())()`");
-  }
 }
 
 export let enableOnRemovedFromDOM = function () {

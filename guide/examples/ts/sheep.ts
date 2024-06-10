@@ -12,9 +12,13 @@ const sleep = function <T>(millis: number, r?: T) {
 };
 
 async function* wander() {
-  while (1) {
-    await sleep(100);
-    yield;
+  try {
+    while (1) {
+      await sleep(100);
+      yield;
+    }
+  } finally {
+    console.log("Stopped wandering");
   }
 }
 
@@ -38,6 +42,7 @@ const COLLIDE_BOTTOM = 4;
 const COLLIDE_LEFT = 2;
 const COLLIDE_RIGHT = 1;
 
+type Point = {x: number, y: number};
 const Sprite = div.extended({
   override:{
     style: {
@@ -72,6 +77,36 @@ const Sheep = Sprite.extended({
     dead: false,
     penned: false
   },
+  declare:{
+    set moveBy({x,y}: Point) {
+      this.x -= x;
+      this.y -= y;
+    },
+    distance({x,y}: Point) {
+      return ((x - this.x) ** 2 + (y - this.y) ** 2) ** 0.5;
+    },
+    wander(dog: Point, penArea: DOMRect) {
+      if (this.penned.valueOf()) {
+        return { x:0, y: 0 }
+      } else {
+        const distance = this.distance(dog);
+        let x = Math.random() * 2 - 1 + Math.sign(dog.x - this.x) * 200 / distance;
+        let y = Math.random() * 2 - 1 + Math.sign(dog.y - this.y) * 200 / distance;
+        if (this.containedBy(penArea)) {
+          this.penned = true;
+          x = 0;
+          y = 0;
+        }
+        if (this.intersects(penArea)) {
+          if (x > 0) {
+            x = 0;
+          }
+          y = 0;
+        }
+        return {x,y}
+      }
+    }
+  },
   constructed() {
     this.x = 100 + Math.random() * 300;
     this.y = 100 + Math.random() * 300;
@@ -82,7 +117,7 @@ const Sheep = Sprite.extended({
 
 const Dog = Sprite.extended({
   constructed() {
-    mousePos.waitFor(done => setTimeout(done, 15)).consume(e => {
+    mousePos/*.waitFor(done => setTimeout(done, 15))*/.consume(e => {
       this.x = e.x - 10;
       this.y = e.y - 10;
     });
@@ -125,33 +160,26 @@ const SheepGame = div.extended({
     sheep: 1
   },
   constructed() {
-    const sheep = [...repeat(this.sheep, Sheep)];
-    this.when('#pen', '@ready')(() => {
+    this.when('#pen', '#dog', '@ready').consume(() => {
       const penArea = this.ids.pen.getBoundingClientRect();
-      wander().consume(() => {
-        for (const s of sheep) if (!s.dead.valueOf()) {
-          const distance = ((this.ids.dog.x - s.x)**2 + (this.ids.dog.y - s.y)**2)**0.5;
-          if (distance < 15)
+      const dog = this.ids.dog;
+
+      const sheep = [...repeat(this.sheep, Sheep)];
+      this.append(...sheep);
+
+      for (const s of sheep) {
+        wander().consume(() => {
+          const distance = s.distance(dog);
+          if (distance < 15) {
             s.dead = true;
-          else if (!s.penned.valueOf()) {
-            const dx = Math.random() * 2 - 1 + Math.sign(this.ids.dog.x - s.x) * 200 / distance;
-            const dy = Math.random() * 2 - 1 + Math.sign(this.ids.dog.y - s.y) * 200 / distance;
-            s.x -= dx;
-            s.y -= dy;
-            if (s.containedBy(penArea)) {
-              s.penned = true;
-            }
-            if (s.intersects(penArea)) {
-              if (dx > 0)
-                s.x += dx;
-              s.y += dy;
-            }
+            throw new Error("dead sheep");
           }
-        }
-      });
-    }).consume();
-    return [SheepPen({ id: 'pen' }), Dog({ id: 'dog' }), sheep]
+          s.moveBy = s.wander(dog, penArea);
+        })
+      };
+    });
+    return [SheepPen({ id: 'pen' }), Dog({ id: 'dog' })]
   }
 })
 
-document.body.append(SheepGame({ sheep: 3 }));
+document.body.append(SheepGame({ sheep: 2 }));

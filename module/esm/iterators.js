@@ -493,19 +493,15 @@ async function consume(f) {
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 function resolveSync(v, then, except) {
-    if (except) {
-        if (isPromiseLike(v))
-            return v.then(then, except);
-        try {
-            return then(v);
-        }
-        catch (ex) {
-            throw ex;
-        }
-    }
+    //return Promise.resolve(v).then(then,except);
     if (isPromiseLike(v))
-        return v.then(then);
-    return then(v);
+        return v.then(then, except);
+    try {
+        return then(v);
+    }
+    catch (ex) {
+        return except(ex);
+    }
 }
 export function filterMap(source, fn, initialValue = Ignore) {
     let ai;
@@ -616,4 +612,18 @@ function multi() {
         }
     };
     return iterableHelpers(mai);
+}
+export function augmentGlobalAsyncGenerators() {
+    let g = (async function* () { })();
+    while (g) {
+        const desc = Object.getOwnPropertyDescriptor(g, Symbol.asyncIterator);
+        if (desc) {
+            iterableHelpers(g);
+            break;
+        }
+        g = Object.getPrototypeOf(g);
+    }
+    if (!g) {
+        console.warn("Failed to augment the prototype of `(async function*())()`");
+    }
 }

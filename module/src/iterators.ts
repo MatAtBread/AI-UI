@@ -586,7 +586,7 @@ type HelperAsyncIterator<F, And = {}, Or = never> =
   ? T : never;
 
 async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: HelperAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
-  let last: unknown = undefined;
+  let last: undefined | void | PromiseLike<void> = undefined;
   for await (const u of this as AsyncIterable<HelperAsyncIterable<U>>)
     last = f?.(u);
   await last;
@@ -600,15 +600,11 @@ export const Ignore = Symbol("Ignore");
 
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
-function resolveSync<Z,R>(v: MaybePromised<Z>, then:(v:Z)=>R, except?:(x:any)=>any): MaybePromised<R> {
-  if (except) {
-    if (isPromiseLike(v))
-      return v.then(then,except);
-    try { return then(v) } catch (ex) { throw ex }
-  }
+function resolveSync<Z,R>(v: MaybePromised<Z>, then:(v:Z)=>R, except:(x:any)=>any): MaybePromised<R> {
+  //return Promise.resolve(v).then(then,except);
   if (isPromiseLike(v))
-    return v.then(then);
-  return then(v);
+    return v.then(then,except);
+  try { return then(v) } catch (ex) { return except(ex) }
 }
 
 export function filterMap<U extends PartialIterable, R>(source: U,
@@ -746,3 +742,19 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
   };
   return iterableHelpers(mai);
 }
+
+export function augmentGlobalAsyncGenerators() {
+  let g = (async function* () { })();
+  while (g) {
+    const desc = Object.getOwnPropertyDescriptor(g, Symbol.asyncIterator);
+    if (desc) {
+      iterableHelpers(g);
+      break;
+    }
+    g = Object.getPrototypeOf(g);
+  }
+  if (!g) {
+    console.warn("Failed to augment the prototype of `(async function*())()`");
+  }
+}
+

@@ -230,9 +230,20 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
 
     const missing = watchSelectors.filter(isMissing);
 
+    let events: AsyncIterator<any, any, undefined> | undefined = undefined;
     const ai: AsyncIterableIterator<any> = {
       [Symbol.asyncIterator]() { return ai },
+      throw(ex: any) {
+        if (events?.throw) return events.throw(ex);
+        return Promise.resolve({ done: true, value: ex });
+      },
+      return(v?: any) {
+        if (events?.return) return events.return(v);
+        return Promise.resolve({ done: true, value: v });
+      },
       async next() {
+        if (events) return events.next();
+
         await containerAndSelectorsMounted(container, missing);
 
         const merged = (iterators.length > 1)
@@ -241,17 +252,13 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
             ? iterators[0]
             : (neverGonnaHappen<WhenIteratedType<S>>());
 
-        // Now everything is ready, we simply defer all async ops to the underlying
-        // merged asyncIterator
-        const events = merged[Symbol.asyncIterator]();
-        if (events) {
-          ai.next = events.next.bind(events); //() => events.next();
-          ai.return = events.return?.bind(events);
-          ai.throw = events.throw?.bind(events);
+        // Now everything is ready, we simply delegate all async ops to the underlying
+        // merged asyncIterator "events"
+        events = merged[Symbol.asyncIterator]();
+        if (!events)
+          return { done: true, value: undefined };
 
-          return { done: false, value: {} };
-        }
-        return { done: true, value: undefined };
+        return { done: false, value: {} };
       }
     };
     return chainAsync(iterableHelpers(ai));
