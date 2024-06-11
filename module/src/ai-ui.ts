@@ -39,7 +39,7 @@ export interface CreateElement {
 /* The interface that creates a set of TagCreators for the specified DOM tags */
 interface TagLoader {
   /** @deprecated - Legacy function similar to Element.append/before/after */
-  appender(container: Node, before?: Node): (c: ChildTags) => (Node | (/*P &*/ (Element & PoElementMethods)))[];
+  appender(container: Node, before?: Node): (...c: Node[]) => (Node | (/*P &*/ (Element & PoElementMethods)))[];
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
   UniqueID: typeof UniqueID;
   augmentGlobalAsyncGenerators(): void;
@@ -178,7 +178,7 @@ export const tag = <TagLoader>function <Tags extends string,
           const n = nodes(r);
           const old = g;
           if (old[0].parentNode) {
-            appender(old[0].parentNode, old[0])(n);
+            appender(old[0].parentNode, old[0])(...n);
             old.forEach(e => e.parentNode?.removeChild(e));
           }
           g = n;
@@ -248,7 +248,8 @@ export const tag = <TagLoader>function <Tags extends string,
               }
               const q = nodes(unbox(es.value) as ChildTags);
               // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-              t = appender(n[0].parentNode!, n[0])(q.length ? q : DomPromiseContainer());
+              if (!q.length) q.push(DomPromiseContainer());
+              t = appender(n[0].parentNode!, n[0])(...q);
               n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
               ap.next().then(update).catch(error);
             } catch (ex) {
@@ -268,8 +269,8 @@ export const tag = <TagLoader>function <Tags extends string,
   function appender(container: Node, before?: Node | null) {
     if (before === undefined)
       before = null;
-    return function (c: ChildTags) {
-      const children = nodes(c);
+    return function (...children: Node[]) {
+      //const children = nodes(c);
       if (before) {
         // "before", being a node, could be #text node
         if (before instanceof Element) {
@@ -620,7 +621,7 @@ export const tag = <TagLoader>function <Tags extends string,
         for (const base of newCallStack) {
           const children = base?.constructed?.call(e);
           if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
-            appender(e)(children);
+            appender(e)(...nodes(children));
         }
         // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
         // so the full hierarchy gets to consume the initial state, unless they have been assigned
@@ -750,7 +751,7 @@ export const tag = <TagLoader>function <Tags extends string,
         assignProps(e, attrs);
 
         // Append any children
-        appender(e)(children);
+        appender(e)(...nodes(...children));
         return e;
       }
     }

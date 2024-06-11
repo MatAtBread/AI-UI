@@ -108,6 +108,11 @@ export function queueIteratableIterator(stop = () => { }) {
             }
             return Promise.reject(value);
         },
+        get length() {
+            if (!_items)
+                return -1; // The queue has no consumers and has terminated.
+            return _items.length;
+        },
         push(value) {
             if (!_pending) {
                 //throw new Error("queueIterator has stopped");

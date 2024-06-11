@@ -41,6 +41,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
   push(value: T): boolean;
+  readonly length: number;
 }
 
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers { }
@@ -131,6 +132,11 @@ export function queueIteratableIterator<T>(stop = () => { }) {
         _items = _pending = null;
       }
       return Promise.reject(value);
+    },
+
+    get length() {
+      if (!_items) return -1; // The queue has no consumers and has terminated.
+      return _items.length;
     },
 
     push(value: T) {

@@ -10,6 +10,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 };
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
     push(value: T): boolean;
+    readonly length: number;
 }
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers {
 }

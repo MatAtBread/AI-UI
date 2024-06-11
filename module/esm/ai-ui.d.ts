@@ -16,7 +16,7 @@ export interface CreateElement {
 }
 interface TagLoader {
     /** @deprecated - Legacy function similar to Element.append/before/after */
-    appender(container: Node, before?: Node): (c: ChildTags) => (Node | ((Element & PoElementMethods)))[];
+    appender(container: Node, before?: Node): (...c: Node[]) => (Node | ((Element & PoElementMethods)))[];
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];
     UniqueID: typeof UniqueID;
     augmentGlobalAsyncGenerators(): void;

@@ -93,7 +93,7 @@ export const tag = function (_1, _2, _3) {
                     const n = nodes(r);
                     const old = g;
                     if (old[0].parentNode) {
-                        appender(old[0].parentNode, old[0])(n);
+                        appender(old[0].parentNode, old[0])(...n);
                         old.forEach(e => e.parentNode?.removeChild(e));
                     }
                     g = n;
@@ -158,7 +158,9 @@ export const tag = function (_1, _2, _3) {
                             }
                             const q = nodes(unbox(es.value));
                             // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-                            t = appender(n[0].parentNode, n[0])(q.length ? q : DomPromiseContainer());
+                            if (!q.length)
+                                q.push(DomPromiseContainer());
+                            t = appender(n[0].parentNode, n[0])(...q);
                             n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
                             ap.next().then(update).catch(error);
                         }
@@ -178,8 +180,8 @@ export const tag = function (_1, _2, _3) {
     function appender(container, before) {
         if (before === undefined)
             before = null;
-        return function (c) {
-            const children = nodes(c);
+        return function (...children) {
+            //const children = nodes(c);
             if (before) {
                 // "before", being a node, could be #text node
                 if (before instanceof Element) {
@@ -520,7 +522,7 @@ export const tag = function (_1, _2, _3) {
                 for (const base of newCallStack) {
                     const children = base?.constructed?.call(e);
                     if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
-                        appender(e)(children);
+                        appender(e)(...nodes(children));
                 }
                 // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
                 // so the full hierarchy gets to consume the initial state, unless they have been assigned
@@ -626,7 +628,7 @@ export const tag = function (_1, _2, _3) {
                 deepDefine(e, tagPrototypes);
                 assignProps(e, attrs);
                 // Append any children
-                appender(e)(children);
+                appender(e)(...nodes(...children));
                 return e;
             }
         };
