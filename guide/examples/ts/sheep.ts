@@ -1,4 +1,4 @@
-import { tag } from '../../../module/esm/ai-ui.js';
+import { Iterators, tag } from '../../../module/esm/ai-ui.js';
 import { queueIteratableIterator } from '../../../module/esm/iterators.js'
 
 const { div } = tag();
@@ -37,12 +37,8 @@ function* repeat<T>(count: number, what: () => T) {
   while (count--) yield what();
 }
 
-const COLLIDE_TOP = 8;
-const COLLIDE_BOTTOM = 4;
-const COLLIDE_LEFT = 2;
-const COLLIDE_RIGHT = 1;
-
 type Point = {x: number, y: number};
+
 const Sprite = div.extended({
   override:{
     style: {
@@ -86,12 +82,14 @@ const Sheep = Sprite.extended({
       return ((x - this.x) ** 2 + (y - this.y) ** 2) ** 0.5;
     },
     wander(dog: Point, penArea: DOMRect) {
+      let x = Math.random() * 2 - 1;
+      let y = Math.random() * 2 - 1;
       if (this.penned.valueOf()) {
-        return { x:0, y: 0 }
+        return { x,y }
       } else {
         const distance = this.distance(dog);
-        let x = Math.random() * 2 - 1 + Math.sign(dog.x - this.x) * 200 / distance;
-        let y = Math.random() * 2 - 1 + Math.sign(dog.y - this.y) * 200 / distance;
+        x += Math.sign(dog.x - this.x) * 200 / distance;
+        y += Math.sign(dog.y - this.y) * 200 / distance;
         if (this.containedBy(penArea)) {
           this.penned = true;
           x = 0;
@@ -117,7 +115,7 @@ const Sheep = Sprite.extended({
 
 const Dog = Sprite.extended({
   constructed() {
-    mousePos/*.waitFor(done => setTimeout(done, 15))*/.consume(e => {
+    mousePos.waitFor(done => setTimeout(done, 12.5)).consume(e => {
       this.x = e.x - 10;
       this.y = e.y - 10;
     });
@@ -165,8 +163,26 @@ const SheepGame = div.extended({
       const dog = this.ids.dog;
 
       const sheep = [...repeat(this.sheep, Sheep)];
-      this.append(...sheep);
-
+      const home = Iterators.merge(...sheep.map(s => s.penned)).map(() => sheep.reduce((a,s) => a + (s.penned.valueOf()?1:0),0));
+      const dead = Iterators.merge(...sheep.map(s => s.dead)).map(() => sheep.reduce((a,s) => a + (s.dead.valueOf()?1:0),0));
+      const gameOver = Iterators.combine({ home, dead }, { ignorePartial: true }).map(n => n.dead! + n.home! >= sheep.length ? "gameover" : Iterators.Ignore);
+      this.append(...sheep,
+        div({
+          style: `text-align: center;
+          font-family: cursive;
+          color: white;
+          position: absolute;
+          bottom: 8px;
+          left: 8px;
+          right: 8px;`
+        },
+        div(
+          "Home ", home
+        ),div(
+          "Dead ", dead
+        ))
+      );
+      
       for (const s of sheep) {
         wander().consume(() => {
           const distance = s.distance(dog);
