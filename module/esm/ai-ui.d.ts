@@ -19,7 +19,6 @@ interface TagLoader {
     appender(container: Node, before?: Node): (...c: Node[]) => (Node | ((Element & PoElementMethods)))[];
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];
     UniqueID: typeof UniqueID;
-    augmentGlobalAsyncGenerators(): void;
     <Tags extends keyof HTMLElementTagNameMap>(): {
         [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]>;
     } & CreateElement;

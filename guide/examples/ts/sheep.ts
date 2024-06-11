@@ -188,7 +188,7 @@ const SheepGame = div.extended({
   }
 
   .SheepGame #info .GameOver {
-    background-color: white;
+    background-color: rgba(255, 255, 255, 0.4);
     font-size: 2em;
     color: red;
   }

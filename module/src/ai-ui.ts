@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, augmentGlobalAsyncGenerators, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { ChildTags, Constructed, Instance, Overrides, TagCreator, TagCreatorFunction } from './tags.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
@@ -41,8 +41,7 @@ interface TagLoader {
   /** @deprecated - Legacy function similar to Element.append/before/after */
   appender(container: Node, before?: Node): (...c: Node[]) => (Node | (/*P &*/ (Element & PoElementMethods)))[];
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
-  UniqueID: typeof UniqueID;
-  augmentGlobalAsyncGenerators(): void;
+  UniqueID: typeof UniqueID
 
   /*
    Signatures for the tag loader. All params are optional in any combination,
@@ -298,8 +297,7 @@ export const tag = <TagLoader>function <Tags extends string,
     Object.assign(tag,{
       appender, // Legacy RTA support
       nodes,    // Preferred interface instead of `appender`
-      UniqueID,
-      augmentGlobalAsyncGenerators // We should probably deprecate this from this location. It should be referenced directly.
+      UniqueID
     });
   }
 

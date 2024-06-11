@@ -1,7 +1,7 @@
-import { tag } from '../../module/src/ai-ui';
+import { tag, Iterators } from '../../module/src/ai-ui';
 import type { AsyncExtraIterable } from '../../module/src/iterators';
 
-tag.augmentGlobalAsyncGenerators();
+Iterators.augmentGlobalAsyncGenerators();
 declare global {
   interface AsyncGenerator<T = unknown, TReturn = any, TNext = unknown> extends AsyncIterator<T, TReturn, TNext>, AsyncExtraIterable<T> {
   }

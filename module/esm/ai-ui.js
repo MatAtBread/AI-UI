@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, augmentGlobalAsyncGenerators, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 /* Export useful stuff for users of the bundled code */
@@ -209,8 +209,7 @@ export const tag = function (_1, _2, _3) {
         Object.assign(tag, {
             appender, // Legacy RTA support
             nodes, // Preferred interface instead of `appender`
-            UniqueID,
-            augmentGlobalAsyncGenerators // We should probably deprecate this from this location. It should be referenced directly.
+            UniqueID
         });
     }
     /** Just deep copy an object */
