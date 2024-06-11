@@ -10,7 +10,7 @@
     "strict": true,                                      /* Enable all strict type-checking options. */
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
     "outDir": "./esm",
-    "lib": ["DOM","DOM.Iterable","ES2020"],
+    "lib": ["DOM","DOM.Iterable","ES2022"], /* ES2022 for ErrorOptions */
     "typeRoots": ["./esm"],
   },
   "include": [ "src/*.ts"]

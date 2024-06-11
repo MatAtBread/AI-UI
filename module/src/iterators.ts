@@ -239,31 +239,48 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
   }
 
   let a = box(v, extras);
-  let piped = false;
+  let piped: AsyncIterable<unknown> | undefined = undefined;
 
   Object.defineProperty(obj, name, {
     get(): V { return a },
     set(v: V) {
       if (v !== a) {
-        if (piped) {
-          throw new Error(`Iterable "${name.toString()}" is already consuming another iterator`)
-        }
         if (isAsyncIterable(v)) {
-          // Need to make this lazy really - difficult since we don't
-          // know if anyone has already started consuming it. Since assigning
-          // multiple async iterators to a single iterable is probably a bad idea
-          // (since what do we do: merge? terminate the first then consume the second?),
-          // the solution here (one of many possibilities) is only to allow ONE lazy
-          // assignment if and only if this iterable property has not been 'get' yet.
-          // However, this would at present possibly break the initialisation of iterable
-          // properties as the are initialized by auto-assignment, if it were initialized
-          // to an async iterator
-          piped = true;
+          // Assigning multiple async iterators to a single iterable is probably a
+          // bad idea from a reasoning point of view, and multiple implementations
+          // are possible:
+          //  * merge?
+          //  * ignore subsequent assignments?
+          //  * terminate the first then consume the second?
+          // The solution here (one of many possibilities) is the letter: only to allow
+          // most recent assignment to work, terminating any preceeding iterator when it next
+          // yields and finds this consumer has been re-assigned.
+
+          // If the iterator has been reassigned with no change, just ignore it, as we're already consuming it
+          if (piped === v)
+            return;
+
+          piped = v;
+          let stack = DEBUG ? new Error() : undefined;
           if (DEBUG)
             console.info('(AI-UI)',
               new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
-          consume.call(v,v => { push(v?.valueOf() as V) }).finally(() => piped = false);
+          consume.call(v,y => {
+            if (v !== piped) {
+              // We're being piped from something else. We want to stop that one and get piped from this one
+              throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`,{ cause: stack });
+            }
+            push(y?.valueOf() as V)
+          })
+          .catch(ex => console.info(ex))
+          .finally(() => (v === piped) && (piped = undefined));
+
+          // Early return as we're going to pipe values in later
+          return;
         } else {
+          if (piped) {
+            throw new Error(`Iterable "${name.toString()}" is already piped from another iterator`)
+          }
           a = box(v, extras);
         }
       }
@@ -587,8 +604,9 @@ type HelperAsyncIterator<F, And = {}, Or = never> =
 
 async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: HelperAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
   let last: undefined | void | PromiseLike<void> = undefined;
-  for await (const u of this as AsyncIterable<HelperAsyncIterable<U>>)
+  for await (const u of this as AsyncIterable<HelperAsyncIterable<U>>) {
     last = f?.(u);
+  }
   await last;
 }
 
