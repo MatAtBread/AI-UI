@@ -625,7 +625,6 @@ export const Ignore = Symbol("Ignore");
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
 function resolveSync<Z,R>(v: MaybePromised<Z>, then:(v:Z)=>R, except:(x:any)=>any): MaybePromised<R> {
-  //return Promise.resolve(v).then(then,except);
   if (isPromiseLike(v))
     return v.then(then,except);
   try { return then(v) } catch (ex) { return except(ex) }

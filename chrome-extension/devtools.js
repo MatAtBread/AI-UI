@@ -80,7 +80,7 @@ const _ = ${rootNode}.extended({
         Object.fromEntries(Object.entries(o).map(([k, v]) => [
           (v && v[Symbol.asyncIterator]) ? k + ' 💥' : k,
           {
-            value: typeof v === 'function' ? v : v?.valueOf(),
+            value: typeof v === 'function' ? v : v?.valueOf?.(),
             enumerable: true
           }
         ]))

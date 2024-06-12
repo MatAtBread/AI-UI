@@ -241,24 +241,24 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
         if (events?.return) return events.return(v);
         return Promise.resolve({ done: true, value: v });
       },
-      async next() {
+      next() {
         if (events) return events.next();
 
-        await containerAndSelectorsMounted(container, missing);
-
-        const merged = (iterators.length > 1)
+        return containerAndSelectorsMounted(container, missing).then(() => {
+          const merged = (iterators.length > 1)
           ? merge(...iterators)
           : iterators.length === 1
             ? iterators[0]
             : (neverGonnaHappen<WhenIteratedType<S>>());
 
-        // Now everything is ready, we simply delegate all async ops to the underlying
-        // merged asyncIterator "events"
-        events = merged[Symbol.asyncIterator]();
-        if (!events)
-          return { done: true, value: undefined };
+          // Now everything is ready, we simply delegate all async ops to the underlying
+          // merged asyncIterator "events"
+          events = merged[Symbol.asyncIterator]();
+          if (!events)
+            return { done: true, value: undefined };
 
-        return { done: false, value: {} };
+          return { done: false, value: {} };
+        });
       }
     };
     return chainAsync(iterableHelpers(ai));

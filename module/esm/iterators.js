@@ -513,7 +513,6 @@ async function consume(f) {
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 function resolveSync(v, then, except) {
-    //return Promise.resolve(v).then(then,except);
     if (isPromiseLike(v))
         return v.then(then, except);
     try {
