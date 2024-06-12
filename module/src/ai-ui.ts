@@ -78,7 +78,7 @@ const standandTags = [
 
 const elementProtype: PoElementMethods & ThisType<Element & PoElementMethods> = {
   get ids() {
-    return getElementIdMap(this, /*Object.create(this.defaults) ||*/);
+    return getElementIdMap(this);
   },
   set ids(v: any) {
     throw new Error('Cannot set ids on ' + this.valueOf());
