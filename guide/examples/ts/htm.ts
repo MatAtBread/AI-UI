@@ -1,7 +1,8 @@
 //import htm from 'https://unpkg.com/htm@3.1.1/src/index.mjs';
 import htm from 'https://unpkg.com/htm/mini/index.mjs';
-import { tag, augmentGlobalAsyncGenerators } from '../../../module/esm/ai-ui.js';
-augmentGlobalAsyncGenerators();
+import { tag, Iterators } from '../../../module/esm/ai-ui.js';
+Iterators.augmentGlobalAsyncGenerators();
+
 const { div, h3: heading, createElement } = tag() ;
 const html = htm.bind(createElement);
 

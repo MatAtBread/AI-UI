@@ -37,9 +37,6 @@ You can avoid calls to tag.nodes by [augmenting the standard DOM API](./augment-
 ### tag.UniqueID
 The symbol that identifies the extended tag unique ID within the `Instance` passed to the [`extended`](./instance.md) function.
 
-### tag.augmentGlobalAsyncGenerators()
-The function that attaches async iterators helper functions to all JavaScript async generator results. See [Iterators](./iterators.md) for more details.
-
 ## tagFn: [TagCreator](https://github.com/MatAtBread/AI-UI/blob/v0.10.16/module/esm/tags.d.ts#L112)
 Tag functions are returned by the `tag` function above, and by calls to `tagFn.extended(...)`
 ```typescript

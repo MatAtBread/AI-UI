@@ -1,5 +1,5 @@
-import { tag } from '../../../module/esm/ai-ui.js'
-tag.augmentGlobalAsyncGenerators();
+import { tag, Iterators } from '../../../module/esm/ai-ui.js'
+Iterators.augmentGlobalAsyncGenerators();
 
 const { div, span, button } = tag();
 
@@ -75,7 +75,7 @@ const ColourBlock = div.extended({
         backgroundColor: this.color
       }
     };
-    return '\xA0'; 
+    return '\xA0';
   }
 });
 
@@ -98,13 +98,13 @@ const ColourChooser = span.extended({
       button({
         disabled: this.selectedIndex.map!(n => n <= 0),
         onclick: () => this.selectedIndex -= 1
-      }, 
+      },
       '<'),
       ColourBlock({ color: this.selectedColor }),
       button({
         disabled: this.selectedIndex.map!(n => n >= this.colors.length -1),
         onclick: () => this.selectedIndex += 1
-      }, 
+      },
       '>')
     ]
   }

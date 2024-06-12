@@ -40,7 +40,8 @@
       }, tsFile);
       const script = document.createElement('script');
       script.setAttribute('type', 'module');
-      script.append(jsCode + '\n//# sourceURL=./'+tsFile+'.transpiled.js\n');
+      script.append(jsCode + '\n;window.scriptComplete();\n//# sourceURL=./'+tsFile+'.transpiled.js\n');
+      window.scriptComplete = ()=>script.remove();
       document.body.innerHTML = '';
       document.body.append(script);
     })

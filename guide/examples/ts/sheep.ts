@@ -113,8 +113,6 @@ const Sheep = Sprite.extended({
         if (r.right >= penArea.right) x = 1;
         if (r.top <= penArea.top) y -= 1;
         if (r.bottom >= penArea.bottom) y = 1;
-        this.x -= x;
-        this.y -= y;
       } else {
         const distance = this.distance(dog);
         x += Math.sign(dog.x - this.x) * 200 / distance;
@@ -125,14 +123,14 @@ const Sheep = Sprite.extended({
           y = 0;
         }
         if (this.intersects(penArea)) {
-          if (x > 0) {
+          if (x > 0)
             x = 0;
-          }
           y = 0;
         }
-        this.x -= x;
-        this.y -= y;
       }
+      this.style.transform = `scaleX(${x < 0 ? -1 : 1})`;
+      this.x -= x;
+      this.y -= y;
     }
   },
   constructed() {
@@ -145,7 +143,7 @@ const Sheep = Sprite.extended({
       }
     };
     // The contents of the sheep Sprite depends on whether it is dead.
-    return this.dead.map!(p => p ? '🦴' : '🐑')
+    return this.dead.map!(p => p ? '🥩' : '🐑')
   }
 });
 

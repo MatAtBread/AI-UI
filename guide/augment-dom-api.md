@@ -2,6 +2,9 @@
 
 _coming soon_
 
-- tag.augmentGlobalAsyncGenerators
+### Iterators.augmentGlobalAsyncGenerators()
+The function that attaches async iterators helper functions to all JavaScript async generator results. See [Iterators](./iterators.md) for more details.
+
+
 - tag.nodes
 - tag.augmentHtmlElement

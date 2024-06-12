@@ -1,5 +1,5 @@
-import { tag, augmentGlobalAsyncGenerators } from '../../../module/esm/ai-ui.js'
-augmentGlobalAsyncGenerators();
+import { tag, Iterators } from '../../../module/esm/ai-ui.js'
+Iterators.augmentGlobalAsyncGenerators();
 const { div, span } = tag();
 
 const App = div.extended({
