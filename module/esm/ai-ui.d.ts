@@ -15,8 +15,6 @@ export interface CreateElement {
     createElement(name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]): Node;
 }
 interface TagLoader {
-    /** @deprecated - Legacy function similar to Element.append/before/after */
-    appender(container: Node, before?: Node): (...c: Node[]) => (Node | ((Element & PoElementMethods)))[];
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];
     UniqueID: typeof UniqueID;
     <Tags extends keyof HTMLElementTagNameMap>(): {
@@ -38,4 +36,4 @@ interface TagLoader {
 }
 export declare const tag: TagLoader;
 export declare let enableOnRemovedFromDOM: () => void;
-export declare function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>): Record<string, Element>;
+export declare function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>): Record<string, Element> | undefined;

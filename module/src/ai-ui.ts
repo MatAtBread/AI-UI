@@ -38,8 +38,6 @@ export interface CreateElement {
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
 interface TagLoader {
-  /** @deprecated - Legacy function similar to Element.append/before/after */
-  appender(container: Node, before?: Node): (...c: Node[]) => (Node | (/*P &*/ (Element & PoElementMethods)))[];
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
   UniqueID: typeof UniqueID
 
@@ -167,26 +165,18 @@ export const tag = <TagLoader>function <Tags extends string,
 
   function nodes(...c: ChildTags[]) {
     const appended: Node[] = [];
-    (function children(c: ChildTags) {
+    (function children(c: ChildTags): void {
       if (c === undefined || c === null || c === Ignore)
         return;
       if (isPromiseLike(c)) {
-        let g: Node[] = [DomPromiseContainer()];
-        appended.push(g[0]);
-        c.then(r => {
-          const n = nodes(r);
-          const old = g;
-          if (old[0].parentNode) {
-            appender(old[0].parentNode, old[0])(...n);
-            old.forEach(e => e.parentNode?.removeChild(e));
+        const g: ChildNode = DomPromiseContainer();
+        appended.push(g);
+        c.then(r => g.replaceWith(...nodes(r)),
+          (x:any) => {
+            console.warn('(AI-UI)',x,g);
+            g.replaceWith(DyamicElementError({error: x}));
           }
-          g = n;
-        }, (x:any) => {
-          console.warn('(AI-UI)',x,g);
-          const errorNode = g[0];
-          if (errorNode)
-            errorNode.parentNode?.replaceChild(DyamicElementError({error: x}), errorNode);
-        });
+        );
         return;
       }
       if (c instanceof Node) {
@@ -212,44 +202,45 @@ export const tag = <TagLoader>function <Tags extends string,
         const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed as ChildTags)
         appended.push(...dpm);
 
-        let t: ReturnType<ReturnType<typeof appender>> = dpm;
+        let t = dpm;
         let notYetMounted = true;
         // DEBUG support
         let createdAt = Date.now() + timeOutWarn;
         const createdBy = DEBUG && new Error("Created by").stack;
 
         const error = (errorValue: any) => {
-          const n = t.filter(n => Boolean(n?.parentNode));
+          const n = t.filter(n => Boolean(n?.parentNode)) as ChildNode[];
           if (n.length) {
-            t = appender(n[0].parentNode!, n[0])(DyamicElementError({error: errorValue}));
-            n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
+            t = [DyamicElementError({error: errorValue})];
+            n[0].before(...t); //appendBefore(n[0], ...t);
+            n.forEach(e => e?.parentNode!.removeChild(e));
           }
-          else
-          console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
+          else console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {
           if (!es.done) {
             try {
-              const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
+              // ChildNode[], since we tested .parentNode
+              const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e)) as ChildNode[];
               const n = notYetMounted ? t : mounted;
               if (mounted.length) notYetMounted = false;
 
               if (!n.length) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
                 const msg = "Element(s) do not exist in document" + insertionStack;
-                throw new Error("Element(s) do not exist in document" + insertionStack);
+                throw new Error(msg);
               }
 
               if (notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
                 console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,createdBy, t);
               }
-              const q = nodes(unbox(es.value) as ChildTags);
+              t = nodes(unbox(es.value) as ChildTags);
               // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-              if (!q.length) q.push(DomPromiseContainer());
-              t = appender(n[0].parentNode!, n[0])(...q);
-              n.forEach(e => !t.includes(e) && e.parentNode!.removeChild(e));
+              if (!t.length) t.push(DomPromiseContainer());
+              (n[0] as ChildNode).before(...t);
+              n.forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
               ap.next().then(update).catch(error);
             } catch (ex) {
               // Something went wrong. Terminate the iterator source
@@ -265,38 +256,9 @@ export const tag = <TagLoader>function <Tags extends string,
     return appended;
   }
 
-  function appender(container: Node, before?: Node | null) {
-    if (before === undefined)
-      before = null;
-    return function (...children: Node[]) {
-      //const children = nodes(c);
-      if (before) {
-        // "before", being a node, could be #text node
-        if (before instanceof Element) {
-          Element.prototype.before.call(before, ...children)
-        } else {
-          // We're a text node - work backwards and insert *after* the preceeding Element
-          const parent = before.parentNode;
-          if (!parent)
-            throw new Error("Parent is null");
-
-          if (parent !== container) {
-            console.warn('(AI-UI)',"Internal error - container mismatch");
-          }
-          for (let i = 0; i < children.length; i++)
-            parent.insertBefore(children[i], before);
-        }
-      } else {
-        Element.prototype.append.call(container, ...children)
-      }
-
-      return children;
-    }
-  }
   if (!nameSpace) {
     Object.assign(tag,{
-      appender, // Legacy RTA support
-      nodes,    // Preferred interface instead of `appender`
+      nodes,    // Build DOM Node[] from ChildTags
       UniqueID
     });
   }
@@ -619,7 +581,7 @@ export const tag = <TagLoader>function <Tags extends string,
         for (const base of newCallStack) {
           const children = base?.constructed?.call(e);
           if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
-            appender(e)(...nodes(children));
+            e.append(...nodes(children));
         }
         // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
         // so the full hierarchy gets to consume the initial state, unless they have been assigned
@@ -749,7 +711,7 @@ export const tag = <TagLoader>function <Tags extends string,
         assignProps(e, attrs);
 
         // Append any children
-        appender(e)(...nodes(...children));
+        e.append(...nodes(...children));
         return e;
       }
     }
@@ -805,7 +767,7 @@ export let enableOnRemovedFromDOM = function () {
 const warned = new Set<string>();
 export function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>) {
   node = node || document;
-  ids = ids || {}
+  ids = ids || Object.create(null);
   if (node.querySelectorAll) {
     node.querySelectorAll("[id]").forEach(function (elt) {
       if (elt.id) {
