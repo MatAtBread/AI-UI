@@ -10,7 +10,7 @@
     "strict": true,                                      /* Enable all strict type-checking options. */
     "skipLibCheck": true,                                /* Skip type checking all .d.ts files. */
     "strictNullChecks": true,
-    "lib": ["DOM","DOM.Iterable","ES2020"]
+    "lib": ["DOM","DOM.Iterable","ES2022"]
   },
   "include": [ "./*.ts"]
 }

@@ -1,7 +1,7 @@
 /// <reference path="../test.env.d.ts"/>
 
-import { tag, Iterators } from '../../module/src/ai-ui';
-tag.augmentGlobalAsyncGenerators();
+import { Iterators } from '../../module/src/ai-ui';
+Iterators.augmentGlobalAsyncGenerators();
 
 async function *a(wait: boolean) {
     for (let i=0; i<3; i++) {

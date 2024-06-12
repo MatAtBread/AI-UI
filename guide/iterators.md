@@ -34,8 +34,8 @@ for await (const x of count(4).map(n => n * 2)) console.log(x); // Logs 0,2,4,6
 ```
 From JavaScript, you can explicitly call the function, since there are no types to modify:
 ```javascript
-// tag from however you load it: import, require, or as the global AIUI in a script.
-tag.augmentGlobalAsyncGenerators();
+// Iterators from however you load it: import, require, or as the global AIUI in a script.
+Iterators.augmentGlobalAsyncGenerators();
 ```
 
 The final two require that you import the functions that add the helpers:
@@ -117,7 +117,7 @@ function combine<S extends CombinedIterable>(src: S, opts?: CombineOptions): Com
 The `combine` function is similar to the `merge` function, but allows you to accumulate a number of sources into specified fields of a named object:
 
 ```typescript
-combine({ 
+combine({
   pos: mousePosition(),
   user: fetchUserAccount()
 },{

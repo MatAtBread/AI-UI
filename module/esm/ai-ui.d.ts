@@ -15,11 +15,8 @@ export interface CreateElement {
     createElement(name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]): Node;
 }
 interface TagLoader {
-    /** @deprecated - Legacy function similar to Element.append/before/after */
-    appender(container: Node, before?: Node): (c: ChildTags) => (Node | ((Element & PoElementMethods)))[];
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];
     UniqueID: typeof UniqueID;
-    augmentGlobalAsyncGenerators(): void;
     <Tags extends keyof HTMLElementTagNameMap>(): {
         [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]>;
     } & CreateElement;
@@ -38,6 +35,5 @@ interface TagLoader {
     <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement;
 }
 export declare const tag: TagLoader;
-export declare function augmentGlobalAsyncGenerators(): void;
 export declare let enableOnRemovedFromDOM: () => void;
-export declare function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>): Record<string, Element>;
+export declare function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>): Record<string, Element> | undefined;

@@ -1,7 +1,7 @@
-import { tag, Iterators } from '../../module/src/ai-ui';
-import type { AsyncExtraIterable } from '../../module/src/iterators';
+import { tag } from '../../../module/esm/ai-ui.js'
+import { augmentGlobalAsyncGenerators, type AsyncExtraIterable } from '../../../module/src/iterators.js';
 
-Iterators.augmentGlobalAsyncGenerators();
+augmentGlobalAsyncGenerators();
 declare global {
   interface AsyncGenerator<T = unknown, TReturn = any, TNext = unknown> extends AsyncIterator<T, TReturn, TNext>, AsyncExtraIterable<T> {
   }
@@ -55,5 +55,4 @@ const App = div.extended({
 const a = App();
 document.body.append(a);
 console.log(a.innerHTML);
-Test.response = sleep(5,null).then(_ => console.log(a.innerHTML));
 

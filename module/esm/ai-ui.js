@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator, iterableHelpers } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
 import { when } from './when.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 /* Export useful stuff for users of the bundled code */
@@ -34,7 +34,6 @@ function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
         || typeof x === 'boolean'
-        || typeof x === 'function'
         || x instanceof Node
         || x instanceof NodeList
         || x instanceof HTMLCollection
@@ -44,7 +43,7 @@ function isChildTag(x) {
         || Array.isArray(x)
         || isPromiseLike(x)
         || isAsyncIter(x)
-        || typeof x[Symbol.iterator] === 'function';
+        || (typeof x === 'object' && Symbol.iterator in x && typeof x[Symbol.iterator] === 'function');
 }
 /* tag */
 const callStackSymbol = Symbol('callStack');
@@ -88,26 +87,26 @@ export const tag = function (_1, _2, _3) {
             if (c === undefined || c === null || c === Ignore)
                 return;
             if (isPromiseLike(c)) {
-                let g = [DomPromiseContainer()];
-                appended.push(g[0]);
-                c.then(r => {
-                    const n = nodes(r);
-                    const old = g;
-                    if (old[0].parentNode) {
-                        appender(old[0].parentNode, old[0])(n);
-                        old.forEach(e => e.parentNode?.removeChild(e));
-                    }
-                    g = n;
-                }, (x) => {
+                const g = DomPromiseContainer();
+                appended.push(g);
+                c.then(r => g.replaceWith(...nodes(r)), (x) => {
                     console.warn('(AI-UI)', x, g);
-                    const errorNode = g[0];
-                    if (errorNode)
-                        errorNode.parentNode?.replaceChild(DyamicElementError({ error: x }), errorNode);
+                    g.replaceWith(DyamicElementError({ error: x }));
                 });
                 return;
             }
             if (c instanceof Node) {
                 appended.push(c);
+                return;
+            }
+            // We have an interesting case here where an iterable String is an object with both Symbol.iterator
+            // (inherited from the String prototype) and Symbol.asyncIterator (as it's been augmented by boxed())
+            // but we're only interested in cases like HTMLCollection, NodeList, array, etc., not the fukny ones
+            // It used to be after the isAsyncIter() test, but a non-AsyncIterator *may* also be a sync iterable
+            // For now, we exclude (Symbol.asyncIterator in c) in this case.
+            if (c && typeof c === 'object' && Symbol.iterator in c && !(Symbol.asyncIterator in c) && c[Symbol.iterator]) {
+                for (const d of c)
+                    children(d);
                 return;
             }
             if (isAsyncIter(c)) {
@@ -125,8 +124,9 @@ export const tag = function (_1, _2, _3) {
                 const error = (errorValue) => {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
-                        t = appender(n[0].parentNode, n[0])(DyamicElementError({ error: errorValue }));
-                        n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
+                        t = [DyamicElementError({ error: errorValue })];
+                        n[0].replaceWith(...t); //appendBefore(n[0], ...t);
+                        n.slice(1).forEach(e => e?.parentNode.removeChild(e));
                     }
                     else
                         console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
@@ -134,6 +134,7 @@ export const tag = function (_1, _2, _3) {
                 const update = (es) => {
                     if (!es.done) {
                         try {
+                            // ChildNode[], since we tested .parentNode
                             const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
                             const n = notYetMounted ? t : mounted;
                             if (mounted.length)
@@ -141,16 +142,18 @@ export const tag = function (_1, _2, _3) {
                             if (!n.length) {
                                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
                                 const msg = "Element(s) do not exist in document" + insertionStack;
-                                throw new Error("Element(s) do not exist in document" + insertionStack);
+                                throw new Error(msg);
                             }
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
                                 console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t);
                             }
-                            const q = nodes(unbox(es.value));
+                            t = nodes(unbox(es.value));
                             // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-                            t = appender(n[0].parentNode, n[0])(q.length ? q : DomPromiseContainer());
-                            n.forEach(e => !t.includes(e) && e.parentNode.removeChild(e));
+                            if (!t.length)
+                                t.push(DomPromiseContainer());
+                            n[0].replaceWith(...t);
+                            n.slice(1).forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
                             ap.next().then(update).catch(error);
                         }
                         catch (ex) {
@@ -162,49 +165,14 @@ export const tag = function (_1, _2, _3) {
                 ap.next().then(update).catch(error);
                 return;
             }
-            if (typeof c === 'object' && c?.[Symbol.iterator]) {
-                for (const d of c)
-                    children(d);
-                return;
-            }
             appended.push(document.createTextNode(c.toString()));
         })(c);
         return appended;
     }
-    function appender(container, before) {
-        if (before === undefined)
-            before = null;
-        return function (c) {
-            const children = nodes(c);
-            if (before) {
-                // "before", being a node, could be #text node
-                if (before instanceof Element) {
-                    Element.prototype.before.call(before, ...children);
-                }
-                else {
-                    // We're a text node - work backwards and insert *after* the preceeding Element
-                    const parent = before.parentNode;
-                    if (!parent)
-                        throw new Error("Parent is null");
-                    if (parent !== container) {
-                        console.warn('(AI-UI)', "Internal error - container mismatch");
-                    }
-                    for (let i = 0; i < children.length; i++)
-                        parent.insertBefore(children[i], before);
-                }
-            }
-            else {
-                Element.prototype.append.call(container, ...children);
-            }
-            return children;
-        };
-    }
     if (!nameSpace) {
         Object.assign(tag, {
-            appender, // Legacy RTA support
-            nodes, // Preferred interface instead of `appender`
-            UniqueID,
-            augmentGlobalAsyncGenerators
+            nodes, // Build DOM Node[] from ChildTags
+            UniqueID
         });
     }
     /** Just deep copy an object */
@@ -516,7 +484,7 @@ export const tag = function (_1, _2, _3) {
                 for (const base of newCallStack) {
                     const children = base?.constructed?.call(e);
                     if (isChildTag(children)) // technically not necessary, since "void" is going to be undefined in 99.9% of cases.
-                        appender(e)(children);
+                        e.append(...nodes(children));
                 }
                 // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
                 // so the full hierarchy gets to consume the initial state, unless they have been assigned
@@ -622,7 +590,7 @@ export const tag = function (_1, _2, _3) {
                 deepDefine(e, tagPrototypes);
                 assignProps(e, attrs);
                 // Append any children
-                appender(e)(children);
+                e.append(...nodes(...children));
                 return e;
             }
         };
@@ -650,20 +618,6 @@ const DomPromiseContainer = () => {
 const DyamicElementError = ({ error }) => {
     return document.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
 };
-export function augmentGlobalAsyncGenerators() {
-    let g = (async function* () { })();
-    while (g) {
-        const desc = Object.getOwnPropertyDescriptor(g, Symbol.asyncIterator);
-        if (desc) {
-            iterableHelpers(g);
-            break;
-        }
-        g = Object.getPrototypeOf(g);
-    }
-    if (!g) {
-        console.warn("Failed to augment the prototype of `(async function*())()`");
-    }
-}
 export let enableOnRemovedFromDOM = function () {
     enableOnRemovedFromDOM = function () { }; // Only create the observer once
     new MutationObserver(function (mutations) {
@@ -680,7 +634,7 @@ export let enableOnRemovedFromDOM = function () {
 const warned = new Set();
 export function getElementIdMap(node, ids) {
     node = node || document;
-    ids = ids || {};
+    ids = ids || Object.create(null);
     if (node.querySelectorAll) {
         node.querySelectorAll("[id]").forEach(function (elt) {
             if (elt.id) {
