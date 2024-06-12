@@ -52,8 +52,8 @@ const Sprite = div.extended({
     // Numerical wrappers for the Sprites position
     get x() { return parseFloat(this.style.left) || 0 },
     get y() { return parseFloat(this.style.top) || 0 },
-    set x(n: number) { this.style.left = String(Math.min(Math.max(n, 0), 500)) },
-    set y(n: number) { this.style.top = String(Math.min(Math.max(n, 0), 500)) },
+    set x(n: number) { this.style.left = String(Math.min(Math.max(n, 0), 500)) + 'px' },
+    set y(n: number) { this.style.top = String(Math.min(Math.max(n, 0), 500)) + 'px' },
 
     // Useful sprite methods
     distance({ x, y }: Point) {
