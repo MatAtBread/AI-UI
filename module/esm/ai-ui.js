@@ -125,8 +125,8 @@ export const tag = function (_1, _2, _3) {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
                         t = [DyamicElementError({ error: errorValue })];
-                        n[0].before(...t); //appendBefore(n[0], ...t);
-                        n.forEach(e => e?.parentNode.removeChild(e));
+                        n[0].replaceWith(...t); //appendBefore(n[0], ...t);
+                        n.slice(1).forEach(e => e?.parentNode.removeChild(e));
                     }
                     else
                         console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
@@ -152,8 +152,8 @@ export const tag = function (_1, _2, _3) {
                             // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
                             if (!t.length)
                                 t.push(DomPromiseContainer());
-                            n[0].before(...t);
-                            n.forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
+                            n[0].replaceWith(...t);
+                            n.slice(1).forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
                             ap.next().then(update).catch(error);
                         }
                         catch (ex) {
