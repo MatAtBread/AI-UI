@@ -326,7 +326,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
           // @ts-expect-error - Ignore is the INITIAL value
           if (boxedObject === Ignore) {
             if (DEBUG)
-              console.info( `The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
+              console.info(`The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
             if (Array.isArray(a))
               boxedObject = Object.defineProperties([...a] as V, pds);
               // @ts-ignore
