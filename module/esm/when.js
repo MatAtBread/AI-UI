@@ -30,7 +30,7 @@ function docEventHandler(ev) {
                 }
             }
             catch (ex) {
-                console.warn('(AI-UI)', 'docEventHandler', ex);
+                console.warn('docEventHandler', ex);
             }
         }
     }
@@ -206,7 +206,7 @@ function allSelectorsPresent(container, missing) {
     if (DEBUG) {
         const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
         const warnTimer = setTimeout(() => {
-            console.warn('(AI-UI)', stack, missing);
+            console.warn(stack, missing);
         }, timeOutWarn);
         promise.finally(() => clearTimeout(warnTimer));
     }
