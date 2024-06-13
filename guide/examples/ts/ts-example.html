@@ -38,10 +38,10 @@
         // "jsx": "react-jsx",
         // "jsxImportSource": "../../../module/esm"
       }, tsFile);
-      const script = document.createElement('script');
+      let script = document.createElement('script');
       script.setAttribute('type', 'module');
       script.append(jsCode + '\n;window.scriptComplete();\n//# sourceURL=./'+tsFile+'.transpiled.js\n');
-      window.scriptComplete = ()=>script.remove();
+      window.scriptComplete = ()=>{ script.remove(); script = null };
       document.body.innerHTML = '';
       document.body.append(script);
     })
