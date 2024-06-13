@@ -61,6 +61,39 @@ export const tag = function (_1, _2, _3) {
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
+    function mutationTracker(track) {
+        const handlerMap = new WeakMap();
+        function walk(nodes) {
+            for (const node of nodes) {
+                const f = handlerMap.get(node);
+                // In case it's be re-added/moved
+                if ((track === 'addedNodes') !== node.isConnected) {
+                    walk(node.childNodes);
+                    f?.forEach(g => g(node));
+                }
+            }
+        }
+        new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+                if (m.type === 'childList' && m.removedNodes.length) {
+                    walk(m.removedNodes);
+                }
+            });
+        }).observe(document.body, { subtree: true, childList: true });
+        return function (node, fn) {
+            let m = handlerMap.get(node);
+            if (!m)
+                handlerMap.set(node, m = []);
+            m.push(fn);
+            return function remove() {
+                const i = m.findIndex(h => h === fn);
+                if (i >= 0)
+                    m.splice(i, 1);
+            };
+        };
+    }
+    const removals = mutationTracker('removedNodes');
+    const additions = mutationTracker('addedNodes');
     const commonProperties = options?.commonProperties;
     /* Note: we use property defintion (and not object spread) so getters (like `ids`)
       are not evaluated until called */
@@ -118,6 +151,9 @@ export const tag = function (_1, _2, _3) {
                 appended.push(...dpm);
                 let t = dpm;
                 let notYetMounted = true;
+                const removals = t.map(n => additions(n, nowMounted));
+                const nowMounted = () => { if (notYetMounted)
+                    notYetMounted = false; removals.forEach(r => r()); };
                 // DEBUG support
                 let createdAt = Date.now() + timeOutWarn;
                 const createdBy = DEBUG && new Error("Created by").stack;
@@ -138,7 +174,7 @@ export const tag = function (_1, _2, _3) {
                             const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
                             const n = notYetMounted ? t : mounted;
                             if (mounted.length)
-                                notYetMounted = false;
+                                nowMounted();
                             if (!n.length) {
                                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
                                 const msg = "Element(s) do not exist in document" + insertionStack;
@@ -153,6 +189,7 @@ export const tag = function (_1, _2, _3) {
                             if (!t.length)
                                 t.push(DomPromiseContainer());
                             n[0].replaceWith(...t);
+                            t.forEach(n => additions(n, nowMounted));
                             n.slice(1).forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
                             ap.next().then(update).catch(error);
                         }
@@ -332,6 +369,11 @@ export const tag = function (_1, _2, _3) {
                 function assignIterable(value, k) {
                     const ap = asyncIterator(value);
                     let notYetMounted = true;
+                    additions(base, nowMounted);
+                    const nowMounted = () => {
+                        additions.remove(base, nowMounted);
+                        notYetMounted = false;
+                    };
                     // DEBUG support
                     let createdAt = Date.now() + timeOutWarn;
                     const createdBy = DEBUG && new Error("Created by").stack;
@@ -370,7 +412,7 @@ export const tag = function (_1, _2, _3) {
                                 return;
                             }
                             if (mounted)
-                                notYetMounted = false;
+                                nowMounted();
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
                                 console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, base);

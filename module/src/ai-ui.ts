@@ -135,8 +135,48 @@ export const tag = <TagLoader>function <Tags extends string,
       ? [null, _1 as Tags[], _2 as TagFunctionOptions<Q>]
       : [null, standandTags, _1 as TagFunctionOptions<Q>];
 
-  const commonProperties = options?.commonProperties;
+  /* DOM node removal logic */
+  type MutationTrackingCallback = (n: Node)=>void;
+  type PickByType<T, Value> = {
+    [P in keyof T as T[P] extends Value | undefined ? P : never]: T[P]
+  }
+  function mutationTracker(track: keyof PickByType<MutationRecord, NodeList>){
+    const handlerMap = new WeakMap<Node, MutationTrackingCallback[]>();
+    function walk(nodes: NodeList){
+      for (const node of nodes) {
+        const f = handlerMap.get(node);
+        // In case it's be re-added/moved
+        if ((track === 'addedNodes') !== node.isConnected) {
+          walk(node.childNodes);
+          f?.forEach(g => g(node));
+        }
+      }
+    }
+    new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        if (m.type === 'childList' && m.removedNodes.length) {
+          walk(m.removedNodes)
+        }
+      });
+    }).observe(document.body, { subtree: true, childList: true });
 
+    return function(node: Node, fn: MutationTrackingCallback) {
+      let m = handlerMap.get(node);
+      if (!m)
+        handlerMap.set(node, m = []);
+      m.push(fn);
+      return function remove() {
+        const i = m.findIndex(h => h === fn);
+        if (i >= 0)
+          m.splice(i,1);
+      }
+    }
+  }
+
+  const removals = mutationTracker('removedNodes');
+  const additions = mutationTracker('addedNodes');
+
+  const commonProperties = options?.commonProperties;
   /* Note: we use property defintion (and not object spread) so getters (like `ids`)
     are not evaluated until called */
   const tagPrototypes = Object.create(
@@ -204,6 +244,8 @@ export const tag = <TagLoader>function <Tags extends string,
 
         let t = dpm;
         let notYetMounted = true;
+        const removals = t.map(n => additions(n, nowMounted));
+        const nowMounted = ()=>{ if (notYetMounted) notYetMounted = false; removals.forEach(r => r()) };
         // DEBUG support
         let createdAt = Date.now() + timeOutWarn;
         const createdBy = DEBUG && new Error("Created by").stack;
@@ -224,7 +266,8 @@ export const tag = <TagLoader>function <Tags extends string,
               // ChildNode[], since we tested .parentNode
               const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e)) as ChildNode[];
               const n = notYetMounted ? t : mounted;
-              if (mounted.length) notYetMounted = false;
+              if (mounted.length)
+                nowMounted();
 
               if (!n.length) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
@@ -240,6 +283,7 @@ export const tag = <TagLoader>function <Tags extends string,
               // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
               if (!t.length) t.push(DomPromiseContainer());
               (n[0] as ChildNode).replaceWith(...t);
+              t.forEach(n => additions(n, nowMounted));
               n.slice(1).forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
               ap.next().then(update).catch(error);
             } catch (ex) {
@@ -406,6 +450,12 @@ export const tag = <TagLoader>function <Tags extends string,
         function assignIterable(value: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
           const ap = asyncIterator(value);
           let notYetMounted = true;
+          additions(base, nowMounted);
+          const nowMounted = ()=>{
+            additions.remove(base, nowMounted);
+            notYetMounted = false;
+          };
+
           // DEBUG support
           let createdAt = Date.now() + timeOutWarn;
           const createdBy = DEBUG && new Error("Created by").stack;
@@ -442,7 +492,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 ap.return?.(new Error(msg));
                 return;
               }
-              if (mounted) notYetMounted = false;
+              if (mounted) nowMounted();
               if (notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
                 console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, base);
