@@ -63,7 +63,6 @@ export const tag = function (_1, _2, _3) {
             ? [null, _1, _2]
             : [null, standandTags, _1];
     const removedNodes = mutationTracker(document, 'removedNodes');
-    //const additions = mutationTracker('addedNodes');
     const commonProperties = options?.commonProperties;
     /* Note: we use property defintion (and not object spread) so getters (like `ids`)
       are not evaluated until called */
@@ -133,8 +132,8 @@ export const tag = function (_1, _2, _3) {
                     }
                     else
                         console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
-                    ap.return?.(error);
                     t = [];
+                    ap.return?.(error);
                 };
                 const update = (es) => {
                     if (!es.done) {
@@ -146,8 +145,8 @@ export const tag = function (_1, _2, _3) {
                                 notYetMounted = false;
                             if (!n.length || t.every(e => removedNodes(e))) {
                                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                                const msg = "Element(s) have been removed from the document: " + insertionStack;
                                 t = [];
+                                const msg = "Element(s) have been removed from the document: " + insertionStack;
                                 ap.return?.(new Error(msg));
                             }
                             if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
@@ -372,9 +371,8 @@ export const tag = function (_1, _2, _3) {
                             const mounted = base.isConnected;
                             // If we have been mounted before, bit aren't now, remove the consumer
                             if (removedNodes(base) || (!notYetMounted && !mounted)) {
-                                const msg = `Element does not exist in document when setting async attribute '${k}' to:\n${logNode(base)}`;
-                                console.info(msg);
-                                ap.return?.(new Error(msg));
+                                console.info(`Element does not exist in document when setting async attribute '${k}' to:\n${logNode(base)}`);
+                                ap.return?.();
                                 return;
                             }
                             if (mounted)
@@ -387,8 +385,8 @@ export const tag = function (_1, _2, _3) {
                         }
                     };
                     const error = (errorValue) => {
-                        ap.return?.(errorValue);
                         console.warn("Dynamic attribute error", errorValue, k, d, createdBy, logNode(base));
+                        ap.return?.(errorValue);
                         base.appendChild(DyamicElementError({ error: errorValue }));
                     };
                     ap.next().then(update).catch(error);

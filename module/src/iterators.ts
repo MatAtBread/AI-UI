@@ -269,8 +269,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
           piped = v;
           let stack = DEBUG ? new Error() : undefined;
           if (DEBUG)
-            console.info(
-              new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
+            console.info(new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
           consume.call(v,y => {
             if (v !== piped) {
               // We're being piped from something else. We want to stop that one and get piped from this one
