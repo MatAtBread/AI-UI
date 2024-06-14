@@ -8,7 +8,7 @@ function docEventHandler(ev) {
         for (const o of observations) {
             try {
                 const { push, terminate, container, selector } = o;
-                if (!document.body.contains(container)) {
+                if (!container.isConnected) {
                     const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
                     terminate(new Error(msg));
@@ -164,11 +164,11 @@ export function when(container, ...sources) {
     return chainAsync(iterableHelpers(merged));
 }
 function elementIsInDOM(elt) {
-    if (document.body.contains(elt))
+    if (elt.isConnected)
         return Promise.resolve();
     return new Promise(resolve => new MutationObserver((records, mutation) => {
         if (records.some(r => r.addedNodes?.length)) {
-            if (document.body.contains(elt)) {
+            if (elt.isConnected) {
                 mutation.disconnect();
                 resolve();
             }

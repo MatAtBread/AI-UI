@@ -97,7 +97,7 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
     for (const o of observations) {
       try {
         const { push, terminate, container, selector } = o;
-        if (!document.body.contains(container)) {
+        if (!container.isConnected) {
           const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
           observations.delete(o);
           terminate(new Error(msg));
@@ -274,12 +274,12 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
 }
 
 function elementIsInDOM(elt: Element): Promise<void> {
-  if (document.body.contains(elt))
+  if (elt.isConnected)
     return Promise.resolve();
 
   return new Promise<void>(resolve => new MutationObserver((records, mutation) => {
     if (records.some(r => r.addedNodes?.length)) {
-      if (document.body.contains(elt)) {
+      if (elt.isConnected) {
         mutation.disconnect();
         resolve();
       }
