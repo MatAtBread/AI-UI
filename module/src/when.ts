@@ -97,7 +97,7 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
     for (const o of observations) {
       try {
         const { push, terminate, container, selector } = o;
-        if (!document.body.contains(container)) {
+        if (!container.isConnected) {
           const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
           observations.delete(o);
           terminate(new Error(msg));
@@ -116,7 +116,7 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
           }
         }
       } catch (ex) {
-        console.warn('(AI-UI)', 'docEventHandler', ex);
+        console.warn('docEventHandler', ex);
       }
     }
   }
@@ -274,12 +274,12 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
 }
 
 function elementIsInDOM(elt: Element): Promise<void> {
-  if (document.body.contains(elt))
+  if (elt.isConnected)
     return Promise.resolve();
 
   return new Promise<void>(resolve => new MutationObserver((records, mutation) => {
     if (records.some(r => r.addedNodes?.length)) {
-      if (document.body.contains(elt)) {
+      if (elt.isConnected) {
         mutation.disconnect();
         resolve();
       }
@@ -321,7 +321,7 @@ function allSelectorsPresent(container: Element, missing: string[]): Promise<voi
   if (DEBUG) {
     const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
     const warnTimer = setTimeout(() => {
-      console.warn('(AI-UI)', stack, missing);
+      console.warn(stack, missing);
     }, timeOutWarn);
 
     promise.finally(() => clearTimeout(warnTimer))

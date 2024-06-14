@@ -6,6 +6,7 @@ import { DEBUG, console, timeOutWarn } from './debug.js';
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
 export const UniqueID = Symbol("Unique ID");
+const logNode = DEBUG ? ((n) => `"${'innerHTML' in n ? n.innerHTML : n.textContent}"`) : (n) => undefined;
 let idCount = 0;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
@@ -17,7 +18,7 @@ const standandTags = [
     "strong", "style", "sub", "summary", "sup", "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead", "time",
     "title", "tr", "track", "u", "ul", "var", "video", "wbr"
 ];
-const elementProtype = {
+const elementProtype = Object.getOwnPropertyDescriptors({
     get ids() {
         return getElementIdMap(this);
     },
@@ -27,7 +28,7 @@ const elementProtype = {
     when: function (...what) {
         return when(this, ...what);
     }
-};
+});
 const poStyleElt = document.createElement("STYLE");
 poStyleElt.id = "--ai-ui-extended-tag-styles-";
 function isChildTag(x) {
@@ -61,10 +62,11 @@ export const tag = function (_1, _2, _3) {
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
+    const removedNodes = mutationTracker(document, 'removedNodes');
     const commonProperties = options?.commonProperties;
     /* Note: we use property defintion (and not object spread) so getters (like `ids`)
       are not evaluated until called */
-    const tagPrototypes = Object.create(null, Object.getOwnPropertyDescriptors(elementProtype));
+    const tagPrototypes = Object.create(null, elementProtype);
     // We do this here and not in elementProtype as there's no syntax
     // to copy a getter/setter pair from another object
     Object.defineProperty(tagPrototypes, 'attributes', {
@@ -72,7 +74,7 @@ export const tag = function (_1, _2, _3) {
         set(a) {
             if (isAsyncIter(a)) {
                 const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
-                const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn("(AI-UI)", ex));
+                const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn(ex));
                 step();
             }
             else
@@ -90,7 +92,7 @@ export const tag = function (_1, _2, _3) {
                 const g = DomPromiseContainer();
                 appended.push(g);
                 c.then(r => g.replaceWith(...nodes(r)), (x) => {
-                    console.warn('(AI-UI)', x, g);
+                    console.warn(x, logNode(g));
                     g.replaceWith(DyamicElementError({ error: x }));
                 });
                 return;
@@ -129,24 +131,27 @@ export const tag = function (_1, _2, _3) {
                         n.slice(1).forEach(e => e?.parentNode.removeChild(e));
                     }
                     else
-                        console.warn('(AI-UI)', "Can't report error", errorValue, createdBy, t);
+                        console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
+                    t = [];
+                    ap.return?.(error);
                 };
                 const update = (es) => {
                     if (!es.done) {
                         try {
                             // ChildNode[], since we tested .parentNode
-                            const mounted = t.filter(e => e?.parentNode && e.ownerDocument?.body.contains(e));
+                            const mounted = t.filter(e => e?.parentNode && e.isConnected);
                             const n = notYetMounted ? t : mounted;
                             if (mounted.length)
                                 notYetMounted = false;
-                            if (!n.length) {
+                            if (!n.length || t.every(e => removedNodes(e))) {
                                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                                const msg = "Element(s) do not exist in document" + insertionStack;
-                                throw new Error(msg);
+                                t = [];
+                                const msg = "Element(s) have been removed from the document: " + insertionStack;
+                                ap.return?.(new Error(msg));
                             }
-                            if (notYetMounted && createdAt && createdAt < Date.now()) {
+                            if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.log(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t);
+                                console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t.map(logNode));
                             }
                             t = nodes(unbox(es.value));
                             // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
@@ -158,6 +163,7 @@ export const tag = function (_1, _2, _3) {
                         }
                         catch (ex) {
                             // Something went wrong. Terminate the iterator source
+                            t = [];
                             ap.return?.(ex);
                         }
                     }
@@ -216,7 +222,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             else {
                                 if (value instanceof Node) {
-                                    console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, value);
+                                    console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, logNode(value));
                                     d[k] = value;
                                 }
                                 else {
@@ -254,7 +260,7 @@ export const tag = function (_1, _2, _3) {
                 }
             }
             catch (ex) {
-                console.warn('(AI-UI)', "deepAssign", k, s[k], ex);
+                console.warn("deepAssign", k, s[k], ex);
                 throw ex;
             }
         }
@@ -293,19 +299,19 @@ export const tag = function (_1, _2, _3) {
                                 assignIterable(value, k);
                             }
                             else if (isPromiseLike(value)) {
-                                value.then(value => {
-                                    if (value && typeof value === 'object') {
+                                value.then(v => {
+                                    if (v && typeof v === 'object') {
                                         // Special case: this promise resolved to an async iterator
-                                        if (isAsyncIter(value)) {
-                                            assignIterable(value, k);
+                                        if (isAsyncIter(v)) {
+                                            assignIterable(v, k);
                                         }
                                         else {
-                                            assignObject(value, k);
+                                            assignObject(v, k);
                                         }
                                     }
                                     else {
                                         if (s[k] !== undefined)
-                                            d[k] = s[k];
+                                            d[k] = v;
                                     }
                                 }, error => console.log("Failed to set attribute", error));
                             }
@@ -325,7 +331,7 @@ export const tag = function (_1, _2, _3) {
                         }
                     }
                     catch (ex) {
-                        console.warn('(AI-UI)', "assignProps", k, s[k], ex);
+                        console.warn("assignProps", k, s[k], ex);
                         throw ex;
                     }
                 }
@@ -340,17 +346,17 @@ export const tag = function (_1, _2, _3) {
                             const value = unbox(es.value);
                             if (typeof value === 'object' && value !== null) {
                                 /*
-                                THIS IS JUST A HACK: `style` has to be set member by member, eg:
-                                  e.style.color = 'blue'        --- works
-                                  e.style = { color: 'blue' }   --- doesn't work
-                                whereas in general when assigning to property we let the receiver
-                                do any work necessary to parse the object. This might be better handled
-                                by having a setter for `style` in the PoElementMethods that is sensitive
-                                to the type (string|object) being passed so we can just do a straight
-                                assignment all the time, or making the decsion based on the location of the
-                                property in the prototype chain and assuming anything below "PO" must be
-                                a primitive
-                                */
+                              THIS IS JUST A HACK: `style` has to be set member by member, eg:
+                                e.style.color = 'blue'        --- works
+                                e.style = { color: 'blue' }   --- doesn't work
+                              whereas in general when assigning to property we let the receiver
+                              do any work necessary to parse the object. This might be better handled
+                              by having a setter for `style` in the PoElementMethods that is sensitive
+                              to the type (string|object) being passed so we can just do a straight
+                              assignment all the time, or making the decsion based on the location of the
+                              property in the prototype chain and assuming anything below "PO" must be
+                              a primitive
+                              */
                                 const destDesc = Object.getOwnPropertyDescriptor(d, k);
                                 if (k === 'style' || !destDesc?.set)
                                     assign(d[k], value);
@@ -362,32 +368,32 @@ export const tag = function (_1, _2, _3) {
                                 if (value !== undefined)
                                     d[k] = value;
                             }
-                            const mounted = base.ownerDocument.contains(base);
+                            const mounted = base.isConnected;
                             // If we have been mounted before, bit aren't now, remove the consumer
-                            if (!notYetMounted && !mounted) {
-                                const msg = `Element does not exist in document when setting async attribute '${k}'`;
-                                ap.return?.(new Error(msg));
+                            if (removedNodes(base) || (!notYetMounted && !mounted)) {
+                                console.info(`Element does not exist in document when setting async attribute '${k}' to:\n${logNode(base)}`);
+                                ap.return?.();
                                 return;
                             }
                             if (mounted)
                                 notYetMounted = false;
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.log(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, base);
+                                console.warn(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.\nElement contains: ${logNode(base)}\n${createdBy}`);
                             }
                             ap.next().then(update).catch(error);
                         }
                     };
                     const error = (errorValue) => {
+                        console.warn("Dynamic attribute error", errorValue, k, d, createdBy, logNode(base));
                         ap.return?.(errorValue);
-                        console.warn('(AI-UI)', "Dynamic attribute error", errorValue, k, d, createdBy, base);
                         base.appendChild(DyamicElementError({ error: errorValue }));
                     };
                     ap.next().then(update).catch(error);
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {
-                        console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes", k, value);
+                        console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes", k, logNode(value));
                         d[k] = value;
                     }
                     else {
@@ -612,25 +618,47 @@ export const tag = function (_1, _2, _3) {
     // @ts-ignore
     return baseTagCreators;
 };
-const DomPromiseContainer = () => {
+function DomPromiseContainer() {
     return document.createComment(DEBUG ? new Error("promise").stack?.replace(/^Error: /, '') || "promise" : "promise");
-};
-const DyamicElementError = ({ error }) => {
+}
+function DyamicElementError({ error }) {
     return document.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
-};
+}
 export let enableOnRemovedFromDOM = function () {
     enableOnRemovedFromDOM = function () { }; // Only create the observer once
     new MutationObserver(function (mutations) {
         mutations.forEach(function (m) {
             if (m.type === 'childList') {
                 m.removedNodes.forEach(removed => removed && removed instanceof Element &&
-                    [...removed.getElementsByTagName("*"), removed].filter(elt => !elt.ownerDocument.contains(elt)).forEach(elt => {
+                    [...removed.getElementsByTagName("*"), removed].filter(elt => !elt.isConnected).forEach(elt => {
                         'onRemovedFromDOM' in elt && typeof elt.onRemovedFromDOM === 'function' && elt.onRemovedFromDOM();
                     }));
             }
         });
     }).observe(document.body, { subtree: true, childList: true });
 };
+function mutationTracker(root, track) {
+    const tracked = new WeakSet();
+    function walk(nodes) {
+        for (const node of nodes) {
+            // In case it's be re-added/moved
+            if ((track === 'addedNodes') === node.isConnected) {
+                walk(node.childNodes);
+                tracked.add(node);
+            }
+        }
+    }
+    new MutationObserver(function (mutations) {
+        mutations.forEach(function (m) {
+            if (m.type === 'childList' && m.removedNodes.length) {
+                walk(m[track]);
+            }
+        });
+    }).observe(root, { subtree: true, childList: true });
+    return function (node) {
+        return tracked.has(node);
+    };
+}
 const warned = new Set();
 export function getElementIdMap(node, ids) {
     node = node || document;
@@ -643,7 +671,7 @@ export function getElementIdMap(node, ids) {
                 else if (DEBUG) {
                     if (!warned.has(elt.id)) {
                         warned.add(elt.id);
-                        console.info('(AI-UI)', "Shadowed multiple element IDs", elt.id, elt, ids[elt.id]);
+                        console.info("Shadowed multiple element IDs", elt.id /*, elt, ids![elt.id]*/);
                     }
                 }
             }

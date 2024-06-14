@@ -269,8 +269,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
           piped = v;
           let stack = DEBUG ? new Error() : undefined;
           if (DEBUG)
-            console.info('(AI-UI)',
-              new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
+            console.info(new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
           consume.call(v,y => {
             if (v !== piped) {
               // We're being piped from something else. We want to stop that one and get piped from this one
@@ -326,7 +325,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
           // @ts-expect-error - Ignore is the INITIAL value
           if (boxedObject === Ignore) {
             if (DEBUG)
-              console.info('(AI-UI)', `The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
+              console.info(`The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
             if (Array.isArray(a))
               boxedObject = Object.defineProperties([...a] as V, pds);
               // @ts-ignore
@@ -368,16 +367,6 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
               if (key === 'valueOf')
                 return ()=>boxedObject;
 
-// @ts-ignore
-//const targetValue = key in target ? (target[key] as unknown) : Ignore;
-// @ts-ignore
-// window.console.log("***",key,targetValue,pds[key]);
-//               if (targetValue !== Ignore)
-//                   return targetValue;
-//               if (key in pds)
-//                 // @ts-ignore
-//                 return pds[key].value;
-
               const targetProp = Reflect.getOwnPropertyDescriptor(target,key);
               // We include `targetProp === undefined` so we can monitor nested properties that aren't actually defined (yet)
               // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
@@ -391,7 +380,6 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
                 const props = Object.getOwnPropertyDescriptors(
                     boxedObject.map((o,p) => {
-//                  extraBoxed.map((o,p) => {
                     const ov = o?.[key as keyof typeof o]?.valueOf();
                     const pv = p?.valueOf();
                     if (typeof ov === typeof pv && ov == pv)
