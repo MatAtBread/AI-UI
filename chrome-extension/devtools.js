@@ -74,28 +74,38 @@ const _ = ${rootNode}.extended({
     `;
   }
 
-  function noProto(o) {
-    return typeof o === 'object' && o
-      ? Object.create(null,
-        Object.fromEntries(Object.entries(o).map(([k, v]) => [
-          (v && v[Symbol.asyncIterator]) ? k + ' 💥' : k,
-          {
-            value: typeof v === 'function' ? v : v?.valueOf?.(),
-            enumerable: true
-          }
-        ]))
-      )
-      : o;
+  function noProto(o, deep) {
+    function unbox(v) {
+      if (v===null || v===undefined || !(v.valueOf)) return v;
+      console.log(v,v.valueOf())
+      return v.valueOf();
+    }
+    try {
+      return typeof o === 'object' && o && !Array.isArray(o)
+        ? Object.create(null,
+          Object.fromEntries(Object.entries(o).map(([k, v]) => [
+            (v && v[Symbol.asyncIterator]) ? k + ' 💥' : k,
+            {
+              value: typeof v === 'function' ? v : deep ? noProto(unbox(v), deep) : unbox(v),
+              enumerable: Object.getOwnPropertyDescriptor(o,k).enumerable
+            }
+          ]))
+        )
+        : o;
+    } catch (ex) {
+      return o;
+    }
   }
+  
   function explainConstructor(c) {
     const props = {
       [c.name]: {
         enumerable: true,
         value: c.definition
-          ? Object.assign(noProto(c.definition), {
+          ? Object.assign(noProto(c.definition, true), {
             ['super ' + c.super.name]: c.super
               ? explainConstructor(c.super)[c.super.name]
-              : noProto(c.super)
+              : noProto(c.super, true)
           })
           : Object.getPrototypeOf($0)
       }
@@ -103,15 +113,30 @@ const _ = ${rootNode}.extended({
     return Object.create(null, props);
   }
   const props = explainConstructor($0.constructor);
+
+  function showProperties(o) {
+      const d = noProto(o);
+      let c = o.constructor;
+      while (c) {
+        if (c.definition) {
+          if (c.definition.override)
+            Object.defineProperties(d, Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(c.definition.override)).filter(([name,pd]) => !(name in d)).map(([name,pd]) => [name,((pd.enumerable = false),pd)])));
+          if (c.definition.declare)
+            Object.defineProperties(d, Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(c.definition.declare)).filter(([name,pd]) => !(name in d)).map(([name,pd]) => [name,((pd.enumerable = false),pd)])));
+        }
+        c = c.super;
+      }
+      // \u00AD is a hack to place this at the end of the properties, as dev tools draws in code-point order, and it's non-visible
+      return Object.defineProperty(d, '\u00ADPrototype properties', { value: Object.getPrototypeOf(o) });
+  }
+
   Object.defineProperties(props, {
     'AI-UI Code Snippet': {
       value: codify($0)
     },
 
     'Element properties': {
-      // TODO: Find a way to see what attrs aren't the same as the proto values?
-      // Object.getPrototypeOf($0)[Symbol.toStringTag]
-      value: Object.defineProperty(noProto($0), 'Prototype properties', { value: Object.getPrototypeOf($0) })
+      value: showProperties($0)
     }
   });
 
