@@ -239,6 +239,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 t = [];
                 const msg = "Element(s) have been removed from the document: " + insertionStack;
                 ap.return?.(new Error(msg));
+                return;
               }
 
               if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
