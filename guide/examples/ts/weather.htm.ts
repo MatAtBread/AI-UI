@@ -1,4 +1,4 @@
-import htm from 'https://unpkg.com/htm/dist/htm.module.js';
+import htm from 'https://cdn.jsdelivr.net/npm/htm/dist/htm.module.js';
 import { ChildTags, tag } from '../../../module/esm/ai-ui.js';
 
 const { input, div, img, createElement } = tag();;
