@@ -30,8 +30,8 @@ HTM is a fabulously small library, however becuase the return of the HTML tagged
 To use HTM, check out the [README](https://www.npmjs.com/package/htm), and use the following code to initialise it with AI-UI:
 
 ```javascript
-import htm from 'https://unpkg.com/htm/mini/index.mjs';
-import { tag } from 'https://unpkg.com/@matatbread/ai-ui/esm/ai-ui.js';
+import htm from 'https://cdn.jsdelivr.net/npm/htm/mini/index.mjs';
+import { tag } from 'https://cdn.jsdelivr.net/npm/@matatbread/ai-ui/esm/ai-ui.js';
 const { div, createElement } = tag() ; // You can of course also destructure any AI-UI base tag functions at the same time
 const html = htm.bind(createElement); // Bind tag().createElement to `htm` as per the README
 

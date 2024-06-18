@@ -28,7 +28,7 @@ interface PoElementMethods {
   */
 }
 
-// Support for https://www.npmjs.com/package/htm (or import htm from 'https://unpkg.com/htm/dist/htm.module.js')
+// Support for https://www.npmjs.com/package/htm (or import htm from 'https://cdn.jsdelivr.net/npm/htm/dist/htm.module.js')
 // Note: same signature as React.createElement
 export interface CreateElement {
   // Support for htm, JSX, etc

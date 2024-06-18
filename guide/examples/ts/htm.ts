@@ -1,5 +1,5 @@
-//import htm from 'https://unpkg.com/htm@3.1.1/src/index.mjs';
-import htm from 'https://unpkg.com/htm/mini/index.mjs';
+//import htm from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/src/index.mjs';
+import htm from 'https://cdn.jsdelivr.net/npm/htm/mini/index.mjs';
 import { tag, Iterators } from '../../../module/esm/ai-ui.js';
 Iterators.augmentGlobalAsyncGenerators();
 
