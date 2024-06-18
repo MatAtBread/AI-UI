@@ -28,7 +28,7 @@ interface PoElementMethods {
   */
 }
 
-// Support for https://www.npmjs.com/package/htm (or import htm from 'https://unpkg.com/htm/dist/htm.module.js')
+// Support for https://www.npmjs.com/package/htm (or import htm from 'https://cdn.jsdelivr.net/npm/htm/dist/htm.module.js')
 // Note: same signature as React.createElement
 export interface CreateElement {
   // Support for htm, JSX, etc
@@ -239,6 +239,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 t = [];
                 const msg = "Element(s) have been removed from the document: " + insertionStack;
                 ap.return?.(new Error(msg));
+                return;
               }
 
               if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {

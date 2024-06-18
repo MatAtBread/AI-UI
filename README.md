@@ -67,14 +67,14 @@ The /esm directory contains unbundled ESM files with inline sourcemaps and TypeS
 
 ### ES6 import
 ```
-  import * as AIUI from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs'; // or .min.mjs
+  import * as AIUI from 'https://cdn.jsdelivr.net/npm/@matatbread/ai-ui/dist/ai-ui.mjs'; // or .min.mjs
   // You can, of course, just import the members you need...
-  import { tag } from 'https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.mjs'; // or .min.mjs
+  import { tag } from 'https://cdn.jsdelivr.net/npm/@matatbread/ai-ui/dist/ai-ui.mjs'; // or .min.mjs
 ```
 
 ### HTML `<script>` tag
 ```
-  <script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@matatbread/ai-ui/dist/ai-ui.js"></script>
   <!-- defines global AIUI -->
   <script>
     const { tag } = AIUI;

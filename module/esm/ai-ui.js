@@ -148,6 +148,7 @@ export const tag = function (_1, _2, _3) {
                                 t = [];
                                 const msg = "Element(s) have been removed from the document: " + insertionStack;
                                 ap.return?.(new Error(msg));
+                                return;
                             }
                             if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;

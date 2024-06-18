@@ -22,7 +22,7 @@ The first is easiest to use. If you use this method, you only need to do so once
 
 ```typescript
 // Augments the global prototype and declares global types
-import 'https://www.unpkg.com/@matatbread/ai-ui/esm/augment-iterators.js';
+import 'https://cdn.jsdelivr.net/npm/@matatbread/ai-ui/esm/augment-iterators.js';
 
 async function *count(limit) {
   for (let i=0; i<limit; i++)
@@ -42,7 +42,7 @@ The final two require that you import the functions that add the helpers:
 
 ```javascript
 /* ES6 Import */
-import { Iterators } from 'https://www.unpkg.com/@matatbread/ai-ui/esm/ai-ui.js';
+import { Iterators } from 'https://cdn.jsdelivr.net/npm/@matatbread/ai-ui/esm/ai-ui.js';
 const { iterableHelpers, generatorHelpers } = Iterators;
 ```
 
@@ -54,7 +54,7 @@ const { iterableHelpers, generatorHelpers } = Iterators;
 
 
 ```html
-<script src="https://www.unpkg.com/@matatbread/ai-ui/dist/ai-ui.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@matatbread/ai-ui/dist/ai-ui.min.js"></script>
 <script>
   /* Static script */
   const { iterableHelpers, generatorHelpers } = AIUI.Iterators;
