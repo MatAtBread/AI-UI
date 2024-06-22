@@ -1,34 +1,48 @@
 <!DOCTYPE html>
+
 <head>
+  <script>window.DEBUG = true</script>
   <script src="../../module/dist/ai-ui.js"></script>
 </head>
 
 <body>
 </body>
 <script>
-  const { div, input, button } = AIUI.tag();
+  const { div, input, button, table, tr, td } = AIUI.tag();
 
-  /* A simple async "sleep" function */
-  function sleep(seconds) {
-    return new Promise(resolve => setTimeout(resolve, seconds * 1000))
-  }
+  const Results = table.extended({
+    iterable: {
+      data: []
+    },
+    constructed() {
+      let line = 0;
+      return this.data.map((t) => [
+        tr(td(line++), td(JSON.stringify(t))),
+        this.childNodes
+      ])
+    }
+  });
 
   const App = div.extended({
     iterable: {
-      thing: ['abc','def','ghi']
+      thing: ['abc', 'def', 'ghi']
     },
-    ids:{
-      text: input
+    ids: {
+      text: input,
+      results: table
     },
     constructed() {
+      let line = 1;
       return [
-        div("Expression ", 
-          input({ id: 'text', value: 'this.thing' }), 
-          button({ 
-            onclick: ()=>Function("return ("+this.ids.text.value+")" ).call(this)
-          },"eval")
+        div("Expression ",
+          input({ id: 'text', value: 'this.thing' }),
+          button({
+            onclick: () => new Function("return (" + this.ids.text.value + ")").call(this)
+          }, "eval")
         ),
-        div("Result ",this.thing.map(t => JSON.stringify(t)))
+        div("Updates: ",
+          Results({ data: this.thing })
+        )
       ]
     }
   });

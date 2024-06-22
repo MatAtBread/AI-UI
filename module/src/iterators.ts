@@ -93,8 +93,9 @@ const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(
 export function queueIteratableIterator<T>(stop = () => { }) {
   let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
   let _items: T[] | null = [];
+  let _inflight = new Set<T>();
 
-  const q: QueueIteratableIterator<T> = {
+  const q: QueueIteratableIterator<T> & { debounce(value: T): boolean } = {
     [Symbol.asyncIterator]() {
       return q;
     },
@@ -108,7 +109,7 @@ export function queueIteratableIterator<T>(stop = () => { }) {
       // We install a catch handler as the promise might be legitimately reject before anything waits for it,
       // and q suppresses the uncaught exception warning.
       value.catch(ex => { });
-      _pending!.push(value);
+      _pending!.unshift(value);
       return value;
     },
 
@@ -117,7 +118,7 @@ export function queueIteratableIterator<T>(stop = () => { }) {
       if (_pending) {
         try { stop() } catch (ex) { }
         while (_pending.length)
-          _pending.shift()!.resolve(value);
+          _pending.pop()!.resolve(value);
         _items = _pending = null;
       }
       return Promise.resolve(value);
@@ -128,7 +129,7 @@ export function queueIteratableIterator<T>(stop = () => { }) {
       if (_pending) {
         try { stop() } catch (ex) { }
         while (_pending.length)
-          _pending.shift()!.reject(value);
+          _pending.pop()!.reject(value);
         _items = _pending = null;
       }
       return Promise.reject(value);
@@ -140,12 +141,34 @@ export function queueIteratableIterator<T>(stop = () => { }) {
     },
 
     push(value: T) {
-      if (!_pending) {
-        //throw new Error("queueIterator has stopped");
+      if (!_pending)
         return false;
-      }
+
       if (_pending.length) {
-        _pending.shift()!.resolve({ done: false, value });
+        _pending.pop()!.resolve({ done: false, value });
+      } else {
+        if (!_items) {
+          console.log('Discarding queue push as there are no consumers');
+        } else {
+          _items.push(value)
+        }
+      }
+      return true;
+    },
+    
+    debounce(value: T) {
+      if (!_pending)
+        return false;
+
+      // Debounce
+      if (_inflight.has(value))
+        return true;
+
+      _inflight.add(value);
+      if (_pending.length) {
+        const p = _pending.pop()!;
+        p.then(v => _inflight.delete(v.value) );
+        p.resolve({ done: false, value });
       } else {
         if (!_items) {
           console.log('Discarding queue push as there are no consumers');
@@ -187,7 +210,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
       enumerable: false,
       writable: false
     };
-    push = bi.push;
+    push = bi.debounce;
     extraKeys.forEach(k =>
       extras[k] = {
         // @ts-ignore - Fix

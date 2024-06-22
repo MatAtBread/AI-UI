@@ -34,7 +34,9 @@ declare const asyncExtras: {
         _this: Partial<AsyncIterable<T_1>>;
     } & S>;
 };
-export declare function queueIteratableIterator<T>(stop?: () => void): QueueIteratableIterator<T> & AsyncExtraIterable<T>;
+export declare function queueIteratableIterator<T>(stop?: () => void): QueueIteratableIterator<T> & {
+    debounce(value: T): boolean;
+} & AsyncExtraIterable<T>;
 declare global {
     interface ObjectConstructor {
         defineProperties<T, M extends {
