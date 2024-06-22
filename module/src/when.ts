@@ -91,20 +91,7 @@ type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
 };
 const eventObservations = new Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>();
 
-let pendingEvents: Event[] = [];
 function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: Document, ev: GlobalEventHandlersEventMap[EventName]) {
-  pendingEvents.push(ev);
-  if (pendingEvents.length === 1) requestAnimationFrame(()=>{
-    const pending = pendingEvents;
-    pendingEvents = [];
-    for (const e of pending) {
-      _docEventHandler.call(document, e);
-    }
-  })
-}
-
-
-function _docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: Document, ev: GlobalEventHandlersEventMap[EventName]) {
   const observations = eventObservations.get(ev.type as keyof GlobalEventHandlersEventMap);
   if (observations) {
     for (const o of observations) {
