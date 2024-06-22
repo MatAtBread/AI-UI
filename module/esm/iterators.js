@@ -78,7 +78,7 @@ export function queueIteratableIterator(stop = () => { }) {
             }
             const value = deferred();
             // We install a catch handler as the promise might be legitimately reject before anything waits for it,
-            // and q suppresses the uncaught exception warning.
+            // and this suppresses the uncaught exception warning.
             value.catch(ex => { });
             _pending.unshift(value);
             return value;
@@ -139,7 +139,7 @@ export function queueIteratableIterator(stop = () => { }) {
             _inflight.add(value);
             if (_pending.length) {
                 const p = _pending.pop();
-                p.then(v => _inflight.delete(v.value));
+                p.finally(() => _inflight.delete(value));
                 p.resolve({ done: false, value });
             }
             else {
