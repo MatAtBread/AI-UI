@@ -627,7 +627,7 @@ function DyamicElementError({ error }) {
 }
 export let enableOnRemovedFromDOM = function () {
     enableOnRemovedFromDOM = function () { }; // Only create the observer once
-    new MutationObserver(function (mutations) {
+    new MutationObserver((mutations) => {
         mutations.forEach(function (m) {
             if (m.type === 'childList') {
                 m.removedNodes.forEach(removed => removed && removed instanceof Element &&
@@ -649,7 +649,7 @@ function mutationTracker(root, track) {
             }
         }
     }
-    new MutationObserver(function (mutations) {
+    new MutationObserver((mutations) => {
         mutations.forEach(function (m) {
             if (m.type === 'childList' && m.removedNodes.length) {
                 walk(m[track]);
