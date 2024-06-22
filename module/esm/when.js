@@ -2,19 +2,7 @@ import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
 const eventObservations = new Map();
-let pendingEvents = [];
 function docEventHandler(ev) {
-    pendingEvents.push(ev);
-    if (pendingEvents.length === 1)
-        requestAnimationFrame(() => {
-            const pending = pendingEvents;
-            pendingEvents = [];
-            for (const e of pending) {
-                _docEventHandler.call(document, e);
-            }
-        });
-}
-function _docEventHandler(ev) {
     const observations = eventObservations.get(ev.type);
     if (observations) {
         for (const o of observations) {

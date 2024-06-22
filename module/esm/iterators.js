@@ -299,6 +299,14 @@ export function defineIterableProperty(obj, name, v) {
                     }
                     // else proxy the result so we can track members of the iterable object
                     const extraBoxed = new Proxy(boxedObject, {
+                        deleteProperty(target, key) {
+                            if (Reflect.deleteProperty(target, key)) {
+                                // @ts-ignore - Fix
+                                push(obj[name]);
+                                return true;
+                            }
+                            return false;
+                        },
                         // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
                         set(target, key, value, receiver) {
                             if (Reflect.set(target, key, value, receiver)) {
@@ -317,7 +325,7 @@ export function defineIterableProperty(obj, name, v) {
                             // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
                             // defintions like:
                             //   iterable: { stuff: {} as Record<string, string | number ... }
-                            if (targetProp === undefined || targetProp.enumerable) {
+                            if ((targetProp === undefined && !(key in target)) || targetProp?.enumerable) {
                                 if (targetProp === undefined) {
                                     // @ts-ignore - Fix
                                     target[key] = undefined;
