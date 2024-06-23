@@ -29,6 +29,10 @@ import { DeferredPromise, deferred, isPromiseLike } from "./deferred.js"
   iterable, but it's membetrs are just POJS values.
 */
 
+// Base types that can be made defined as iterable: basically anything, _except_ a function
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
+export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue};
+
 export const Iterability = Symbol("Iterability");
 export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
 export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
@@ -196,7 +200,7 @@ declare global {
    This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
 
-export function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>> {
+export function defineIterableProperty<T extends {}, N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed

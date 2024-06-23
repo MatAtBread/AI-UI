@@ -2,7 +2,7 @@
   No code/data is declared in this file (except the re-exported symbols from iterators.ts).
 */
 
-import type { AsyncProvider, Ignore, IterableProperties } from "./iterators.js";
+import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyValue } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
@@ -62,9 +62,6 @@ export type DeepFlatten<O> = [{
   [K in keyof O]: Flatten<O[K]>
 }][number];
 
-// Basically anything, _except_ an array, as they clash with map, filter
-type OptionalIterablePropertyValue = (string | number | bigint | boolean | undefined | null) | (object & { splice?: never });
-
 type NeverEmpty<O extends object> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
 type PickType<T, V> = [{ [K in keyof T as T[K] extends V ? K : never]: T[K] }][number]
@@ -111,7 +108,7 @@ type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overr
 export type Overrides = {
   override?: object;
   declare?: object;
-  iterable?: { [k: string]: OptionalIterablePropertyValue };
+  iterable?: { [k: string]: IterablePropertyValue };
   ids?: { [id: string]: ExTagCreator<any>; };
   styles?: string;
 }

@@ -1,3 +1,7 @@
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
+export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | {
+    [k: string | symbol | number]: IterablePropertyValue;
+};
 export declare const Iterability: unique symbol;
 export type Iterability<Depth extends 'shallow' = 'shallow'> = {
     [Iterability]: Depth;
@@ -46,7 +50,7 @@ declare global {
         };
     }
 }
-export declare function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>>;
+export declare function defineIterableProperty<T extends {}, N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>>;
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;
