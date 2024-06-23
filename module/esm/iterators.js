@@ -1,12 +1,12 @@
 import { DEBUG, console } from "./debug.js";
-import { deferred, isPromiseLike } from "./deferred.js";
+import { deferred, isObjectLike, isPromiseLike } from "./deferred.js";
 export const Iterability = Symbol("Iterability");
 // NB: This also (incorrectly) passes sync iterators, as the protocol names are the same
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
 }
 export function isAsyncIterable(o) {
-    return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
+    return isObjectLike(o) && (Symbol.asyncIterator in o) && typeof o[Symbol.asyncIterator] === 'function';
 }
 export function isAsyncIter(o) {
     return isAsyncIterable(o) || isAsyncIterator(o);
@@ -145,8 +145,8 @@ function internalDebounceQueueIteratableIterator(stop = () => { }) {
     return q;
 }
 // Re-export to hide the internals
-export const queueIteratableIterator = (stop = () => { }) => internalQueueIteratableIterator(stop);
-export const debounceQueueIteratableIterator = (stop = () => { }) => internalDebounceQueueIteratableIterator(stop);
+export const queueIteratableIterator = internalQueueIteratableIterator;
+export const debounceQueueIteratableIterator = internalDebounceQueueIteratableIterator;
 /* Define a "iterable property" on `obj`.
    This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
    yields when the property is set.

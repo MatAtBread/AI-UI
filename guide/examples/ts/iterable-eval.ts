@@ -32,12 +32,12 @@ const App = div.extended({
           onclick: () => new Function("return (" + this.ids.text.value + ")").call(this)
         }, "eval")
       ),
-      div("Updates: ",
-        div(this.thing.map(j => JSON.stringify(j)))
-      )
       // div("Updates: ",
-      //   Results({ data: this.thing })
+      //   div(this.thing.map(j => JSON.stringify(j)))
       // )
+      div("Updates: ",
+        Results({ data: this.thing })
+      )
     ]
   }
 });

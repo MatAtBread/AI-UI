@@ -1,5 +1,5 @@
 import { DEBUG, console } from "./debug.js"
-import { DeferredPromise, deferred, isPromiseLike } from "./deferred.js"
+import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferred.js"
 
 /* IterableProperties can't be correctly typed in TS right now, either the declaratiin
   works for retrieval (the getter), or it works for assignments (the setter), but there's
@@ -43,7 +43,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 }
 
 /* Things to suppliement the JS base AsyncIterable */
-export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
+export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
   push(value: T): boolean;
   readonly length: number;
 }
@@ -55,7 +55,7 @@ export function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is As
   return typeof o?.next === 'function'
 }
 export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
-  return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function'
+  return isObjectLike(o) && (Symbol.asyncIterator in o) && typeof o[Symbol.asyncIterator] === 'function'
 }
 export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T> {
   return isAsyncIterable(o) || isAsyncIterator(o)
@@ -206,8 +206,8 @@ function internalDebounceQueueIteratableIterator<T>(stop = () => { }) {
 }
 
 // Re-export to hide the internals
-export const queueIteratableIterator = <T>(stop = () => { })=>internalQueueIteratableIterator(stop) as QueueIteratableIterator<T> & AsyncExtraIterable<T>;
-export const debounceQueueIteratableIterator = <T>(stop = () => { })=>internalDebounceQueueIteratableIterator(stop) as QueueIteratableIterator<T> & AsyncExtraIterable<T>;
+export const queueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T> = internalQueueIteratableIterator;
+export const debounceQueueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T> = internalDebounceQueueIteratableIterator;
 
 declare global {
   interface ObjectConstructor {

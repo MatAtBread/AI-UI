@@ -12,7 +12,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 } : {
     [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>;
 };
-export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
+export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
     push(value: T): boolean;
     readonly length: number;
 }
@@ -38,8 +38,8 @@ declare const asyncExtras: {
         _this: Partial<AsyncIterable<T_1>>;
     } & S>;
 };
-export declare const queueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T> & AsyncExtraIterable<T>;
-export declare const debounceQueueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T> & AsyncExtraIterable<T>;
+export declare const queueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T>;
+export declare const debounceQueueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T>;
 declare global {
     interface ObjectConstructor {
         defineProperties<T, M extends {

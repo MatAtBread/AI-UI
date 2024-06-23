@@ -22,6 +22,11 @@ export function deferred<T>(): DeferredPromise<T> {
   return promise;
 }
 
+// True if `expr in x` is valid
+export function isObjectLike(x: any): x is Function | {} {
+  return x && typeof x === 'object' || typeof x === 'function'
+}
+
 export function isPromiseLike<T>(x: any): x is PromiseLike<T> {
-  return x && typeof x === 'object' && ('then' in x) && typeof x.then === 'function';
+  return isObjectLike(x) && ('then' in x) && typeof x.then === 'function';
 }
