@@ -1,3 +1,4 @@
+import { DeferredPromise } from "./deferred.js";
 export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
 export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | {
     [k: string | symbol | number]: IterablePropertyValue;
@@ -38,8 +39,37 @@ declare const asyncExtras: {
         _this: Partial<AsyncIterable<T_1>>;
     } & S>;
 };
-export declare function queueIteratableIterator<T>(stop?: () => void): QueueIteratableIterator<T> & {
-    debounce(value: T): boolean;
+export declare function queueIteratableIterator<T>(stop?: () => void): {
+    _pending: DeferredPromise<IteratorResult<T, any>>[] | null;
+    _items: T[] | null;
+    [Symbol.asyncIterator](): AsyncIterableIterator<T>;
+    next(): DeferredPromise<IteratorResult<T, any>> | Promise<{
+        done: boolean;
+        value: NonNullable<T>;
+    }>;
+    return(v?: unknown): Promise<{
+        done: true;
+        value: undefined;
+    }>;
+    throw(...args: any[]): Promise<never>;
+    readonly length: number;
+    push(value: T): boolean;
+} & AsyncExtraIterable<T>;
+export declare function debounceQueueIteratableIterator<T>(stop?: () => void): {
+    _pending: DeferredPromise<IteratorResult<T, any>>[] | null;
+    _items: T[] | null;
+    [Symbol.asyncIterator](): AsyncIterableIterator<T>;
+    next(): DeferredPromise<IteratorResult<T, any>> | Promise<{
+        done: boolean;
+        value: NonNullable<T>;
+    }>;
+    return(v?: unknown): Promise<{
+        done: true;
+        value: undefined;
+    }>;
+    throw(...args: any[]): Promise<never>;
+    readonly length: number;
+    push(value: T): boolean;
 } & AsyncExtraIterable<T>;
 declare global {
     interface ObjectConstructor {

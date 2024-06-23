@@ -94,96 +94,110 @@ const asyncExtras = {
 
 const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)] as (keyof typeof asyncExtras)[];
 
-export function queueIteratableIterator<T>(stop = () => { }) {
-  let _pending = [] as DeferredPromise<IteratorResult<T>>[] | null;
-  let _items: T[] | null = [];
-  let _inflight = new Set<T>();
+// Like Object.assign, but the assigned properties are not enumerable
+function assignHidden<D extends {}, S extends {}>(d: D, ...srcs: S[]) {
+  for (const s of srcs) {
+    for (const [k,pd] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
+      Object.defineProperty(d, k, {...pd, enumerable: false});
+    }
+  }
+  return d as D & S; 
+}
 
-  const q: QueueIteratableIterator<T> & { debounce(value: T): boolean } = {
+export function queueIteratableIterator<T>(stop = () => { }) {
+  const q = {
+    _pending: [] as DeferredPromise<IteratorResult<T>>[] | null,
+    _items: [] as T[] | null,
+
     [Symbol.asyncIterator]() {
-      return q;
+      return q as AsyncIterableIterator<T>;
     },
 
     next() {
-      if (_items?.length) {
-        return Promise.resolve({ done: false, value: _items.shift()! });
+      if (q._items?.length) {
+        return Promise.resolve({ done: false, value: q._items.shift()! });
       }
 
       const value = deferred<IteratorResult<T>>();
       // We install a catch handler as the promise might be legitimately reject before anything waits for it,
       // and this suppresses the uncaught exception warning.
       value.catch(ex => { });
-      _pending!.unshift(value);
+      q._pending!.unshift(value);
       return value;
     },
 
-    return() {
+    return(v?: unknown) {
       const value = { done: true as const, value: undefined };
-      if (_pending) {
+      if (q._pending) {
         try { stop() } catch (ex) { }
-        while (_pending.length)
-          _pending.pop()!.resolve(value);
-        _items = _pending = null;
+        while (q._pending.length)
+          q._pending.pop()!.resolve(value);
+        q._items = q._pending = null;
       }
       return Promise.resolve(value);
     },
 
     throw(...args: any[]) {
       const value = { done: true as const, value: args[0] };
-      if (_pending) {
+      if (q._pending) {
         try { stop() } catch (ex) { }
-        while (_pending.length)
-          _pending.pop()!.reject(value);
-        _items = _pending = null;
+        while (q._pending.length)
+          q._pending.pop()!.reject(value);
+        q._items = q._pending = null;
       }
       return Promise.reject(value);
     },
 
     get length() {
-      if (!_items) return -1; // The queue has no consumers and has terminated.
-      return _items.length;
+      if (!q._items) return -1; // The queue has no consumers and has terminated.
+      return q._items.length;
     },
 
     push(value: T) {
-      if (!_pending)
+      if (!q._pending)
         return false;
 
-      if (_pending.length) {
-        _pending.pop()!.resolve({ done: false, value });
+      if (q._pending.length) {
+        q._pending.pop()!.resolve({ done: false, value });
       } else {
-        if (!_items) {
+        if (!q._items) {
           console.log('Discarding queue push as there are no consumers');
-        } else {
-          _items.push(value)
-        }
-      }
-      return true;
-    },
-    
-    debounce(value: T) {
-      if (!_pending)
-        return false;
-
-      // Debounce
-      if (_inflight.has(value))
-        return true;
-
-      _inflight.add(value);
-      if (_pending.length) {
-        const p = _pending.pop()!;
-        p.finally(() => _inflight.delete(value));
-        p.resolve({ done: false, value });
-      } else {
-        if (!_items) {
-          console.log('Discarding queue push as there are no consumers');
-        } else {
-          _items.push(value)
+        } else if (!q._items.find(v => v === value)) {
+          q._items.push(value)
         }
       }
       return true;
     }
   };
   return iterableHelpers(q);
+}
+
+export function debounceQueueIteratableIterator<T>(stop = () => { }) {
+  let _inflight = new Set<T>();
+  const q = queueIteratableIterator<T>(stop);
+  q.push = function (value: T) {
+    if (!q._pending)
+      return false;
+
+    // Debounce
+    if (_inflight.has(value))
+      return true;
+
+    _inflight.add(value);
+    if (q._pending.length) {
+      const p = q._pending.pop()!;
+      p.finally(() => _inflight.delete(value));
+      p.resolve({ done: false, value });
+    } else {
+      if (!q._items) {
+        console.log('Discarding queue push as there are no consumers');
+      } else {
+        q._items.push(value)
+      }
+    }
+    return true;
+  }
+  return q;
 }
 
 declare global {
@@ -206,7 +220,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
   // never referenced, and therefore cannot be consumed and ultimately closed
   let initIterator = () => {
     initIterator = () => b;
-    const bi = queueIteratableIterator<V>();
+    const bi = debounceQueueIteratableIterator<V>();
     const mi = bi.multi();
     const b = mi[Symbol.asyncIterator]();
     extras[Symbol.asyncIterator] = {
@@ -214,7 +228,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
       enumerable: false,
       writable: false
     };
-    push = bi.debounce;
+    push = bi.push;
     extraKeys.forEach(k =>
       extras[k] = {
         // @ts-ignore - Fix
@@ -355,30 +369,17 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
               console.info(`The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
             if (Array.isArray(a))
               boxedObject = Object.defineProperties([...a] as V, pds);
-              // @ts-ignore
-              // boxedObject = [...a] as V;
             else
               boxedObject = Object.defineProperties({ ...(a as V) }, pds);
-            // @ts-ignore
-              // boxedObject = { ...(a as V) };
           } else {
             Object.assign(boxedObject, a);
           }
           if (boxedObject[Iterability] === 'shallow') {
             boxedObject = Object.defineProperties(boxedObject, pds);
-            /*
-            BROKEN: fails nested properties
-            Object.defineProperty(boxedObject, 'valueOf', {
-              value() {
-                return boxedObject
-              },
-              writable: true
-            });
-            */
             return boxedObject;
           }
-          // else proxy the result so we can track members of the iterable object
 
+          // Proxy the result so we can track members of the iterable object
           const extraBoxed: typeof boxedObject = new Proxy(boxedObject, {
             deleteProperty(target, key) {
               if (Reflect.deleteProperty(target, key)) {
@@ -409,7 +410,7 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
               //   iterable: { stuff: {} as Record<string, string | number ... }
               if ((targetProp === undefined && !(key in target)) || targetProp?.enumerable) {
                 if (targetProp === undefined) {
-                  // @ts-ignore - Fix
+                  // @ts-ignore - Fix: this "redefines" V as having an optional member called `key`
                   target[key] = undefined;
                 }
                 const realValue = Reflect.get(boxedObject as Exclude<typeof boxedObject, typeof Ignore>, key, receiver);
@@ -419,11 +420,10 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                     const pv = p?.valueOf();
                     if (typeof ov === typeof pv && ov == pv)
                       return Ignore;
-                    return ov//o?.[key as keyof typeof o]
+                    return ov;
                   })
                 );
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
-                // @ts-ignore - Fix
                 return box(realValue, props);
               }
               return Reflect.get(target, key, receiver);
@@ -604,12 +604,13 @@ function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
 export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown> {
   if (!isExtraIterable(ai)) {
-    Object.defineProperties(ai,
-      Object.fromEntries(
-        Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k,v]) => [k,{...v, enumerable: false}]
-        )
-      )
-    );
+    assignHidden(ai, asyncExtras);
+    // Object.defineProperties(ai,
+    //   Object.fromEntries(
+    //     Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k,v]) => [k,{...v, enumerable: false}]
+    //     )
+    //   )
+    // );
   }
   return ai as A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> : never
 }

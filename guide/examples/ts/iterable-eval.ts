@@ -33,8 +33,11 @@ const App = div.extended({
         }, "eval")
       ),
       div("Updates: ",
-        Results({ data: this.thing })
+        div(this.thing.map(j => JSON.stringify(j)))
       )
+      // div("Updates: ",
+      //   Results({ data: this.thing })
+      // )
     ]
   }
 });
