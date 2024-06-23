@@ -433,7 +433,9 @@ export function defineIterableProperty<T extends {}, N extends string | symbol, 
                   })
                 );
                 (Reflect.ownKeys(props) as (keyof typeof props)[]).forEach(k => props[k].enumerable = false);
-                return box(realValue, props);
+                const aib = box(realValue, props);
+                Reflect.set(target, key, aib);
+                return aib;
               }
               return Reflect.get(target, key, receiver);
             },

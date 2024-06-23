@@ -339,7 +339,9 @@ export function defineIterableProperty(obj, name, v) {
                                     return ov;
                                 }));
                                 Reflect.ownKeys(props).forEach(k => props[k].enumerable = false);
-                                return box(realValue, props);
+                                const aib = box(realValue, props);
+                                Reflect.set(target, key, aib);
+                                return aib;
                             }
                             return Reflect.get(target, key, receiver);
                         },
