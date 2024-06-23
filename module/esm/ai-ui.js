@@ -482,8 +482,9 @@ export const tag = function (_1, _2, _3) {
                 if (k in e) {
                     console.log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
                 }
-                else
+                else {
                     defineIterableProperty(e, k, tagDefinition.iterable[k]);
+                }
             });
             if (combinedAttrs[callStackSymbol] === newCallStack) {
                 if (!noAttrs)

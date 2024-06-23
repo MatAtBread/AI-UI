@@ -164,7 +164,7 @@ function internalQueueIteratableIterator<T>(stop = () => { }) {
       } else {
         if (!q[queue_items]) {
           console.log('Discarding queue push as there are no consumers');
-        } else if (!q[queue_items].find(v => v === value)) {
+        } else {
           q[queue_items].push(value)
         }
       }
@@ -196,7 +196,7 @@ function internalDebounceQueueIteratableIterator<T>(stop = () => { }) {
     } else {
       if (!q[queue_items]) {
         console.log('Discarding queue push as there are no consumers');
-      } else {
+      } else if (!q[queue_items].find(v => v === value)) {
         q[queue_items].push(value)
       }
     }
@@ -223,7 +223,7 @@ declare global {
    This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
 
-export function defineIterableProperty<T extends {}, N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>> {
+export function defineIterableProperty<T extends {}, const N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<{ [k in N]: V }> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
@@ -616,12 +616,6 @@ function isExtraIterable<T>(i: any): i is AsyncExtraIterable<T> {
 export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown> {
   if (!isExtraIterable(ai)) {
     assignHidden(ai, asyncExtras);
-    // Object.defineProperties(ai,
-    //   Object.fromEntries(
-    //     Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k,v]) => [k,{...v, enumerable: false}]
-    //     )
-    //   )
-    // );
   }
   return ai as A extends AsyncIterable<infer T> ? AsyncExtraIterable<T> & A : never
 }

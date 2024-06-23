@@ -107,7 +107,7 @@ function internalQueueIteratableIterator(stop = () => { }) {
                 if (!q[queue_items]) {
                     console.log('Discarding queue push as there are no consumers');
                 }
-                else if (!q[queue_items].find(v => v === value)) {
+                else {
                     q[queue_items].push(value);
                 }
             }
@@ -136,7 +136,7 @@ function internalDebounceQueueIteratableIterator(stop = () => { }) {
             if (!q[queue_items]) {
                 console.log('Discarding queue push as there are no consumers');
             }
-            else {
+            else if (!q[queue_items].find(v => v === value)) {
                 q[queue_items].push(value);
             }
         }
@@ -493,12 +493,6 @@ function isExtraIterable(i) {
 export function iterableHelpers(ai) {
     if (!isExtraIterable(ai)) {
         assignHidden(ai, asyncExtras);
-        // Object.defineProperties(ai,
-        //   Object.fromEntries(
-        //     Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k,v]) => [k,{...v, enumerable: false}]
-        //     )
-        //   )
-        // );
     }
     return ai;
 }
