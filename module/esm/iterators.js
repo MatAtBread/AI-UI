@@ -46,67 +46,69 @@ function assignHidden(d, ...srcs) {
     }
     return d;
 }
-export function queueIteratableIterator(stop = () => { }) {
+const queue_pending = Symbol('pending');
+const queue_items = Symbol('items');
+function internalQueueIteratableIterator(stop = () => { }) {
     const q = {
-        _pending: [],
-        _items: [],
+        [queue_pending]: [],
+        [queue_items]: [],
         [Symbol.asyncIterator]() {
             return q;
         },
         next() {
-            if (q._items?.length) {
-                return Promise.resolve({ done: false, value: q._items.shift() });
+            if (q[queue_items]?.length) {
+                return Promise.resolve({ done: false, value: q[queue_items].shift() });
             }
             const value = deferred();
             // We install a catch handler as the promise might be legitimately reject before anything waits for it,
             // and this suppresses the uncaught exception warning.
             value.catch(ex => { });
-            q._pending.unshift(value);
+            q[queue_pending].unshift(value);
             return value;
         },
         return(v) {
             const value = { done: true, value: undefined };
-            if (q._pending) {
+            if (q[queue_pending]) {
                 try {
                     stop();
                 }
                 catch (ex) { }
-                while (q._pending.length)
-                    q._pending.pop().resolve(value);
-                q._items = q._pending = null;
+                while (q[queue_pending].length)
+                    q[queue_pending].pop().resolve(value);
+                q[queue_items] = q[queue_pending] = null;
             }
             return Promise.resolve(value);
         },
         throw(...args) {
             const value = { done: true, value: args[0] };
-            if (q._pending) {
+            if (q[queue_pending]) {
                 try {
                     stop();
                 }
                 catch (ex) { }
-                while (q._pending.length)
-                    q._pending.pop().reject(value);
-                q._items = q._pending = null;
+                while (q[queue_pending].length)
+                    q[queue_pending].pop().reject(value);
+                q[queue_items] = q[queue_pending] = null;
             }
             return Promise.reject(value);
         },
         get length() {
-            if (!q._items)
+            if (!q[queue_items])
                 return -1; // The queue has no consumers and has terminated.
-            return q._items.length;
+            return q[queue_items].length;
         },
         push(value) {
-            if (!q._pending)
+            if (!q[queue_pending])
                 return false;
-            if (q._pending.length) {
-                q._pending.pop().resolve({ done: false, value });
+            if (q[queue_pending].length) {
+                q[queue_pending].pop().resolve({ done: false, value });
             }
             else {
-                if (!q._items) {
+                if (!q[queue_items]) {
                     console.log('Discarding queue push as there are no consumers');
                 }
-                else if (!q._items.find(v => v === value)) {
-                    q._items.push(value);
+                else if (!q[queue_items].find(v => v === value)) {
+                    q[queue_items].push(value);
                 }
             }
             return true;
@@ -114,33 +116,37 @@ export function queueIteratableIterator(stop = () => { }) {
     };
     return iterableHelpers(q);
 }
-export function debounceQueueIteratableIterator(stop = () => { }) {
-    let _inflight = new Set();
-    const q = queueIteratableIterator(stop);
+const queue_inflight = Symbol('inflight');
+function internalDebounceQueueIteratableIterator(stop = () => { }) {
+    const q = internalQueueIteratableIterator(stop);
+    q[queue_inflight] = new Set();
     q.push = function (value) {
-        if (!q._pending)
+        if (!q[queue_pending])
             return false;
         // Debounce
-        if (_inflight.has(value))
+        if (q[queue_inflight].has(value))
             return true;
-        _inflight.add(value);
-        if (q._pending.length) {
-            const p = q._pending.pop();
-            p.finally(() => _inflight.delete(value));
+        q[queue_inflight].add(value);
+        if (q[queue_pending].length) {
+            const p = q[queue_pending].pop();
+            p.finally(() => q[queue_inflight].delete(value));
             p.resolve({ done: false, value });
         }
         else {
-            if (!q._items) {
+            if (!q[queue_items]) {
                 console.log('Discarding queue push as there are no consumers');
             }
             else {
-                q._items.push(value);
+                q[queue_items].push(value);
             }
         }
         return true;
     };
     return q;
 }
+// Re-export to hide the internals
+export const queueIteratableIterator = (stop = () => { }) => internalQueueIteratableIterator(stop);
+export const debounceQueueIteratableIterator = (stop = () => { }) => internalDebounceQueueIteratableIterator(stop);
 /* Define a "iterable property" on `obj`.
    This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
    yields when the property is set.
