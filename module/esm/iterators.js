@@ -38,11 +38,10 @@ const asyncExtras = {
 };
 const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)];
 // Like Object.assign, but the assigned properties are not enumerable
-function assignHidden(d, ...srcs) {
-    for (const s of srcs) {
-        for (const [k, pd] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
-            Object.defineProperty(d, k, { ...pd, enumerable: false });
-        }
+function assignHidden(d, s) {
+    const keys = [...Object.getOwnPropertyNames(s), ...Object.getOwnPropertySymbols(s)];
+    for (const k of keys) {
+        Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false });
     }
     return d;
 }
@@ -57,7 +56,7 @@ function internalQueueIteratableIterator(stop = () => { }) {
         },
         next() {
             if (q[queue_items]?.length) {
-                return Promise.resolve({ done: false, value: q[queue_items].shift() });
+                return Promise.resolve(q[queue_items].shift());
             }
             const value = deferred();
             // We install a catch handler as the promise might be legitimately reject before anything waits for it,
@@ -108,7 +107,7 @@ function internalQueueIteratableIterator(stop = () => { }) {
                     console.log('Discarding queue push as there are no consumers');
                 }
                 else {
-                    q[queue_items].push(value);
+                    q[queue_items].push({ done: false, value });
                 }
             }
             return true;
@@ -137,7 +136,7 @@ function internalDebounceQueueIteratableIterator(stop = () => { }) {
                 console.log('Discarding queue push as there are no consumers');
             }
             else if (!q[queue_items].find(v => v === value)) {
-                q[queue_items].push(value);
+                q[queue_items].push({ done: false, value });
             }
         }
         return true;
@@ -152,6 +151,7 @@ export const debounceQueueIteratableIterator = internalDebounceQueueIteratableIt
    yields when the property is set.
    This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
+const ProxiedAsyncIterator = Symbol('ProxiedAsyncIterator');
 export function defineIterableProperty(obj, name, v) {
     // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
     // access the iterator methods to prevent leaks where an iterable is created, but
@@ -161,19 +161,12 @@ export function defineIterableProperty(obj, name, v) {
         const bi = debounceQueueIteratableIterator();
         const mi = bi.multi();
         const b = mi[Symbol.asyncIterator]();
-        extras[Symbol.asyncIterator] = {
-            value: mi[Symbol.asyncIterator],
-            enumerable: false,
-            writable: false
-        };
+        extras[Symbol.asyncIterator] = mi[Symbol.asyncIterator];
         push = bi.push;
-        extraKeys.forEach(k => extras[k] = {
-            // @ts-ignore - Fix
-            value: b[k],
-            enumerable: false,
-            writable: false
-        });
-        Object.defineProperties(a, extras);
+        extraKeys.forEach(k => // @ts-ignore
+         extras[k] = b[k]);
+        if (!(ProxiedAsyncIterator in a))
+            assignHidden(a, extras);
         return b;
     };
     // Create stubs that lazily create the AsyncExtraIterable interface when invoked
@@ -186,27 +179,17 @@ export function defineIterableProperty(obj, name, v) {
             }
         }[method];
     }
-    const extras = {
-        [Symbol.asyncIterator]: {
-            enumerable: false,
-            writable: true,
-            value: initIterator
-        }
-    };
-    extraKeys.forEach((k) => extras[k] = {
-        enumerable: false,
-        writable: true,
-        // @ts-ignore - Fix
-        value: lazyAsyncMethod(k)
-    });
+    const extras = { [Symbol.asyncIterator]: initIterator };
+    extraKeys.forEach((k) => // @ts-ignore
+     extras[k] = lazyAsyncMethod(k));
+    if (typeof v === 'object' && v && Iterability in v && v[Iterability] === 'shallow') {
+        extras[Iterability] = v[Iterability];
+    }
     // Lazily initialize `push`
     let push = (v) => {
         initIterator(); // Updates `push` to reference the multi-queue
         return push(v);
     };
-    if (typeof v === 'object' && v && Iterability in v) {
-        extras[Iterability] = Object.getOwnPropertyDescriptor(v, Iterability);
-    }
     let a = box(v, extras);
     let piped = undefined;
     Object.defineProperty(obj, name, {
@@ -235,6 +218,7 @@ export function defineIterableProperty(obj, name, v) {
                             // We're being piped from something else. We want to stop that one and get piped from this one
                             throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`, { cause: stack });
                         }
+                        console.log("piped push", y);
                         push(y?.valueOf());
                     })
                         .catch(ex => console.info(ex))
@@ -243,123 +227,105 @@ export function defineIterableProperty(obj, name, v) {
                     return;
                 }
                 else {
-                    if (piped) {
-                        throw new Error(`Iterable "${name.toString()}" is already piped from another iterator`);
+                    if (piped && DEBUG) {
+                        console.log(`Iterable "${name.toString()}" is already piped from another iterator, and might be overrwitten later`);
                     }
                     a = box(v, extras);
                 }
             }
+            console.log("set push", v);
             push(v?.valueOf());
         },
         enumerable: true
     });
     return obj;
     function box(a, pds) {
-        let boxedObject = Ignore;
         if (a === null || a === undefined) {
-            return Object.create(null, {
-                ...pds,
+            return assignHidden(Object.create(null, {
                 valueOf: { value() { return a; }, writable: true },
                 toJSON: { value() { return a; }, writable: true }
-            });
+            }), pds);
         }
         switch (typeof a) {
-            case 'object':
-                /* TODO: This is problematic as the object might have clashing keys and nested members.
-                  The current implementation:
-                  * Spreads iterable objects in to a shallow copy of the original object, and overrites clashing members like `map`
-                  *     this.iterableObj.map(o => o.field);
-                  * The iterator will yield on
-                  *     this.iterableObj = newValue;
-        
-                  * Members access is proxied, so that:
-                  *     (set) this.iterableObj.field = newValue;
-                  * ...causes the underlying object to yield by re-assignment (therefore calling the setter)
-                  * Similarly:
-                  *     (get) this.iterableObj.field
-                  * ...causes the iterator for the base object to be mapped, like
-                  *     this.iterableObject.map(o => o[field])
-                */
-                if (!(Symbol.asyncIterator in a)) {
-                    // @ts-expect-error - Ignore is the INITIAL value
-                    if (boxedObject === Ignore) {
-                        if (DEBUG)
-                            console.info(`The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
-                        if (Array.isArray(a))
-                            boxedObject = Object.defineProperties([...a], pds);
-                        else
-                            boxedObject = Object.defineProperties({ ...a }, pds);
-                    }
-                    else {
-                        Object.assign(boxedObject, a);
-                    }
-                    if (boxedObject[Iterability] === 'shallow') {
-                        boxedObject = Object.defineProperties(boxedObject, pds);
-                        return boxedObject;
-                    }
-                    // Proxy the result so we can track members of the iterable object
-                    const extraBoxed = new Proxy(boxedObject, {
-                        deleteProperty(target, key) {
-                            if (Reflect.deleteProperty(target, key)) {
-                                // @ts-ignore - Fix
-                                push(obj[name]);
-                                return true;
-                            }
-                            return false;
-                        },
-                        // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
-                        set(target, key, value, receiver) {
-                            if (Reflect.set(target, key, value, receiver)) {
-                                // @ts-ignore - Fix
-                                push(obj[name]);
-                                return true;
-                            }
-                            return false;
-                        },
-                        // Implement the logic that returns a mapped iterator for the specified field
-                        get(target, key, receiver) {
-                            if (key === 'valueOf')
-                                return () => boxedObject;
-                            const targetProp = Reflect.getOwnPropertyDescriptor(target, key);
-                            // We include `targetProp === undefined` so we can monitor nested properties that aren't actually defined (yet)
-                            // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
-                            // defintions like:
-                            //   iterable: { stuff: {} as Record<string, string | number ... }
-                            if ((targetProp === undefined && !(key in target)) || targetProp?.enumerable) {
-                                if (targetProp === undefined) {
-                                    // @ts-ignore - Fix: this "redefines" V as having an optional member called `key`
-                                    target[key] = undefined;
-                                }
-                                const realValue = Reflect.get(boxedObject, key, receiver);
-                                const props = Object.getOwnPropertyDescriptors(boxedObject.map((o, p) => {
-                                    const ov = o?.[key]?.valueOf();
-                                    const pv = p?.valueOf();
-                                    if (typeof ov === typeof pv && ov == pv)
-                                        return Ignore;
-                                    return ov;
-                                }));
-                                Reflect.ownKeys(props).forEach(k => props[k].enumerable = false);
-                                const aib = box(realValue, props);
-                                Reflect.set(target, key, aib);
-                                return aib;
-                            }
-                            return Reflect.get(target, key, receiver);
-                        },
-                    });
-                    return extraBoxed;
-                }
-                return a;
             case 'bigint':
             case 'boolean':
             case 'number':
             case 'string':
                 // Boxes types, including BigInt
-                return Object.defineProperties(Object(a), {
-                    ...pds,
+                return assignHidden(Object(a), Object.assign(pds, {
                     toJSON: { value() { return a.valueOf(); }, writable: true }
-                });
+                }));
+            case 'object':
+                // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
+                // The proxies are recursive, so that if an object contains objects, they too are proxied. Objects containing primitives remain proxied to
+                // handle the get/set/selete in place of the usual primitive boxing via Object(primitiveValue)
+                // @ts-ignore
+                return boxObject(a, pds);
         }
         throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
+    }
+    function boxObject(a, pds) {
+        const cachedIterators = new Map();
+        const handler = (path = '') => ({
+            has(target, key) {
+                return key === ProxiedAsyncIterator || key in target || key in pds;
+            },
+            get(target, key, receiver) {
+                function destructure(o) {
+                    const fields = path.split('.').slice(1);
+                    // @ts-ignore
+                    for (let i = 0; i < fields.length; i++)
+                        o = o?.[fields[i]];
+                    return o;
+                }
+                if (key === 'valueOf')
+                    return () => destructure(a);
+                if (key in pds) {
+                    if (!path.length)
+                        // @ts-ignore
+                        return pds[key];
+                    let ai = cachedIterators.get(path);
+                    if (!ai) {
+                        ai = filterMap(pds, (o, p) => {
+                            const v = destructure(o);
+                            return p === v ? Ignore : v;
+                        }, Ignore, destructure(a));
+                        cachedIterators.set(path, ai);
+                    }
+                    return ai[key];
+                }
+                if (typeof key === 'string') {
+                    if (Object.hasOwn(target, key)) {
+                        return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
+                    }
+                    if (!(key in target)) {
+                        // This is a brand new key within the target
+                        return new Proxy({}, handler(path + '.' + key));
+                    }
+                }
+                // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
+                return Reflect.get(target, key, receiver);
+            },
+            set(target, key, value, receiver) {
+                if (key in pds) {
+                    throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
+                }
+                if (Reflect.get(target, key, receiver) !== value) {
+                    console.log("proxy push", target, key);
+                    push(a);
+                }
+                return Reflect.set(target, key, value, receiver);
+            },
+            deleteProperty(target, key) {
+                if (key in pds) {
+                    throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
+                }
+                push(a);
+                // TODO: close the queue (via push?) and that of any contained propeties
+                return Reflect.deleteProperty(target, key);
+            },
+        });
+        return new Proxy(a, handler());
     }
 }
 export const merge = (...ai) => {
@@ -521,9 +487,8 @@ function resolveSync(v, then, except) {
         return except(ex);
     }
 }
-export function filterMap(source, fn, initialValue = Ignore) {
+export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
     let ai;
-    let prev = Ignore;
     const fai = {
         [Symbol.asyncIterator]() {
             return fai;

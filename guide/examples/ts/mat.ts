@@ -1,25 +1,20 @@
-import { tag, Iterators } from '../../../module/esm/ai-ui.js'
-Iterators.augmentGlobalAsyncGenerators();
-const { div, span } = tag();
+import { IterableProperties, defineIterableProperty } from '../../../module/esm/iterators.js'
+import { tag } from '../../../module/esm/ai-ui.js';
+const { div } = tag();
 
-const App = div.extended({
-iterable:{
-    v: {
-        data:{}
-    }
-},
-  constructed() {
-    return [
-        this.v.map!(v => JSON.stringify(v))," ",
-        this.v.data.map!(v => JSON.stringify(v))," "
-    ];
+const x = {} as IterableProperties<{
+  n: number,
+  o: {
+    s: string,
+    p: any
   }
-});
+}>;
+(window as any).x = x;
+defineIterableProperty(x,'n',456);
+x.n.consume!(x => console.log("n is",x));
 
-/* Create and add an "App" element to the document so the user can see it! */
-document.body.append(window.x = App());
+defineIterableProperty(x,'o',{ s: 'foo', p: { q: 123 } });
 
-// A simple async function that pauses for the specified number of milliseocnds
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+x.o.consume!(x => console.log("o is",x));
+x.o.s.consume!(x => console.log("o.s is",x));
+x.o.p.consume!(x => console.log("o.p is",x));
