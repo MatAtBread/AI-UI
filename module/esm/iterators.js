@@ -265,66 +265,69 @@ export function defineIterableProperty(obj, name, v) {
         throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
     }
     function boxObject(a, pds) {
-        const cachedIterators = new Map();
-        const handler = (path = '') => ({
-            has(target, key) {
-                return key === ProxiedAsyncIterator || key in target || key in pds;
-            },
-            get(target, key, receiver) {
-                function destructure(o) {
-                    const fields = path.split('.').slice(1);
-                    // @ts-ignore
-                    for (let i = 0; i < fields.length; i++)
-                        o = o?.[fields[i]];
-                    return o;
-                }
-                if (key === 'valueOf')
-                    return () => destructure(a);
-                if (key in pds) {
-                    if (!path.length)
-                        // @ts-ignore
-                        return pds[key];
-                    let ai = cachedIterators.get(path);
-                    if (!ai) {
-                        ai = filterMap(pds, (o, p) => {
-                            const v = destructure(o);
-                            return p === v ? Ignore : v;
-                        }, Ignore, destructure(a));
-                        cachedIterators.set(path, ai);
+        const keyIterator = new Map();
+        function handler(path = '') {
+            return {
+                has(target, key) {
+                    return key === ProxiedAsyncIterator || key in target || key in pds;
+                },
+                get(target, key, receiver) {
+                    function destructure(o) {
+                        const fields = path.split('.').slice(1);
+                        for (let i = 0; i < fields.length; i++)
+                            o = o?.[fields[i]];
+                        return o;
                     }
-                    return ai[key];
-                }
-                if (typeof key === 'string') {
-                    if (Object.hasOwn(target, key)) {
-                        return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
+                    if (key === 'valueOf')
+                        return () => destructure(a);
+                    if (key in pds) {
+                        if (!path.length) {
+                            return pds[key];
+                        }
+                        let ai = keyIterator.get(path);
+                        if (!ai) {
+                            ai = filterMap(pds, (o, p) => {
+                                const v = destructure(o);
+                                return p === v ? Ignore : v;
+                            }, Ignore, destructure(a));
+                            keyIterator.set(path, ai);
+                        }
+                        return ai[key];
                     }
-                    if (!(key in target)) {
-                        // This is a brand new key within the target
-                        return new Proxy({}, handler(path + '.' + key));
+                    if (typeof key === 'string') {
+                        if (Object.hasOwn(target, key)) {
+                            return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
+                        }
+                        if (!(key in target)) {
+                            // This is a brand new key within the target
+                            return new Proxy({}, handler(path + '.' + key));
+                        }
                     }
-                }
-                // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
-                return Reflect.get(target, key, receiver);
-            },
-            set(target, key, value, receiver) {
-                if (key in pds) {
-                    throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
-                }
-                if (Reflect.get(target, key, receiver) !== value) {
-                    console.log("proxy push", target, key);
-                    push(a);
-                }
-                return Reflect.set(target, key, value, receiver);
-            },
-            deleteProperty(target, key) {
-                if (key in pds) {
-                    throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
-                }
-                push(a);
-                // TODO: close the queue (via push?) and that of any contained propeties
-                return Reflect.deleteProperty(target, key);
-            },
-        });
+                    // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
+                    return Reflect.get(target, key, receiver);
+                },
+                set(target, key, value, receiver) {
+                    if (key in pds) {
+                        throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
+                    }
+                    // TODO: close the queue (via push?) and that of any contained propeties
+                    if (Reflect.get(target, key, receiver) !== value) {
+                        console.log("proxy push", target, key);
+                        push(a);
+                    }
+                    return Reflect.set(target, key, value, receiver);
+                },
+                deleteProperty(target, key) {
+                    if (key in pds) {
+                        throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
+                    }
+                    // TODO: close the queue (via push?) and that of any contained propeties
+                    if (Object.hasOwn(target, key))
+                        push(a);
+                    return Reflect.deleteProperty(target, key);
+                },
+            };
+        }
         return new Proxy(a, handler());
     }
 }
