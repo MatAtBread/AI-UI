@@ -264,32 +264,38 @@ export function defineIterableProperty(obj, name, v) {
         }
         throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
     }
+    function isProxiedAsyncIterator(o) {
+        return isObjectLike(o) && ProxiedAsyncIterator in o;
+    }
+    function destructure(o, path) {
+        const fields = path.split('.').slice(1);
+        for (let i = 0; i < fields.length; i++)
+            o = o?.[fields[i]];
+        return o;
+    }
     function boxObject(a, pds) {
         const keyIterator = new Map();
+        const withPath = filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator] : { a: o, path: '' });
+        const withoutPath = filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator].a : o);
         function handler(path = '') {
             return {
                 has(target, key) {
                     return key === ProxiedAsyncIterator || key in target || key in pds;
                 },
                 get(target, key, receiver) {
-                    function destructure(o) {
-                        const fields = path.split('.').slice(1);
-                        for (let i = 0; i < fields.length; i++)
-                            o = o?.[fields[i]];
-                        return o;
-                    }
                     if (key === 'valueOf')
-                        return () => destructure(a);
+                        return () => destructure(a, path);
                     if (key in pds) {
                         if (!path.length) {
-                            return pds[key];
+                            return withoutPath[key];
                         }
                         let ai = keyIterator.get(path);
                         if (!ai) {
-                            ai = filterMap(pds, (o, p) => {
-                                const v = destructure(o);
-                                return p === v ? Ignore : v;
-                            }, Ignore, destructure(a));
+                            ai = filterMap(withPath, (o, p) => {
+                                const v = destructure(o.a, path);
+                                //console.log(path,key,o.path,v);
+                                return p !== v || o.path.startsWith(path) ? v : Ignore;
+                            }, Ignore, destructure(a, path));
                             keyIterator.set(path, ai);
                         }
                         return ai[key];
@@ -312,8 +318,7 @@ export function defineIterableProperty(obj, name, v) {
                     }
                     // TODO: close the queue (via push?) and that of any contained propeties
                     if (Reflect.get(target, key, receiver) !== value) {
-                        console.log("proxy push", target, key);
-                        push(a);
+                        push({ [ProxiedAsyncIterator]: { a, path } });
                     }
                     return Reflect.set(target, key, value, receiver);
                 },
@@ -323,7 +328,7 @@ export function defineIterableProperty(obj, name, v) {
                     }
                     // TODO: close the queue (via push?) and that of any contained propeties
                     if (Object.hasOwn(target, key))
-                        push(a);
+                        push({ [ProxiedAsyncIterator]: { a, path } });
                     return Reflect.deleteProperty(target, key);
                 },
             };
