@@ -303,7 +303,6 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
               // We're being piped from something else. We want to stop that one and get piped from this one
               throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`,{ cause: stack });
             }
-            console.log("piped push",y);
             push(y?.valueOf() as V)
           })
           .catch(ex => console.info(ex))
@@ -318,7 +317,6 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           a = box(v, extras);
         }
       }
-      console.log("set push",v);
       push(v?.valueOf() as V);
     },
     enumerable: true
@@ -370,7 +368,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
       return {
         // A boxed object has its own keys, and the keys of an AsyncExtraIterable
         has(target, key) {
-          return key === ProxiedAsyncIterator || key in target || key in pds;
+          return key === ProxiedAsyncIterator || key === Symbol.toPrimitive || key in target || key in pds;
         },
         // When a key is set in the target, push the change, and conditionally terminate any consumers
         set(target, key, value, receiver) {
@@ -391,23 +389,23 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           // TODO: close the queue (via push?) and that of any contained propeties
           //if (Object.hasOwn(target, key))
           //  push({ [ProxiedAsyncIterator]: {a,path} } as any);
-          let ai = keyIterator.get(path);
-          console.log("TODO: terminate", ai);
+          // let ai = keyIterator.get(path);
+          // if (ai instanceof Error) return false;
+          // keyIterator.set(`${path}.${key.toString()}`, new Error(`Iterable propety ${name.toString()}${path}.${key.toString()} has been deleted`));
           // @ts-ignore
           // if (ai) ai?.return();
           return Reflect.deleteProperty(target, key);
         },
         // When getting the value of a boxed object member, prefer asyncExtraIterable over target keys
         get(target, key, receiver) {
-          if (key === 'valueOf') return () => destructure(a, path);
-
           // If the key is an asyncExtraIterable member, create the mapped queue to generate it
-          if (key in pds) {
+          if (Object.hasOwn(pds,key)) {
             if (!path.length) {
               withoutPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator].a : o);
               return withoutPath[key as keyof typeof pds];
             }
             let ai = keyIterator.get(path);
+            // if (ai instanceof Error) throw ai;
             if (!ai) {
               withPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator] : { a: o, path: '' });
 
@@ -421,17 +419,31 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           }
 
           // If the key is a target property, create the proxy to handle it
-          if (typeof key === 'string') {
-            if (Object.hasOwn(target, key)) {
-              return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
+          if (key === Symbol.toPrimitive) {
+            // Special case, since Symbol.toPrimitive is in ha(), we need to implement it
+            return function(hint?:'string'|'number'|'default') {
+              if (Reflect.has(target, key))
+                return Reflect.get(target, key, target)(hint);
+              if (hint === 'string') return target.toString();
+              if (hint === 'number') return +target.valueOf();
+              return target.constructor(target);
             }
+          }
+          if (typeof key === 'string') {
             if (!(key in target)) {
               // This is a brand new key within the target
-              return new Proxy({}, handler(path + '.' + key));
+              Reflect.set(target, key, undefined, target);
+            }
+            if (Object.hasOwn(target, key)) {
+              return new Proxy(Object(Reflect.get(target, key, target)), handler(path + '.' + key));
             }
           }
           // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
-          return Reflect.get(target, key, receiver);
+          const p = Reflect.get(target, key, target);
+          if (typeof p === 'function') {
+            return p.bind(target);
+          }
+          return p;
         }
       }
     }
