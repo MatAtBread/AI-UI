@@ -359,28 +359,58 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
   }
   function destructure(o: any, path: string) {
     const fields = path.split('.').slice(1);
-    for (let i = 0; i < fields.length; i++) o = o?.[fields[i]];
+    for (let i = 0; i < fields.length && ((o = o?.[fields[i]]) !== undefined); i++) ;
     return o;
   }
   function boxObject(a: V, pds: AsyncExtraIterable<PossiblyWithPath>) {
     const keyIterator = new Map<string,AsyncExtraIterable<any>>();
-    const withPath = filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator] : { a: o, path: '' });
-    const withoutPath = filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator].a : o);
+    let withPath:  AsyncExtraIterable<WithPath[typeof ProxiedAsyncIterator]>;
+    let withoutPath:  AsyncExtraIterable<V>;
     function handler(path = ''): ProxyHandler<object> {
-
       return {
+        // A boxed object has its own keys, and the keys of an AsyncExtraIterable
         has(target, key) {
           return key === ProxiedAsyncIterator || key in target || key in pds;
         },
+        // When a key is set in the target, push the change, and conditionally terminate any consumers
+        set(target, key, value, receiver) {
+          if (key in pds) {
+            throw new Error(`Cannot set ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
+          }
+          // TODO: close the queue (via push?) and that of any contained propeties
+          if (Reflect.get(target, key, receiver) !== value) {
+            push({ [ProxiedAsyncIterator]: {a,path} } as any);
+          }
+          return Reflect.set(target, key, value, receiver);
+        },
+        // When a key is deleted from the target terminate any consumers
+        deleteProperty(target, key) {
+          if (key in pds) {
+            throw new Error(`Cannot delete ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
+          }
+          // TODO: close the queue (via push?) and that of any contained propeties
+          //if (Object.hasOwn(target, key))
+          //  push({ [ProxiedAsyncIterator]: {a,path} } as any);
+          let ai = keyIterator.get(path);
+          console.log("TODO: terminate", ai);
+          // @ts-ignore
+          // if (ai) ai?.return();
+          return Reflect.deleteProperty(target, key);
+        },
+        // When getting the value of a boxed object member, prefer asyncExtraIterable over target keys
         get(target, key, receiver) {
           if (key === 'valueOf') return () => destructure(a, path);
 
+          // If the key is an asyncExtraIterable member, create the mapped queue to generate it
           if (key in pds) {
             if (!path.length) {
+              withoutPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator].a : o);
               return withoutPath[key as keyof typeof pds];
             }
             let ai = keyIterator.get(path);
             if (!ai) {
+              withPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator] : { a: o, path: '' });
+
               ai = filterMap(withPath, (o, p) => {
                 const v = destructure(o.a, path);
                 return p !== v || o.path.startsWith(path) ? v : Ignore ;
@@ -390,6 +420,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
             return ai[key as keyof typeof ai];
           }
 
+          // If the key is a target property, create the proxy to handle it
           if (typeof key === 'string') {
             if (Object.hasOwn(target, key)) {
               return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
@@ -401,26 +432,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           }
           // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
           return Reflect.get(target, key, receiver);
-        },
-        set(target, key, value, receiver) {
-          if (key in pds) {
-            throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
-          }
-          // TODO: close the queue (via push?) and that of any contained propeties
-          if (Reflect.get(target, key, receiver) !== value) {
-            push({ [ProxiedAsyncIterator]: {a,path} } as any);
-          }
-          return Reflect.set(target, key, value, receiver);
-        },
-        deleteProperty(target, key) {
-          if (key in pds) {
-            throw new Error(`Cannot set iterable property ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
-          }
-          // TODO: close the queue (via push?) and that of any contained propeties
-          if (Object.hasOwn(target, key))
-            push({ [ProxiedAsyncIterator]: {a,path} } as any);
-          return Reflect.deleteProperty(target, key);
-        },
+        }
       }
     }
     return new Proxy(a as object, handler()) as V & AsyncExtraIterable<V>;
