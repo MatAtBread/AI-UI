@@ -95,13 +95,12 @@ const asyncExtras = {
 const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)] as (keyof typeof asyncExtras)[];
 
 // Like Object.assign, but the assigned properties are not enumerable
-function assignHidden<D extends {}, S extends {}>(d: D, ...srcs: S[]) {
-  for (const s of srcs) {
-    for (const [k,pd] of Object.entries(Object.getOwnPropertyDescriptors(s))) {
-      Object.defineProperty(d, k, {...pd, enumerable: false});
-    }
+function assignHidden<D extends {}, S extends {}>(d: D, s: S) {
+  const keys = [...Object.getOwnPropertyNames(s), ...Object.getOwnPropertySymbols(s)];
+  for (const k of keys) {
+    Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false});
   }
-  return d as D & S; 
+  return d as D & S;
 }
 
 const queue_pending = Symbol('pending');
