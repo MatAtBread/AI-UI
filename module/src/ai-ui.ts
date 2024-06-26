@@ -583,8 +583,9 @@ export const tag = <TagLoader>function <Tags extends string,
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
         if (k in e) {
           console.log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
-        } else
+        } else {
           defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
+        }
       });
       if (combinedAttrs[callStackSymbol] === newCallStack) {
         if (!noAttrs)
@@ -760,7 +761,7 @@ function DyamicElementError({ error }:{ error: Error | IteratorResult<Error>}) {
 
 export let enableOnRemovedFromDOM = function () {
   enableOnRemovedFromDOM = function () {} // Only create the observer once
-  new MutationObserver(function (mutations) {
+  new MutationObserver((mutations) => {
     mutations.forEach(function (m) {
       if (m.type === 'childList') {
         m.removedNodes.forEach(
@@ -790,7 +791,7 @@ function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, Nod
       }
     }
   }
-  new MutationObserver(function (mutations) {
+  new MutationObserver((mutations) => {
     mutations.forEach(function (m) {
       if (m.type === 'childList' && m.removedNodes.length) {
         walk(m[track])

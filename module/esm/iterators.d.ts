@@ -1,3 +1,7 @@
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
+export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | {
+    [k: string | symbol | number]: IterablePropertyValue;
+};
 export declare const Iterability: unique symbol;
 export type Iterability<Depth extends 'shallow' = 'shallow'> = {
     [Iterability]: Depth;
@@ -8,7 +12,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 } : {
     [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>;
 };
-export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T> {
+export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
     push(value: T): boolean;
     readonly length: number;
 }
@@ -34,7 +38,8 @@ declare const asyncExtras: {
         _this: Partial<AsyncIterable<T_1>>;
     } & S>;
 };
-export declare function queueIteratableIterator<T>(stop?: () => void): QueueIteratableIterator<T> & AsyncExtraIterable<T>;
+export declare const queueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T>;
+export declare const debounceQueueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T>;
 declare global {
     interface ObjectConstructor {
         defineProperties<T, M extends {
@@ -44,7 +49,9 @@ declare global {
         };
     }
 }
-export declare function defineIterableProperty<T extends {}, N extends string | symbol, V>(obj: T, name: N, v: V): T & IterableProperties<Record<N, V>>;
+export declare function defineIterableProperty<T extends {}, const N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<{
+    [k in N]: V;
+}>;
 type CollapseIterableType<T> = T[] extends Partial<AsyncIterable<infer U>>[] ? U : never;
 type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => CollapseIterableTypes<A[number]> & AsyncExtraIterable<CollapseIterableType<A[number]>>;

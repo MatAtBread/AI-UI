@@ -1,39 +1,12 @@
 import { DEBUG, console } from "./debug.js";
-import { deferred, isPromiseLike } from "./deferred.js";
-/* IterableProperties can't be correctly typed in TS right now, either the declaratiin
-  works for retrieval (the getter), or it works for assignments (the setter), but there's
-  no TS syntax that permits correct type-checking at present.
-
-  Ideally, it would be:
-
-  type IterableProperties<IP> = {
-    get [K in keyof IP](): AsyncExtraIterable<IP[K]> & IP[K]
-    set [K in keyof IP](v: IP[K])
-  }
-  See https://github.com/microsoft/TypeScript/issues/43826
-
-  We choose the following type description to avoid the issues above. Because the AsyncExtraIterable
-  is Partial it can be omitted from assignments:
-    this.prop = value;  // Valid, as long as valus has the same type as the prop
-  ...and when retrieved it will be the value type, and optionally the async iterator:
-    Div(this.prop) ; // the value
-    this.prop.map!(....)  // the iterator (not the trailing '!' to assert non-null value)
-
-  This relies on a hack to `wrapAsyncHelper` in iterators.ts when *accepts* a Partial<AsyncIterator>
-  but casts it to a AsyncIterator before use.
-
-  The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
-  By default, the currently implementation does a one-level deep mapping, so an iterable property 'obj' is itself
-  iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
-  iterable, but it's membetrs are just POJS values.
-*/
+import { deferred, isObjectLike, isPromiseLike } from "./deferred.js";
 export const Iterability = Symbol("Iterability");
 // NB: This also (incorrectly) passes sync iterators, as the protocol names are the same
 export function isAsyncIterator(o) {
     return typeof o?.next === 'function';
 }
 export function isAsyncIterable(o) {
-    return o && o[Symbol.asyncIterator] && typeof o[Symbol.asyncIterator] === 'function';
+    return isObjectLike(o) && (Symbol.asyncIterator in o) && typeof o[Symbol.asyncIterator] === 'function';
 }
 export function isAsyncIter(o) {
     return isAsyncIterable(o) || isAsyncIterator(o);
@@ -64,69 +37,77 @@ const asyncExtras = {
     }
 };
 const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)];
-export function queueIteratableIterator(stop = () => { }) {
-    let _pending = [];
-    let _items = [];
+// Like Object.assign, but the assigned properties are not enumerable
+function assignHidden(d, s) {
+    const keys = [...Object.getOwnPropertyNames(s), ...Object.getOwnPropertySymbols(s)];
+    for (const k of keys) {
+        Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false });
+    }
+    return d;
+}
+const queue_pending = Symbol('pending');
+const queue_items = Symbol('items');
+function internalQueueIteratableIterator(stop = () => { }) {
     const q = {
+        [queue_pending]: [],
+        [queue_items]: [],
         [Symbol.asyncIterator]() {
             return q;
         },
         next() {
-            if (_items?.length) {
-                return Promise.resolve({ done: false, value: _items.shift() });
+            if (q[queue_items]?.length) {
+                return Promise.resolve({ done: false, value: q[queue_items].shift() });
             }
             const value = deferred();
             // We install a catch handler as the promise might be legitimately reject before anything waits for it,
-            // and q suppresses the uncaught exception warning.
+            // and this suppresses the uncaught exception warning.
             value.catch(ex => { });
-            _pending.push(value);
+            q[queue_pending].unshift(value);
             return value;
         },
-        return() {
+        return(v) {
             const value = { done: true, value: undefined };
-            if (_pending) {
+            if (q[queue_pending]) {
                 try {
                     stop();
                 }
                 catch (ex) { }
-                while (_pending.length)
-                    _pending.shift().resolve(value);
-                _items = _pending = null;
+                while (q[queue_pending].length)
+                    q[queue_pending].pop().resolve(value);
+                q[queue_items] = q[queue_pending] = null;
             }
             return Promise.resolve(value);
         },
         throw(...args) {
             const value = { done: true, value: args[0] };
-            if (_pending) {
+            if (q[queue_pending]) {
                 try {
                     stop();
                 }
                 catch (ex) { }
-                while (_pending.length)
-                    _pending.shift().reject(value);
-                _items = _pending = null;
+                while (q[queue_pending].length)
+                    q[queue_pending].pop().reject(value);
+                q[queue_items] = q[queue_pending] = null;
             }
             return Promise.reject(value);
         },
         get length() {
-            if (!_items)
+            if (!q[queue_items])
                 return -1; // The queue has no consumers and has terminated.
-            return _items.length;
+            return q[queue_items].length;
         },
         push(value) {
-            if (!_pending) {
-                //throw new Error("queueIterator has stopped");
+            if (!q[queue_pending])
                 return false;
-            }
-            if (_pending.length) {
-                _pending.shift().resolve({ done: false, value });
+            if (q[queue_pending].length) {
+                q[queue_pending].pop().resolve({ done: false, value });
             }
             else {
-                if (!_items) {
+                if (!q[queue_items]) {
                     console.log('Discarding queue push as there are no consumers');
                 }
                 else {
-                    _items.push(value);
+                    q[queue_items].push(value);
                 }
             }
             return true;
@@ -134,6 +115,37 @@ export function queueIteratableIterator(stop = () => { }) {
     };
     return iterableHelpers(q);
 }
+const queue_inflight = Symbol('inflight');
+function internalDebounceQueueIteratableIterator(stop = () => { }) {
+    const q = internalQueueIteratableIterator(stop);
+    q[queue_inflight] = new Set();
+    q.push = function (value) {
+        if (!q[queue_pending])
+            return false;
+        // Debounce
+        if (q[queue_inflight].has(value))
+            return true;
+        q[queue_inflight].add(value);
+        if (q[queue_pending].length) {
+            const p = q[queue_pending].pop();
+            p.finally(() => q[queue_inflight].delete(value));
+            p.resolve({ done: false, value });
+        }
+        else {
+            if (!q[queue_items]) {
+                console.log('Discarding queue push as there are no consumers');
+            }
+            else if (!q[queue_items].find(v => v === value)) {
+                q[queue_items].push(value);
+            }
+        }
+        return true;
+    };
+    return q;
+}
+// Re-export to hide the internals
+export const queueIteratableIterator = internalQueueIteratableIterator;
+export const debounceQueueIteratableIterator = internalDebounceQueueIteratableIterator;
 /* Define a "iterable property" on `obj`.
    This is a property that holds a boxed (within an Object() call) value, and is also an AsyncIterableIterator. which
    yields when the property is set.
@@ -145,7 +157,7 @@ export function defineIterableProperty(obj, name, v) {
     // never referenced, and therefore cannot be consumed and ultimately closed
     let initIterator = () => {
         initIterator = () => b;
-        const bi = queueIteratableIterator();
+        const bi = debounceQueueIteratableIterator();
         const mi = bi.multi();
         const b = mi[Symbol.asyncIterator]();
         extras[Symbol.asyncIterator] = {
@@ -274,31 +286,26 @@ export function defineIterableProperty(obj, name, v) {
                             console.info(`The iterable property '${name.toString()}' of type "object" will be spread to prevent re-initialisation.\n${new Error().stack?.slice(6)}`);
                         if (Array.isArray(a))
                             boxedObject = Object.defineProperties([...a], pds);
-                        // @ts-ignore
-                        // boxedObject = [...a] as V;
                         else
                             boxedObject = Object.defineProperties({ ...a }, pds);
-                        // @ts-ignore
-                        // boxedObject = { ...(a as V) };
                     }
                     else {
                         Object.assign(boxedObject, a);
                     }
                     if (boxedObject[Iterability] === 'shallow') {
                         boxedObject = Object.defineProperties(boxedObject, pds);
-                        /*
-                        BROKEN: fails nested properties
-                        Object.defineProperty(boxedObject, 'valueOf', {
-                          value() {
-                            return boxedObject
-                          },
-                          writable: true
-                        });
-                        */
                         return boxedObject;
                     }
-                    // else proxy the result so we can track members of the iterable object
+                    // Proxy the result so we can track members of the iterable object
                     const extraBoxed = new Proxy(boxedObject, {
+                        deleteProperty(target, key) {
+                            if (Reflect.deleteProperty(target, key)) {
+                                // @ts-ignore - Fix
+                                push(obj[name]);
+                                return true;
+                            }
+                            return false;
+                        },
                         // Implement the logic that fires the iterator by re-assigning the iterable via it's setter
                         set(target, key, value, receiver) {
                             if (Reflect.set(target, key, value, receiver)) {
@@ -317,9 +324,9 @@ export function defineIterableProperty(obj, name, v) {
                             // Note: this only applies to object iterables (since the root ones aren't proxied), but it does allow us to have
                             // defintions like:
                             //   iterable: { stuff: {} as Record<string, string | number ... }
-                            if (targetProp === undefined || targetProp.enumerable) {
+                            if ((targetProp === undefined && !(key in target)) || targetProp?.enumerable) {
                                 if (targetProp === undefined) {
-                                    // @ts-ignore - Fix
+                                    // @ts-ignore - Fix: this "redefines" V as having an optional member called `key`
                                     target[key] = undefined;
                                 }
                                 const realValue = Reflect.get(boxedObject, key, receiver);
@@ -328,11 +335,12 @@ export function defineIterableProperty(obj, name, v) {
                                     const pv = p?.valueOf();
                                     if (typeof ov === typeof pv && ov == pv)
                                         return Ignore;
-                                    return ov; //o?.[key as keyof typeof o]
+                                    return ov;
                                 }));
                                 Reflect.ownKeys(props).forEach(k => props[k].enumerable = false);
-                                // @ts-ignore - Fix
-                                return box(realValue, props);
+                                const aib = box(realValue, props);
+                                Reflect.set(target, key, aib);
+                                return aib;
                             }
                             return Reflect.get(target, key, receiver);
                         },
@@ -483,7 +491,7 @@ function isExtraIterable(i) {
 // Attach the pre-defined helpers onto an AsyncIterable and return the modified object correctly typed
 export function iterableHelpers(ai) {
     if (!isExtraIterable(ai)) {
-        Object.defineProperties(ai, Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(asyncExtras)).map(([k, v]) => [k, { ...v, enumerable: false }])));
+        assignHidden(ai, asyncExtras);
     }
     return ai;
 }

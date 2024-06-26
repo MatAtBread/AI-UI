@@ -13,6 +13,10 @@ export function deferred() {
     }
     return promise;
 }
+// True if `expr in x` is valid
+export function isObjectLike(x) {
+    return x && typeof x === 'object' || typeof x === 'function';
+}
 export function isPromiseLike(x) {
-    return x && typeof x === 'object' && ('then' in x) && typeof x.then === 'function';
+    return isObjectLike(x) && ('then' in x) && typeof x.then === 'function';
 }

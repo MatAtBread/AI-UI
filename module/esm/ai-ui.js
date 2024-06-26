@@ -482,8 +482,9 @@ export const tag = function (_1, _2, _3) {
                 if (k in e) {
                     console.log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
                 }
-                else
+                else {
                     defineIterableProperty(e, k, tagDefinition.iterable[k]);
+                }
             });
             if (combinedAttrs[callStackSymbol] === newCallStack) {
                 if (!noAttrs)
@@ -627,7 +628,7 @@ function DyamicElementError({ error }) {
 }
 export let enableOnRemovedFromDOM = function () {
     enableOnRemovedFromDOM = function () { }; // Only create the observer once
-    new MutationObserver(function (mutations) {
+    new MutationObserver((mutations) => {
         mutations.forEach(function (m) {
             if (m.type === 'childList') {
                 m.removedNodes.forEach(removed => removed && removed instanceof Element &&
@@ -649,7 +650,7 @@ function mutationTracker(root, track) {
             }
         }
     }
-    new MutationObserver(function (mutations) {
+    new MutationObserver((mutations) => {
         mutations.forEach(function (m) {
             if (m.type === 'childList' && m.removedNodes.length) {
                 walk(m[track]);
