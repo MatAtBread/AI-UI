@@ -10,7 +10,7 @@ const x = {} as IterableProperties<{
   o: {
     s: string,
     p: {
-      q: number,
+      q?: number,
       r: string | number
     }
   }
@@ -27,7 +27,7 @@ const err = (e:any) => console.log('consumed ex:',e);
 x.o.consume!(x => console.log("o is",x)).then(ok,err);
 x.o.s.consume!(x => console.log("o.s is",x)).then(ok,err);
 x.o.p.consume!(x => console.log("o.p is",x)).then(ok,err);
-x.o.p.q.consume!(x => console.log("o.p.q is",x)).then(ok,err);
+x.o.p.q!.consume!(x => console.log("o.p.q is",x)).then(ok,err);
 x.o.p.r.consume!(x => { console.log("o.p.r is",x); if (typeof x === 'number' && x < 0) throw new Error("-ve") }).then(ok,err);
 
 x.o.p.q = 123;
@@ -36,6 +36,11 @@ x.o.p.q = 888;
 await sleep(500)
 x.o.p.q = 456;
 console.log("xopq",-x.o.p.q);
+delete x.o.p.q;
+await sleep(500)
+x.o.p.q = 888;
+await sleep(500)
+x.o.p.q = 456;
 
 await sleep(500)
 x.o.p.r = 3;
@@ -44,3 +49,4 @@ x.o.p.r = -3;
 await sleep(500)
 x.o.p.r = 3;
 await sleep(500)
+
