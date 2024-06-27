@@ -104,68 +104,71 @@ function assignHidden<D extends {}, S extends {}>(d: D, s: S) {
   return d as D & S;
 }
 
-const queue_pending = Symbol('pending');
-const queue_items = Symbol('items');
+const _pending = Symbol('_pending');
+const _items = Symbol('_items');
 function internalQueueIteratableIterator<T>(stop = () => { }) {
   const q = {
-    [queue_pending]: [] as DeferredPromise<IteratorResult<T>>[] | null,
-    [queue_items]: [] as IteratorResult<T>[] | null,
+    [_pending]: [] as DeferredPromise<IteratorResult<T>>[] | null,
+    [_items]: [] as IteratorResult<T>[] | null,
 
     [Symbol.asyncIterator]() {
       return q as AsyncIterableIterator<T>;
     },
 
     next() {
-      if (q[queue_items]?.length) {
-        return Promise.resolve(q[queue_items].shift()!);
+      if (q[_items]?.length) {
+        return Promise.resolve(q[_items].shift()!);
       }
+
+      if (!q[_pending])
+        return Promise.resolve({ done: true as const, value: undefined });
 
       const value = deferred<IteratorResult<T>>();
       // We install a catch handler as the promise might be legitimately reject before anything waits for it,
       // and this suppresses the uncaught exception warning.
       value.catch(ex => { });
-      q[queue_pending]!.unshift(value);
+      q[_pending].unshift(value);
       return value;
     },
 
     return(v?: unknown) {
       const value = { done: true as const, value: undefined };
-      if (q[queue_pending]) {
+      if (q[_pending]) {
         try { stop() } catch (ex) { }
-        while (q[queue_pending].length)
-          q[queue_pending].pop()!.resolve(value);
-        q[queue_items] = q[queue_pending] = null;
+        while (q[_pending].length)
+          q[_pending].pop()!.resolve(value);
+        q[_items] = q[_pending] = null;
       }
       return Promise.resolve(value);
     },
 
     throw(...args: any[]) {
       const value = { done: true as const, value: args[0] };
-      if (q[queue_pending]) {
+      if (q[_pending]) {
         try { stop() } catch (ex) { }
-        while (q[queue_pending].length)
-          q[queue_pending].pop()!.reject(value);
-        q[queue_items] = q[queue_pending] = null;
+        while (q[_pending].length)
+          q[_pending].pop()!.reject(value);
+        q[_items] = q[_pending] = null;
       }
       return Promise.reject(value);
     },
 
     get length() {
-      if (!q[queue_items]) return -1; // The queue has no consumers and has terminated.
-      return q[queue_items].length;
+      if (!q[_items]) return -1; // The queue has no consumers and has terminated.
+      return q[_items].length;
     },
 
     push(value: T) {
-      if (!q[queue_pending])
+      if (!q[_pending])
         return false;
 
-      if (q[queue_pending].length) {
-        q[queue_pending].pop()!.resolve({ done: false, value });
+      if (q[_pending].length) {
+        q[_pending].pop()!.resolve({ done: false, value });
       } else {
-        if (!q[queue_items]) {
+        if (!q[_items]) {
           console.log('Discarding queue push as there are no consumers');
         } else {
-          q[queue_items].push({ done: false, value })
+          q[_items].push({ done: false, value })
         }
       }
       return true;
@@ -174,30 +177,29 @@ function internalQueueIteratableIterator<T>(stop = () => { }) {
   return iterableHelpers(q);
 }
 
-const queue_inflight = Symbol('inflight');
-
+const _inflight = Symbol('inflight');
 function internalDebounceQueueIteratableIterator<T>(stop = () => { }) {
-  const q = internalQueueIteratableIterator<T>(stop) as ReturnType<typeof internalQueueIteratableIterator<T>> & { [queue_inflight]: Set<T> };
-  q[queue_inflight] = new Set<T>();
+  const q = internalQueueIteratableIterator<T>(stop) as ReturnType<typeof internalQueueIteratableIterator<T>> & { [_inflight]: Set<T> };
+  q[_inflight] = new Set<T>();
 
   q.push = function (value: T) {
-    if (!q[queue_pending])
+    if (!q[_pending])
       return false;
 
     // Debounce
-    if (q[queue_inflight].has(value))
+    if (q[_inflight].has(value))
       return true;
 
-    q[queue_inflight].add(value);
-    if (q[queue_pending].length) {
-      const p = q[queue_pending].pop()!;
-      p.finally(() => q[queue_inflight].delete(value));
+    q[_inflight].add(value);
+    if (q[_pending].length) {
+      const p = q[_pending].pop()!;
+      p.finally(() => q[_inflight].delete(value));
       p.resolve({ done: false, value });
     } else {
-      if (!q[queue_items]) {
+      if (!q[_items]) {
         console.log('Discarding queue push as there are no consumers');
-      } else if (!q[queue_items].find(v => v === value)) {
-        q[queue_items].push({ done: false, value });
+      } else if (!q[_items].find(v => v === value)) {
+        q[_items].push({ done: false, value });
       }
     }
     return true;
@@ -223,7 +225,7 @@ declare global {
    This routine creates the getter/setter for the specified property, and manages the aassociated async iterator.
 */
 
-const ProxiedAsyncIterator = Symbol('ProxiedAsyncIterator');
+const _proxiedAsyncIterator = Symbol('_proxiedAsyncIterator');
 export function defineIterableProperty<T extends {}, const N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<{ [k in N]: V }> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
@@ -237,7 +239,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
     push = bi.push;
     extraKeys.forEach(k => // @ts-ignore
        extras[k] = b[k as keyof typeof b]);
-    if (!(ProxiedAsyncIterator in a))
+    if (!(_proxiedAsyncIterator in a))
       assignHidden(a, extras);
     return b;
   }
@@ -350,10 +352,10 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
     throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
   }
 
-  type WithPath = { [ProxiedAsyncIterator]: { a: V, path: string }};
+  type WithPath = { [_proxiedAsyncIterator]: { a: V, path: string }};
   type PossiblyWithPath = V | WithPath;
   function isProxiedAsyncIterator(o: PossiblyWithPath): o is WithPath {
-    return isObjectLike(o) && ProxiedAsyncIterator in o;
+    return isObjectLike(o) && _proxiedAsyncIterator in o;
   }
   function destructure(o: any, path: string) {
     const fields = path.split('.').slice(1);
@@ -361,61 +363,49 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
     return o;
   }
   function boxObject(a: V, pds: AsyncExtraIterable<PossiblyWithPath>) {
-    const keyIterator = new Map<string,AsyncExtraIterable<any>>();
-    let withPath:  AsyncExtraIterable<WithPath[typeof ProxiedAsyncIterator]>;
+    let withPath:  AsyncExtraIterable<WithPath[typeof _proxiedAsyncIterator]>;
     let withoutPath:  AsyncExtraIterable<V>;
+    return new Proxy(a as object, handler()) as V & AsyncExtraIterable<V>;
+
     function handler(path = ''): ProxyHandler<object> {
       return {
         // A boxed object has its own keys, and the keys of an AsyncExtraIterable
         has(target, key) {
-          return key === ProxiedAsyncIterator || key === Symbol.toPrimitive || key in target || key in pds;
+          return key === _proxiedAsyncIterator || key === Symbol.toPrimitive || key in target || key in pds;
         },
-        // When a key is set in the target, push the change, and conditionally terminate any consumers
+        // When a key is set in the target, push the change
         set(target, key, value, receiver) {
-          if (key in pds) {
+          if (Object.hasOwn(pds,key)) {
             throw new Error(`Cannot set ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
           }
-          // TODO: close the queue (via push?) and that of any contained propeties
           if (Reflect.get(target, key, receiver) !== value) {
-            push({ [ProxiedAsyncIterator]: {a,path} } as any);
+            push({ [_proxiedAsyncIterator]: {a,path} } as any);
           }
           return Reflect.set(target, key, value, receiver);
         },
-        // When a key is deleted from the target terminate any consumers
         deleteProperty(target, key) {
-          if (key in pds) {
-            throw new Error(`Cannot delete ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
+          if (Reflect.deleteProperty(target, key)) {
+            push({ [_proxiedAsyncIterator]: {a,path} } as any);
+            return true;
           }
-          // TODO: close the queue (via push?) and that of any contained propeties
-          //if (Object.hasOwn(target, key))
-          //  push({ [ProxiedAsyncIterator]: {a,path} } as any);
-          // let ai = keyIterator.get(path);
-          // if (ai instanceof Error) return false;
-          // keyIterator.set(`${path}.${key.toString()}`, new Error(`Iterable propety ${name.toString()}${path}.${key.toString()} has been deleted`));
-          // @ts-ignore
-          // if (ai) ai?.return();
-          return Reflect.deleteProperty(target, key);
+          return false;
         },
         // When getting the value of a boxed object member, prefer asyncExtraIterable over target keys
         get(target, key, receiver) {
           // If the key is an asyncExtraIterable member, create the mapped queue to generate it
           if (Object.hasOwn(pds,key)) {
             if (!path.length) {
-              withoutPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator].a : o);
+              withoutPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator].a : o);
               return withoutPath[key as keyof typeof pds];
-            }
-            let ai = keyIterator.get(path);
-            // if (ai instanceof Error) throw ai;
-            if (!ai) {
-              withPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[ProxiedAsyncIterator] : { a: o, path: '' });
+            } else {
+              withPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator] : { a: o, path: '' });
 
-              ai = filterMap(withPath, (o, p) => {
+              let ai = filterMap(withPath, (o, p) => {
                 const v = destructure(o.a, path);
                 return p !== v || o.path.startsWith(path) ? v : Ignore ;
               }, Ignore, destructure(a, path));
-              keyIterator.set(path, ai);
+              return ai[key as keyof typeof ai];
             }
-            return ai[key as keyof typeof ai];
           }
 
           // If the key is a target property, create the proxy to handle it
@@ -423,10 +413,10 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
             // Special case, since Symbol.toPrimitive is in ha(), we need to implement it
             return function(hint?:'string'|'number'|'default') {
               if (Reflect.has(target, key))
-                return Reflect.get(target, key, target)(hint);
+                return Reflect.get(target, key, target).call(target, hint);
               if (hint === 'string') return target.toString();
-              if (hint === 'number') return +target.valueOf();
-              return target.constructor(target);
+              if (hint === 'number') return Number(target);
+              return target.valueOf();
             }
           }
           if (typeof key === 'string') {
@@ -434,7 +424,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
               // This is a brand new key within the target
               Reflect.set(target, key, undefined, target);
             }
-            if (Object.hasOwn(target, key)) {
+            if (Object.hasOwn(target, key) && !(Iterability in target && target[Iterability] === 'shallow')) {
               return new Proxy(Object(Reflect.get(target, key, target)), handler(path + '.' + key));
             }
           }
@@ -447,7 +437,6 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
         }
       }
     }
-    return new Proxy(a as object, handler()) as V & AsyncExtraIterable<V>;
   }
 }
 
