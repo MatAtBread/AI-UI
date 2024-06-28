@@ -50,7 +50,7 @@ const App = div.extended({
         onclick:e => {
           const field = (e.target as HTMLElement).previousSibling as HTMLInputElement; 
           if (field.value) {
-            this.append(Results({ label: field.value, data: new Function(`return (this.thing${field.value})`).call(this)))
+            this.append(Results({ label: field.value, data: new Function(`return (this.thing${field.value})`).call(this) }))
           }
         }
       },".consume()")),
