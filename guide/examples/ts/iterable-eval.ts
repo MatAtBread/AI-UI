@@ -9,6 +9,9 @@ const Results = div.extended({
   iterable: {
     data: undefined as any
   },
+  override:{
+    style: 'display: inline-block; border: 1px solid black; background-color: #ccc; padding: 3px; margin: 3px;'
+  },
   ids:{
     rows: table
   },
