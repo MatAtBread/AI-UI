@@ -3,7 +3,7 @@ import { deferred, isObjectLike, isPromiseLike } from "./deferred.js";
 export const Iterability = Symbol("Iterability");
 // NB: This also (incorrectly) passes sync iterators, as the protocol names are the same
 export function isAsyncIterator(o) {
-    return typeof o?.next === 'function';
+    return isObjectLike(o) && 'next' in o && typeof o?.next === 'function';
 }
 export function isAsyncIterable(o) {
     return isObjectLike(o) && (Symbol.asyncIterator in o) && typeof o[Symbol.asyncIterator] === 'function';

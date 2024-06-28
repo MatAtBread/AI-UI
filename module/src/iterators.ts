@@ -53,7 +53,7 @@ export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHe
 
 // NB: This also (incorrectly) passes sync iterators, as the protocol names are the same
 export function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
-  return typeof o?.next === 'function'
+  return isObjectLike(o) && 'next' in o && typeof o?.next === 'function'
 }
 export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
   return isObjectLike(o) && (Symbol.asyncIterator in o) && typeof o[Symbol.asyncIterator] === 'function'

@@ -117,8 +117,8 @@ export const tag = function (_1, _2, _3) {
                 // It's possible that this async iterator is a boxed object that also holds a value
                 const unboxed = c.valueOf();
                 const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed);
-                appended.push(...dpm);
-                let t = dpm;
+                let t = dpm.length ? dpm : [DomPromiseContainer()];
+                appended.push(...t);
                 let notYetMounted = true;
                 // DEBUG support
                 let createdAt = Date.now() + timeOutWarn;
