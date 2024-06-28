@@ -16,13 +16,13 @@ const Results = div.extended({
     rows: table
   },
   styles:`
-  #rows {
+  .value {
     margin-left:1em;
     font-family: monospace;
   }`,
   constructed() {
     let line = 0;
-    this.data.consume((t:unknown) => this.ids.rows.prepend(...tag.nodes(tr(td(line++), td(JSON.stringify(t))))));
+    this.data.consume((t:unknown) => this.ids.rows.prepend(...tag.nodes(tr(td(line++), td({ className: 'value'},JSON.stringify(t))))));
     return [
       span({ style: 'font-weight: bold' }, this.label),
       table({id: 'rows'})
@@ -46,14 +46,14 @@ const App = div.extended({
           onclick: () => new Function("return (" + this.ids.text.value + ")").call(this)
         }, "eval")
       ),
-      div(input(), button({
+      div("this.thing",input(), button({
         onclick:e => {
           const field = (e.target as HTMLElement).previousSibling as HTMLInputElement; 
           if (field.value) {
-            this.append(Results({ label: field.value, data: this.thing[field.value]}))
+            this.append(Results({ label: field.value, data: new Function(`return (this.thing${field.value})`).call(this)))
           }
         }
-      },"consume")),
+      },".consume()")),
       Results({ data: this.thing, label: "this.thing" })
     ]
   }
