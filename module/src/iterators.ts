@@ -339,7 +339,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
       case 'string':
         // Boxes types, including BigInt
         return assignHidden(Object(a), Object.assign(pds, {
-          toJSON: { value() { return a.valueOf() }, writable: true }
+          toJSON() { return a.valueOf() }
         }));
       case 'object':
           // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
@@ -425,11 +425,11 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
               Reflect.set(target, key, undefined, target);
             }
             if (Object.hasOwn(target, key) && !(Iterability in target && target[Iterability] === 'shallow')) {
-              return new Proxy(Object(Reflect.get(target, key, target)), handler(path + '.' + key));
+              return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
             }
           }
           // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
-          const p = Reflect.get(target, key, target);
+          const p = Reflect.get(target, key, receiver);
           if (typeof p === 'function') {
             return p.bind(target);
           }
