@@ -409,6 +409,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           }
 
           // If the key is a target property, create the proxy to handle it
+          if (key === 'valueOf') return () => destructure(a, path);
           if (key === Symbol.toPrimitive) {
             // Special case, since Symbol.toPrimitive is in ha(), we need to implement it
             return function(hint?:'string'|'number'|'default') {
@@ -429,11 +430,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
             }
           }
           // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
-          const p = Reflect.get(target, key, receiver);
-          if (typeof p === 'function') {
-            return p.bind(target);
-          }
-          return p;
+          return Reflect.get(target, key, receiver);
         }
       }
     }
