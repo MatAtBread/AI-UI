@@ -421,11 +421,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
             }
           }
           if (typeof key === 'string') {
-            if (!(key in target)) {
-              // This is a brand new key within the target
-              Reflect.set(target, key, undefined, target);
-            }
-            if (Object.hasOwn(target, key) && !(Iterability in target && target[Iterability] === 'shallow')) {
+            if ((!(key in target) || Object.hasOwn(target, key)) && !(Iterability in target && target[Iterability] === 'shallow')) {
               const field = Reflect.get(target, key, receiver);
               return (typeof field === 'function') || isAsyncIter(field)
                 ? field
