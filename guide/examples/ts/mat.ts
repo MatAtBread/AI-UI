@@ -1,25 +1,71 @@
-import { tag, Iterators } from '../../../module/esm/ai-ui.js'
+import { tag, Iterators } from '../../../module/esm/ai-ui.js';
+
 Iterators.augmentGlobalAsyncGenerators();
+const sleep = (ms:number) => new Promise(r => setTimeout(r,ms));
+
 const { div, span } = tag();
 
-const App = div.extended({
-iterable:{
-    v: {
-        data:{}
-    }
-},
+const Base = span.extended({
+  iterable:{
+    n: undefined as number|undefined
+  },
   constructed() {
-    return [
-        this.v.map!(v => JSON.stringify(v))," ",
-        this.v.data.map!(v => JSON.stringify(v))," "
-    ];
+    return ["n is ", this.n]
   }
 });
 
-/* Create and add an "App" element to the document so the user can see it! */
-document.body.append(window.x = App());
+const Mid = div.extended({
+  iterable:{
+    state:{} as Partial<{ count: number }>
+  },
+  constructed() {
+    return ["Mid ",Base({ n: this.state.count }), " count ", this.state.count, " "]
+  }
+});
 
-// A simple async function that pauses for the specified number of milliseocnds
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+const Pass = div.extended({
+  iterable:{
+    count: undefined as number|undefined
+  },
+  constructed() {
+    return ["Pass ", Base({ n: this.count }), " count ", this.count, " "]
+  }
+});
+
+const Nest = div.extended({
+  iterable:{
+    x: undefined as number|undefined
+  },
+  constructed() {
+    return Pass({ count: this.x })
+  }
+});
+
+const loop = (async function *() {
+  try {
+    for (let i = 1; i < 10; i++) {
+      yield i;
+      await sleep(300)
+    }
+  } catch (ex) {
+    console.log("loop",ex);
+  } finally {
+    console.log("finally loop")
+  }
+})().multi();
+
+let [m,p,n] = [Mid(),Pass(),Nest()];
+document.body.append(
+  Mid({ state: loop.map(v => ({ count: v }))}),
+  Pass({ count: loop }),
+  Nest({ x: loop }),
+  m,p,n
+);
+n.x = p.count = m.state.count = loop as (typeof loop & number);
+
+document.body.append(
+  Mid({ state: loop.map(v => ({ count: v }))}),
+  Mid({ state: loop.map(v => ({ count: v }))}),
+  Mid({ state: { count: loop } }), 
+  Mid({ state: { count: loop } })  
+);

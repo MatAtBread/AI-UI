@@ -1,18 +1,32 @@
 import { tag } from '../../../module/esm/ai-ui.js'
-import { IterablePropertyValue } from '../../../module/esm/iterators.js';
 
-const { div, input, button, table, tr, td } = tag();
+const { div, input, button, table, tr, td, span } = tag();
 
-const Results = table.extended({
-  iterable: {
-    data: [] as IterablePropertyValue[]
+const Results = div.extended({
+  declare: {
+    label: ''
   },
+  iterable: {
+    data: undefined as any
+  },
+  override:{
+    style: 'display: inline-block; border: 1px solid black; background-color: #ccc; padding: 3px; margin: 3px;'
+  },
+  ids:{
+    rows: table
+  },
+  styles:`
+  .value {
+    margin-left:1em;
+    font-family: monospace;
+  }`,
   constructed() {
     let line = 0;
-    return this.data.map((t) => [
-      tr(td(line++), td(JSON.stringify(t))),
-      this.childNodes
-    ])
+    this.data.consume((t:unknown) => this.ids.rows.prepend(...tag.nodes(tr(td(line++), td({ className: 'value'},JSON.stringify(t))))));
+    return [
+      span({ style: 'font-weight: bold' }, this.label),
+      table({id: 'rows'})
+    ]
   }
 });
 
@@ -32,12 +46,15 @@ const App = div.extended({
           onclick: () => new Function("return (" + this.ids.text.value + ")").call(this)
         }, "eval")
       ),
-      // div("Updates: ",
-      //   div(this.thing.map(j => JSON.stringify(j)))
-      // )
-      div("Updates: ",
-        Results({ data: this.thing })
-      )
+      div("this.thing",input(), button({
+        onclick:e => {
+          const field = (e.target as HTMLElement).previousSibling as HTMLInputElement; 
+          if (field.value) {
+            this.append(Results({ label: field.value, data: new Function(`return (this.thing${field.value})`).call(this) }))
+          }
+        }
+      },".consume()")),
+      Results({ data: this.thing, label: "this.thing" })
     ]
   }
 });

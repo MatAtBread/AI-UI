@@ -24,7 +24,7 @@ export declare function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | Asy
 export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
 type AsyncIterableHelpers = typeof asyncExtras;
-declare const asyncExtras: {
+export declare const asyncExtras: {
     filterMap<U extends Partial<AsyncIterable<any>>, R>(this: U, fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;
     map: typeof map;
     filter: typeof filter;
@@ -74,7 +74,7 @@ type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof
 type MaybePromised<T> = PromiseLike<T> | T;
 export declare const Ignore: unique symbol;
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
-export declare function filterMap<U extends PartialIterable, R>(source: U, fn: Mapper<HelperAsyncIterable<U>, R>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;
+export declare function filterMap<U extends PartialIterable, R>(source: U, fn: Mapper<HelperAsyncIterable<U>, R>, initialValue?: R | typeof Ignore, prev?: R | typeof Ignore): AsyncExtraIterable<R>;
 declare function map<U extends PartialIterable, R>(this: U, mapper: Mapper<HelperAsyncIterable<U>, R>): AsyncExtraIterable<R>;
 declare function filter<U extends PartialIterable>(this: U, fn: (o: HelperAsyncIterable<U>) => boolean | PromiseLike<boolean>): AsyncExtraIterable<HelperAsyncIterable<U>>;
 declare function unique<U extends PartialIterable>(this: U, fn?: (next: HelperAsyncIterable<U>, prev: HelperAsyncIterable<U>) => boolean | PromiseLike<boolean>): AsyncExtraIterable<HelperAsyncIterable<U>>;

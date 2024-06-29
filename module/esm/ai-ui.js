@@ -117,8 +117,8 @@ export const tag = function (_1, _2, _3) {
                 // It's possible that this async iterator is a boxed object that also holds a value
                 const unboxed = c.valueOf();
                 const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed);
-                appended.push(...dpm);
-                let t = dpm;
+                let t = dpm.length ? dpm : [DomPromiseContainer()];
+                appended.push(...t);
                 let notYetMounted = true;
                 // DEBUG support
                 let createdAt = Date.now() + timeOutWarn;
@@ -127,7 +127,7 @@ export const tag = function (_1, _2, _3) {
                     const n = t.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
                         t = [DyamicElementError({ error: errorValue })];
-                        n[0].replaceWith(...t); //appendBefore(n[0], ...t);
+                        n[0].replaceWith(...t);
                         n.slice(1).forEach(e => e?.parentNode.removeChild(e));
                     }
                     else
@@ -390,7 +390,11 @@ export const tag = function (_1, _2, _3) {
                         ap.return?.(errorValue);
                         base.appendChild(DyamicElementError({ error: errorValue }));
                     };
-                    ap.next().then(update).catch(error);
+                    const unboxed = value.valueOf();
+                    if (unboxed !== undefined && unboxed !== value && !isAsyncIter(unboxed))
+                        update({ done: false, value: unboxed });
+                    else
+                        ap.next().then(update).catch(error);
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {
@@ -621,7 +625,9 @@ export const tag = function (_1, _2, _3) {
     return baseTagCreators;
 };
 function DomPromiseContainer() {
-    return document.createComment(DEBUG ? new Error("promise").stack?.replace(/^Error: /, '') || "promise" : "promise");
+    return document.createComment(DEBUG
+        ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
+        : "promise");
 }
 function DyamicElementError({ error }) {
     return document.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
