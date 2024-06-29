@@ -1,52 +1,71 @@
-import { IterableProperties, defineIterableProperty } from '../../../module/esm/iterators.js'
-import { tag } from '../../../module/esm/ai-ui.js';
+import { tag, Iterators } from '../../../module/esm/ai-ui.js';
 
+Iterators.augmentGlobalAsyncGenerators();
 const sleep = (ms:number) => new Promise(r => setTimeout(r,ms));
 
-const { div } = tag();
+const { div, span } = tag();
 
-const x = {} as IterableProperties<{
-  n: number,
-  o: {
-    s: string,
-    p: {
-      q?: number,
-      r: string | number
-    }
+const Base = span.extended({
+  iterable:{
+    n: undefined as number|undefined
+  },
+  constructed() {
+    return ["n is ", this.n]
   }
-}>;
-(window as any).x = x;
-defineIterableProperty(x,'n',456);
-x.n.consume!(x => console.log("n is",x));
+});
 
-defineIterableProperty(x,'o',{ s: 'foo', p: { q: 123, r: 'abc' } });
+const Mid = div.extended({
+  iterable:{
+    state:{} as Partial<{ count: number }>
+  },
+  constructed() {
+    return ["Mid ",Base({ n: this.state.count }), " count ", this.state.count, " "]
+  }
+});
 
-const ok = (e:any) => console.log('consumed ok:',e);
-const err = (e:any) => console.log('consumed ex:',e);
+const Pass = div.extended({
+  iterable:{
+    count: undefined as number|undefined
+  },
+  constructed() {
+    return ["Pass ", Base({ n: this.count }), " count ", this.count, " "]
+  }
+});
 
-x.o.consume!(x => console.log("o is",x)).then(ok,err);
-x.o.s.consume!(x => console.log("o.s is",x)).then(ok,err);
-x.o.p.consume!(x => console.log("o.p is",x)).then(ok,err);
-x.o.p.q!.consume!(x => console.log("o.p.q is",x)).then(ok,err);
-x.o.p.r.consume!(x => { console.log("o.p.r is",x); if (typeof x === 'number' && x < 0) throw new Error("-ve") }).then(ok,err);
+const Nest = div.extended({
+  iterable:{
+    x: undefined as number|undefined
+  },
+  constructed() {
+    return Pass({ count: this.x })
+  }
+});
 
-x.o.p.q = 123;
-await sleep(500)
-x.o.p.q = 888;
-await sleep(500)
-x.o.p.q = 456;
-console.log("xopq",-x.o.p.q);
-delete x.o.p.q;
-await sleep(500)
-x.o.p.q = 888;
-await sleep(500)
-x.o.p.q = 456;
+const loop = (async function *() {
+  try {
+    for (let i = 1; i < 10; i++) {
+      yield i;
+      await sleep(300)
+    }
+  } catch (ex) {
+    console.log("loop",ex);
+  } finally {
+    console.log("finally loop")
+  }
+})().multi();
 
-await sleep(500)
-x.o.p.r = 3;
-await sleep(500)
-x.o.p.r = -3;
-await sleep(500)
-x.o.p.r = 3;
-await sleep(500)
+let [m,p,n] = [Mid(),Pass(),Nest()];
+document.body.append(
+  Mid({ state: loop.map(v => ({ count: v }))}),
+  Pass({ count: loop }),
+  Nest({ x: loop }),
+  m,p,n
+);
+n.x = p.count = m.state.count = loop as (typeof loop & number);
 
+document.body.append(
+  Mid({ state: loop.map(v => ({ count: v }))}),
+  Mid({ state: loop.map(v => ({ count: v }))}),
+  Mid({ state: { count: loop } }), 
+  Mid({ state: { count: loop } })  
+);

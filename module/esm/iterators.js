@@ -18,7 +18,7 @@ export function asyncIterator(o) {
         return o;
     throw new Error("Not as async provider");
 }
-const asyncExtras = {
+export const asyncExtras = {
     filterMap(fn, initialValue = Ignore) {
         return filterMap(this, fn, initialValue);
     },
@@ -338,7 +338,10 @@ export function defineIterableProperty(obj, name, v) {
                             Reflect.set(target, key, undefined, target);
                         }
                         if (Object.hasOwn(target, key) && !(Iterability in target && target[Iterability] === 'shallow')) {
-                            return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
+                            const field = Reflect.get(target, key, receiver);
+                            return (typeof field === 'function') || isAsyncIter(field)
+                                ? field
+                                : new Proxy(Object(field), handler(path + '.' + key));
                         }
                     }
                     // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)

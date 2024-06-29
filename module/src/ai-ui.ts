@@ -218,7 +218,7 @@ export const tag = <TagLoader>function <Tags extends string,
           const n = t.filter(n => Boolean(n?.parentNode)) as ChildNode[];
           if (n.length) {
             t = [DyamicElementError({error: errorValue})];
-            n[0].replaceWith(...t); //appendBefore(n[0], ...t);
+            n[0].replaceWith(...t);
             n.slice(1).forEach(e => e?.parentNode!.removeChild(e));
           }
           else console.warn( "Can't report error", errorValue, createdBy, t.map(logNode));
@@ -467,7 +467,11 @@ export const tag = <TagLoader>function <Tags extends string,
             ap.return?.(errorValue);
             base.appendChild(DyamicElementError({ error: errorValue }));
           }
-          ap.next().then(update).catch(error);
+          const unboxed = value.valueOf();
+          if (unboxed !== undefined && unboxed !== value && !isAsyncIter(unboxed))
+            update({ done: false, value: unboxed });
+          else
+            ap.next().then(update).catch(error);
         }
 
         function assignObject(value: any, k: string) {
@@ -752,7 +756,9 @@ export const tag = <TagLoader>function <Tags extends string,
 }
 
 function DomPromiseContainer() {
-  return document.createComment(DEBUG ? new Error("promise").stack?.replace(/^Error: /, '') || "promise" : "promise")
+  return document.createComment(DEBUG 
+    ? new Error("promise").stack?.replace(/^Error: /, '') || "promise" 
+    : "promise")
 }
 
 function DyamicElementError({ error }:{ error: Error | IteratorResult<Error>}) {

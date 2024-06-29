@@ -71,7 +71,7 @@ export function asyncIterator<T>(o: AsyncProvider<T>) {
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
-const asyncExtras = {
+export const asyncExtras = {
   filterMap<U extends PartialIterable, R>(this: U,
     fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
     initialValue: R | typeof Ignore = Ignore
@@ -426,7 +426,10 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
               Reflect.set(target, key, undefined, target);
             }
             if (Object.hasOwn(target, key) && !(Iterability in target && target[Iterability] === 'shallow')) {
-              return new Proxy(Object(Reflect.get(target, key, receiver)), handler(path + '.' + key));
+              const field = Reflect.get(target, key, receiver);
+              return (typeof field === 'function') || isAsyncIter(field)
+                ? field
+                : new Proxy(Object(field), handler(path + '.' + key));
             }
           }
           // This is a symbolic entry, or a prototypical value (since it's in the target, but not a target property)
