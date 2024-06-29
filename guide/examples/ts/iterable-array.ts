@@ -1,7 +1,9 @@
-import { tag } from '../../../module/esm/ai-ui.js'
+import { tag } from '../../../module/src/ai-ui.js'
+import { IterableProperties } from '../../../module/src/iterators.js';
 
 const { div, span, button } = tag();
-
+async function *I<T>(t:T){ yield t }
+/*
 const Thing = div.extended({
   iterable: {
     thing: {} as {
@@ -23,5 +25,31 @@ document.body.append(t,
   button({ onclick:()=> t.thing = { b:'mmm' }},"set thing{b}"),
   button({ onclick:()=> t.thing.b = 'nnn' },"set thing.b")
 );
-// @ts-ignore
-window.t = t;
+
+(window as any).t = t;
+*/
+const Arr = div.extended({
+  iterable:{
+    a: [] as string[],
+    b: 0,
+    o: {
+      foo: 0,
+      bar: false
+    }
+  },
+  declare: {
+    z: 0
+  },
+  constructed(){
+    this.attributes = {
+      z: I(8),
+      className: I('0')
+    };
+    this.attributes = {
+      z: 8,
+      className: 'c'
+    };
+    return this.a
+  }
+});
+const arr = Arr();

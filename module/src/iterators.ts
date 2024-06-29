@@ -37,11 +37,37 @@ export type IterablePropertyValue = IterablePropertyPrimitive | IterableProperty
 export const Iterability = Symbol("Iterability");
 export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
 export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
+
+declare global {
+  // This is patch to the std lib definition of Array<T>. I don't know why it's absent,
+  // as this is the implementation in all JavaScript engines. It is probably a result
+  // of its absence in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/values,
+  // which inherits from the Object.prototype, which makes no claim for the return type
+  // since it could be overriddem. However, in that case, a TS defn should also override
+  // it, like Number, String, Boolean etc do.
+  interface Array<T> {
+    valueOf():Array<T>;
+  }
+  // As above, the return type could be T rather than Object, since this is the default impl,
+  // but it's not, for some reason.
+  interface Object {
+    valueOf<T>(this:T): T extends IterableType<infer Z> ? Z : Object;
+  }
+}
+
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
   [K in keyof Omit<IP,typeof Iterability>]: IterableType<IP[K]>
-} : {
-  [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>
-}
+} : ({
+  [K in keyof IP]: (
+    IP[K] extends Array<infer E> 
+    ? (IterableProperties<E>[] | IterableProperties<E[]>) 
+    : ((
+      IP[K] extends object 
+      ? IterableProperties<IP[K]>
+      : IP[K]
+    ) & IterableType<IP[K]>) 
+  )
+})
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
