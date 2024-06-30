@@ -1,5 +1,4 @@
 import { tag } from '../../../module/src/ai-ui.js'
-import { IterableProperties } from '../../../module/src/iterators.js';
 
 const { div, span, button } = tag();
 async function *I<T>(t:T){ yield t }

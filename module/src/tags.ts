@@ -35,11 +35,11 @@ type AsyncGeneratedObject<X extends object> = {
   [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K]
 }
 
-type IDS<I> = {
+type IDS<I> = I extends {} ? {
   ids: {
     [J in keyof I]: I[J] extends ExTagCreator<any> ? ReturnType<I[J]> : never;
   }
-}
+} : { ids: {} }
 
 type ReTypedEventHandlers<T> = {
   [K in keyof T]: K extends keyof GlobalEventHandlers
