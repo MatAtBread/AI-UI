@@ -60,6 +60,7 @@ const Over4 = Over3.extended({
     N: 1 as const // Works as it's narrower, prevents further overrides
   },
   constructed() {
+    // @ts-expect-error
     (<AssertEqual<typeof this.N, never>>{}).true;
   },
 });

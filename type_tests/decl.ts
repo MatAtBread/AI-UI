@@ -13,7 +13,7 @@ export declare var Base: TagCreator<{
   Attr: 'base',
   N: 0 | 1 | 2, fn(): void,
   gen: unknown
-}>;
+} /*& Pick<Element, 'attributes'>*/>;
 
 const e0 = Base({
   fn() {

@@ -35,11 +35,11 @@ type AsyncGeneratedObject<X extends object> = {
   [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K]
 }
 
-type IDS<I> = {
+type IDS<I> = I extends {} ? {
   ids: {
     [J in keyof I]: I[J] extends ExTagCreator<any> ? ReturnType<I[J]> : never;
   }
-}
+} : { ids: {} }
 
 type ReTypedEventHandlers<T> = {
   [K in keyof T]: K extends keyof GlobalEventHandlers
@@ -49,10 +49,12 @@ type ReTypedEventHandlers<T> = {
     : T[K]
 }
 
-type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
-  get attributes(): NamedNodeMap;
-  set attributes(v: DeepPartial<PossiblyAsync<Base>>);
-}
+type ReadWriteAttributes<E, Base = E> = E extends { attributes: any }
+  ? (Omit<E, 'attributes'> & {
+    get attributes(): NamedNodeMap;
+    set attributes(v: DeepPartial<PossiblyAsync<Omit<Base,'attributes'>>>);
+  })
+  : (Omit<E, 'attributes'>)
 
 export type Flatten<O> = [{
   [K in keyof O]: O[K]
@@ -145,7 +147,8 @@ type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> =
     & AsyncGeneratedObject<CombinedNonIterableProperties<Base,D>>,
     D['declare']
     & D['override']
-    & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>
+    & CombinedIterableProperties<Base,D>
+    & Omit<TagCreatorAttributes<Base>, keyof CombinedIterableProperties<Base,D>>
   >;
 
 type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<
@@ -204,7 +207,7 @@ export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */
-export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReadWriteAttributes<ReTypedEventHandlers<Base>>;
 
 /* A TagCreator is TagCreatorFunction decorated with some extra methods. The Super & Statics args are only
 ever specified by ExtendedTag (internally), and so is not exported */
