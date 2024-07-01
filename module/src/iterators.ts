@@ -59,13 +59,13 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
   [K in keyof Omit<IP,typeof Iterability>]: IterableType<IP[K]>
 } : ({
   [K in keyof IP]: (
-    IP[K] extends Array<infer E> 
-    ? (IterableProperties<E>[] | IterableProperties<E[]>) 
+    IP[K] extends Array<infer E>
+    ? (IterableProperties<E>[] | IterableProperties<E[]>)
     : ((
-      IP[K] extends object 
+      IP[K] extends object
       ? IterableProperties<IP[K]>
       : IP[K]
-    ) & IterableType<IP[K]>) 
+    ) & IterableType<IP[K]>)
   )
 })
 
@@ -216,8 +216,8 @@ function internalDebounceQueueIteratableIterator<T>(stop = () => { }) {
     if (q[_inflight].has(value))
       return true;
 
-    q[_inflight].add(value);
     if (q[_pending].length) {
+      q[_inflight].add(value);
       const p = q[_pending].pop()!;
       p.finally(() => q[_inflight].delete(value));
       p.resolve({ done: false, value });

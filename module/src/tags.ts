@@ -145,7 +145,8 @@ type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> =
     & AsyncGeneratedObject<CombinedNonIterableProperties<Base,D>>,
     D['declare']
     & D['override']
-    & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>
+    & CombinedIterableProperties<Base,D>
+    & Omit<TagCreatorAttributes<Base>, keyof CombinedIterableProperties<Base,D>>
   >;
 
 type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<

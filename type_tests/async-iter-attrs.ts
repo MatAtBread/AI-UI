@@ -1,7 +1,7 @@
 import { tag, type TagCreator } from '../module/src/ai-ui';
 import '../module/src/augment-iterators';
 
-declare var Base: TagCreator<Pick<Element, 'attributes'>>;
+declare var Base: TagCreator<Pick<HTMLElement, 'attributes' | 'onclick'>>;
 
 const { div } = tag();
 export async function* ai<const T>(t: T) { yield t }
@@ -20,38 +20,61 @@ type ExpandRecursively<T> = T extends object
   ? T extends infer O ? { [K in keyof O]: ExpandRecursively<O[K]> } : never
   : T;
 
-const I = Base.extended({
+const I = div.extended({
   iterable:{
-    a: 'A' as const
+    a: 1 as const
   },
   declare:{
-//    a: 'A' as const,
+    b: 2 as const,
     constructed(){
-      type T = Expand<typeof this>; 
-      this.a = 'A';
-      this.attributes = { a: 'A' };
-      this.attributes = { a: Promise.resolve('A') };
-      this.attributes = { a: ai('A') };
+      type T = Expand<typeof this>;
+      this.a = 1;
+      this.attributes = { a: 1 };
+      this.attributes = { a: Promise.resolve(1) };
+      this.attributes = { a: ai(1) };
+//      this.attributes = ai({ a: 1 });
+
+      this.b = 2;
+      this.attributes = { b: 2 };
+      this.attributes = { b: Promise.resolve(2) };
+      this.attributes = { b: ai(2) };
+//      this.attributes = ai({ b: 2 });
     }
   }
 });
 
-const t = [
+const aa = [
   I().a,
-  I({ a: 'A' }).a,
-  I({ a: ai('A') }).a,
-  I({ a: Promise.resolve('A') }).a,
+  I({ a: 1 }).a,
+  I({ a: ai(1) }).a,
+  I({ a: Promise.resolve(1) }).a,
 
   // @ts-expect-error
-  I({ a: 'B' }).a,
+  I({ a: '!A' }).a,
   // @ts-expect-error
-  I({ a: ai('B') }).a,
+  I({ a: ai('!A') }).a,
   // @ts-expect-error
-  I({ a: Promise.resolve('B') }).a,
+  I({ a: Promise.resolve('!A') }).a,
+];
+
+const bb = [
+  I().b,
+  I({ b: 2 }).b,
+  I({ b: ai(2) }).b,
+  I({ b: Promise.resolve(2) }).b,
+
+  // @ts-expect-error
+  I({ b: '!B' }).b,
+  // @ts-expect-error
+  I({ b: ai('!B') }).b,
+  // @ts-expect-error
+  I({ b: Promise.resolve('!B') }).b,
 ];
 
 const i = I();
 type TI = Expand<typeof i>;
-i.attributes = { a: 'A'};
-i.attributes = { a: 'A'};
+// i.attributes = { a: 1};
+// i.attributes = { a: '!A'};
+// i.attributes = { b: 2};
+// i.attributes = { b: '!B'};
 

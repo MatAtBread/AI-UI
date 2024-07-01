@@ -7,11 +7,19 @@ export type Iterability<Depth extends 'shallow' = 'shallow'> = {
     [Iterability]: Depth;
 };
 export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
+declare global {
+    interface Array<T> {
+        valueOf(): Array<T>;
+    }
+    interface Object {
+        valueOf<T>(this: T): T extends IterableType<infer Z> ? Z : Object;
+    }
+}
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
     [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>;
-} : {
-    [K in keyof IP]: (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>;
-};
+} : ({
+    [K in keyof IP]: (IP[K] extends Array<infer E> ? (IterableProperties<E>[] | IterableProperties<E[]>) : ((IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>));
+});
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
     push(value: T): boolean;
     readonly length: number;

@@ -127,8 +127,8 @@ function internalDebounceQueueIteratableIterator(stop = () => { }) {
         // Debounce
         if (q[_inflight].has(value))
             return true;
-        q[_inflight].add(value);
         if (q[_pending].length) {
+            q[_inflight].add(value);
             const p = q[_pending].pop();
             p.finally(() => q[_inflight].delete(value));
             p.resolve({ done: false, value });
