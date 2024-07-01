@@ -26,10 +26,12 @@ type IDS<I> = I extends {} ? {
 type ReTypedEventHandlers<T> = {
     [K in keyof T]: K extends keyof GlobalEventHandlers ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E) => any ? (this: T, e: E) => any | null : T[K] : T[K];
 };
-type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
+type ReadWriteAttributes<E, Base = E> = E extends {
+    attributes: any;
+} ? (Omit<E, 'attributes'> & {
     get attributes(): NamedNodeMap;
-    set attributes(v: DeepPartial<PossiblyAsync<Base>>);
-};
+    set attributes(v: DeepPartial<PossiblyAsync<Omit<Base, 'attributes'>>>);
+}) : (Omit<E, 'attributes'>);
 export type Flatten<O> = [
     {
         [K in keyof O]: O[K];
@@ -94,7 +96,7 @@ type CheckConstructedReturn<SuppliedDefinitions, Result> = SuppliedDefinitions e
     "constructed` does not return ChildTags": SuppliedDefinitions['constructed'];
 } : Result;
 export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
-export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReadWriteAttributes<ReTypedEventHandlers<Base>>;
 type ExTagCreator<Base extends object, Super extends (unknown | ExTagCreator<any>) = unknown, SuperDefs extends Overrides = {}, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;
     super: Super;

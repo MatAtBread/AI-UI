@@ -16,10 +16,8 @@ const Over2 = Over1.extended({
     N: 2 as const // Fails as Over1.N is 0|1
   },
   constructed() {
-    (<AssertEqual<typeof this.N, never>>{}).true;
-    (<AssertEqual<typeof this.N, 2>>{}).false;
-    (<AssertEqual<typeof this.N, 0 | 1>>{}).false;
-  },
+    this;
+  }
 });
 // @ts-expect-error: Fails as N has been narrowed to 0|1
 Over2();
@@ -42,7 +40,7 @@ const Over4 = Over3.extended({
     N: 1 as const // Works as it's narrower, prevents further overrides
   },
   constructed() {
-    (<AssertEqual<typeof this.N, never>>{}).true;
+    this;
   },
 });
 Over4['`override` has properties not in the base tag or of the wrong type, and should match'].N

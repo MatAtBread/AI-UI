@@ -49,10 +49,12 @@ type ReTypedEventHandlers<T> = {
     : T[K]
 }
 
-type ReadWriteAttributes<E, Base> = Omit<E, 'attributes'> & {
-  get attributes(): NamedNodeMap;
-  set attributes(v: DeepPartial<PossiblyAsync<Base>>);
-}
+type ReadWriteAttributes<E, Base = E> = E extends { attributes: any }
+  ? (Omit<E, 'attributes'> & {
+    get attributes(): NamedNodeMap;
+    set attributes(v: DeepPartial<PossiblyAsync<Omit<Base,'attributes'>>>);
+  })
+  : (Omit<E, 'attributes'>)
 
 export type Flatten<O> = [{
   [K in keyof O]: O[K]
@@ -205,7 +207,7 @@ export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */
-export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReTypedEventHandlers<Base>;
+export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReadWriteAttributes<ReTypedEventHandlers<Base>>;
 
 /* A TagCreator is TagCreatorFunction decorated with some extra methods. The Super & Statics args are only
 ever specified by ExtendedTag (internally), and so is not exported */

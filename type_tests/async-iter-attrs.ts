@@ -27,7 +27,7 @@ const I = div.extended({
   declare:{
     b: 2 as const,
     constructed(){
-      type T = Expand<typeof this>;
+//      type T = Expand<typeof this>;
       this.a = 1;
       this.attributes = { a: 1 };
       this.attributes = { a: Promise.resolve(1) };
@@ -73,8 +73,16 @@ const bb = [
 
 const i = I();
 type TI = Expand<typeof i>;
-// i.attributes = { a: 1};
-// i.attributes = { a: '!A'};
-// i.attributes = { b: 2};
-// i.attributes = { b: '!B'};
+i.attributes = { a: 1 };
+i.attributes = { a: ai(1) };
+i.attributes = { a: Promise.resolve(1) };
+i.attributes = { b: 2 };
+i.attributes = { b: ai(2) };
+i.attributes = { b: Promise.resolve(2) };
 
+// @ts-expect-error
+i.attributes = { b: 1 };
+// @ts-expect-error
+i.attributes = { b: ai(1) };
+// @ts-expect-error
+i.attributes = { b: Promise.resolve(1) };
