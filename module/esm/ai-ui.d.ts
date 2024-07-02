@@ -14,7 +14,7 @@ interface PoElementMethods {
 export interface CreateElement {
     createElement(name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]): Node;
 }
-interface TagLoader {
+export interface TagLoader {
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];
     UniqueID: typeof UniqueID;
     <Tags extends keyof HTMLElementTagNameMap>(): {

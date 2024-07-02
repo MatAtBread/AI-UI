@@ -91,9 +91,9 @@ export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterat
 export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>
 
 export function asyncIterator<T>(o: AsyncProvider<T>) {
-  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
   if (isAsyncIterator(o)) return o;
-  throw new Error("Not as async provider");
+  if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
+  throw new Error("Not an async provider");
 }
 
 type AsyncIterableHelpers = typeof asyncExtras;
@@ -130,8 +130,8 @@ function assignHidden<D extends {}, S extends {}>(d: D, s: S) {
   return d as D & S;
 }
 
-const _pending = Symbol('_pending');
-const _items = Symbol('_items');
+const _pending = Symbol('pending');
+const _items = Symbol('items');
 function internalQueueIteratableIterator<T>(stop = () => { }) {
   const q = {
     [_pending]: [] as DeferredPromise<IteratorResult<T>>[] | null,
@@ -224,7 +224,7 @@ function internalDebounceQueueIteratableIterator<T>(stop = () => { }) {
     } else {
       if (!q[_items]) {
         console.log('Discarding queue push as there are no consumers');
-      } else if (!q[_items].find(v => v === value)) {
+      } else if (!q[_items].find(v => v.value === value)) {
         q[_items].push({ done: false, value });
       }
     }
@@ -378,7 +378,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
     throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
   }
 
-  type WithPath = { [_proxiedAsyncIterator]: { a: V, path: string }};
+  type WithPath = { [_proxiedAsyncIterator]: { a: V, path: string | null }};
   type PossiblyWithPath = V | WithPath;
   function isProxiedAsyncIterator(o: PossiblyWithPath): o is WithPath {
     return isObjectLike(o) && _proxiedAsyncIterator in o;
@@ -424,11 +424,11 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
               withoutPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator].a : o);
               return withoutPath[key as keyof typeof pds];
             } else {
-              withPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator] : { a: o, path: '' });
+              withPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator] : { a: o, path: null });
 
               let ai = filterMap(withPath, (o, p) => {
                 const v = destructure(o.a, path);
-                return p !== v || o.path.startsWith(path) ? v : Ignore ;
+                return p !== v || o.path === null || o.path.startsWith(path) ? v : Ignore ;
               }, Ignore, destructure(a, path));
               return ai[key as keyof typeof ai];
             }

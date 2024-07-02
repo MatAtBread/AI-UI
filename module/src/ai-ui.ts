@@ -42,7 +42,7 @@ export interface CreateElement {
 }
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
-interface TagLoader {
+export interface TagLoader {
   nodes(...c: ChildTags[]): (Node | (/*P &*/ (Element & PoElementMethods)))[];
   UniqueID: typeof UniqueID
 
@@ -584,9 +584,11 @@ export const tag = <TagLoader>function <Tags extends string,
       }
       deepDefine(e, tagDefinition.declare, true);
       deepDefine(e, tagDefinition.override);
+      const reAssign = new Set<string>();
       tagDefinition.iterable && Object.keys(tagDefinition.iterable).forEach(k => {
         if (k in e) {
           console.log(`Ignoring attempt to re-define iterable property "${k}" as it could already have consumers`);
+          reAssign.add(k);
         } else {
           defineIterableProperty(e, k, tagDefinition.iterable![k as keyof typeof tagDefinition.iterable])
         }
@@ -602,18 +604,24 @@ export const tag = <TagLoader>function <Tags extends string,
         // Once the full tree of augmented DOM elements has been constructed, fire all the iterable propeerties
         // so the full hierarchy gets to consume the initial state, unless they have been assigned
         // by assignProps from a future
+        const combinedInitialIterableValues = {};
+        let hasInitialValues = false;
         for (const base of newCallStack) {
           if (base.iterable) for (const k of Object.keys(base.iterable)) {
             // We don't self-assign iterables that have themselves been assigned with futures
-            if (!(!noAttrs && k in attrs && (!isPromiseLike(attrs[k]) || !isAsyncIter(attrs[k])))) {
-              const value = e[k as keyof typeof e];
-              if (value?.valueOf() !== undefined) {
+            const attrExists = !noAttrs && k in attrs;
+            if ((reAssign.has(k) && attrExists) || !(attrExists && (!isPromiseLike(attrs[k]) || !isAsyncIter(attrs[k])))) {
+              const value = e[k as keyof typeof e]?.valueOf();
+              if (value !== undefined) {
                 // @ts-ignore - some props of e (HTMLElement) are read-only, and we don't know if k is one of them.
-                e[k] = value;
+                combinedInitialIterableValues[k] = value;
+                hasInitialValues = true;
               }
             }
           }
         }
+        if (hasInitialValues)
+          Object.assign(e, combinedInitialIterableValues);
       }
       return e;
     }
