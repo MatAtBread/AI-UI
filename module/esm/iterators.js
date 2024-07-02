@@ -12,11 +12,11 @@ export function isAsyncIter(o) {
     return isAsyncIterable(o) || isAsyncIterator(o);
 }
 export function asyncIterator(o) {
-    if (isAsyncIterable(o))
-        return o[Symbol.asyncIterator]();
     if (isAsyncIterator(o))
         return o;
-    throw new Error("Not as async provider");
+    if (isAsyncIterable(o))
+        return o[Symbol.asyncIterator]();
+    throw new Error("Not an async provider");
 }
 export const asyncExtras = {
     filterMap(fn, initialValue = Ignore) {
@@ -45,8 +45,8 @@ function assignHidden(d, s) {
     }
     return d;
 }
-const _pending = Symbol('_pending');
-const _items = Symbol('_items');
+const _pending = Symbol('pending');
+const _items = Symbol('items');
 function internalQueueIteratableIterator(stop = () => { }) {
     const q = {
         [_pending]: [],
@@ -137,7 +137,7 @@ function internalDebounceQueueIteratableIterator(stop = () => { }) {
             if (!q[_items]) {
                 console.log('Discarding queue push as there are no consumers');
             }
-            else if (!q[_items].find(v => v === value)) {
+            else if (!q[_items].find(v => v.value === value)) {
                 q[_items].push({ done: false, value });
             }
         }
@@ -309,10 +309,10 @@ export function defineIterableProperty(obj, name, v) {
                             return withoutPath[key];
                         }
                         else {
-                            withPath ?? (withPath = filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator] : { a: o, path: '' }));
+                            withPath ?? (withPath = filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator] : { a: o, path: null }));
                             let ai = filterMap(withPath, (o, p) => {
                                 const v = destructure(o.a, path);
-                                return p !== v || o.path.startsWith(path) ? v : Ignore;
+                                return p !== v || o.path === null || o.path.startsWith(path) ? v : Ignore;
                             }, Ignore, destructure(a, path));
                             return ai[key];
                         }
