@@ -354,8 +354,8 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
   function box<V>(a: V, pds: AsyncExtraIterable<V>): V & AsyncExtraIterable<V> {
     if (a === null || a === undefined) {
       return assignHidden(Object.create(null, {
-        valueOf: { value() { return a }, writable: true },
-        toJSON: { value() { return a }, writable: true }
+        valueOf: { value() { return a }, writable: true, configurable: true },
+        toJSON: { value() { return a }, writable: true, configurable: true }
       }), pds);
     }
     switch (typeof a) {
