@@ -242,8 +242,8 @@ export function defineIterableProperty(obj, name, v) {
     function box(a, pds) {
         if (a === null || a === undefined) {
             return assignHidden(Object.create(null, {
-                valueOf: { value() { return a; }, writable: true },
-                toJSON: { value() { return a; }, writable: true }
+                valueOf: { value() { return a; }, writable: true, configurable: true },
+                toJSON: { value() { return a; }, writable: true, configurable: true }
             }), pds);
         }
         switch (typeof a) {
