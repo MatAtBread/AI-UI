@@ -35,9 +35,11 @@ export type WhenReturn<S extends WhenParameters> =
     AsyncExtraIterable<
       WhenIteratedType<S>>>;
 
+type EmptyObject = Record<string | symbol | number, never>;
+
 type SpecialWhenEvents = {
-  "@start": {},  // Always fires when referenced
-  "@ready": {}   // Fires when all Element specified sources are mounted in the DOM
+  "@start": EmptyObject,  // Always fires when referenced
+  "@ready": EmptyObject   // Fires when all Element specified sources are mounted in the DOM
 };
 type WhenEvents = GlobalEventHandlersEventMap & SpecialWhenEvents;
 type EventNameList<T extends string> = T extends keyof WhenEvents

@@ -3,9 +3,10 @@ export type WhenParameters<IDS extends string = string> = ReadonlyArray<AsyncIte
 type WhenIteratedType<S extends WhenParameters> = (Extract<S[number], AsyncIterable<any>> extends AsyncIterable<infer I> ? unknown extends I ? never : I : never) | ExtractEvents<Extract<S[number], string>> | (Extract<S[number], Element> extends never ? never : Event);
 type MappableIterable<A extends AsyncIterable<any>> = A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> & (<R>(mapper: (value: A extends AsyncIterable<infer T> ? T : never) => R) => (AsyncExtraIterable<Awaited<R>>)) : never;
 export type WhenReturn<S extends WhenParameters> = MappableIterable<AsyncExtraIterable<WhenIteratedType<S>>>;
+type EmptyObject = Record<string | symbol | number, never>;
 type SpecialWhenEvents = {
-    "@start": {};
-    "@ready": {};
+    "@start": EmptyObject;
+    "@ready": EmptyObject;
 };
 type WhenEvents = GlobalEventHandlersEventMap & SpecialWhenEvents;
 type EventNameList<T extends string> = T extends keyof WhenEvents ? T : T extends `${infer S extends keyof WhenEvents},${infer R}` ? EventNameList<R> extends never ? never : `${S},${EventNameList<R>}` : never;

@@ -21,47 +21,6 @@ const standandTags = [
 function idsInaccessible() {
     throw new Error("<elt>.ids is a read-only map of Elements");
 }
-const elementProtype = Object.getOwnPropertyDescriptors({
-    get ids() {
-        const elt = this;
-        return new Proxy(Object.create(null), {
-            apply: idsInaccessible,
-            construct: idsInaccessible,
-            defineProperty: idsInaccessible,
-            deleteProperty: idsInaccessible,
-            set: idsInaccessible,
-            setPrototypeOf: idsInaccessible,
-            getPrototypeOf() { return null; },
-            isExtensible() { return false; },
-            has(target, p) { return typeof p === 'string' && Boolean(elt.querySelector(`#${p}`)); },
-            get(target, p) { return typeof p === 'string' ? elt.querySelector(`#${p}`) : null; },
-            preventExtensions() { return false; },
-            ownKeys(target) {
-                return Array.from(elt.querySelectorAll('[id]'), e => e.id);
-            },
-            getOwnPropertyDescriptor(target, p) {
-                if (p in target)
-                    return Reflect.getOwnPropertyDescriptor(target, p);
-                const pds = {
-                    writable: false,
-                    enumerable: true,
-                    configurable: false,
-                    value: this.get(target, p, null)
-                };
-                if (pds.value) {
-                    Reflect.defineProperty(target, p, pds);
-                    return pds;
-                }
-            }
-        });
-    },
-    set ids(v) {
-        throw new Error('Cannot set ids on ' + this.valueOf());
-    },
-    when: function (...what) {
-        return when(this, ...what);
-    }
-});
 function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
@@ -106,25 +65,81 @@ export const tag = function (_1, _2, _3) {
     }
     const poStyleElt = thisDoc.createElement("STYLE");
     poStyleElt.id = "--ai-ui-extended-tag-styles-";
-    /* Note: we use property defintion (and not object spread) so getters (like `ids`)
-      are not evaluated until called */
-    const tagPrototypes = Object.create(null, elementProtype);
-    // We do this here and not in elementProtype as there's no syntax
-    // to copy a getter/setter pair from another object
-    Object.defineProperty(tagPrototypes, 'attributes', {
-        ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
-        set(a) {
-            if (isAsyncIter(a)) {
-                const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
-                const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn(ex));
-                step();
+    const fixedTagPrototypes = Object.create(null, {
+        when: {
+            writable: false,
+            configurable: true,
+            enumerable: false,
+            value: function (...what) {
+                return when(this, ...what);
             }
-            else
-                assignProps(this, a);
+        },
+        attributes: {
+            ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
+            set(a) {
+                if (isAsyncIter(a)) {
+                    const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
+                    const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn(ex));
+                    step();
+                }
+                else
+                    assignProps(this, a);
+            }
         }
     });
     if (commonProperties)
-        deepDefine(tagPrototypes, commonProperties);
+        deepDefine(fixedTagPrototypes, commonProperties);
+    function instanceTagPrototypes(elt) {
+        const target = Object.create(null);
+        function validTarget(p) {
+            if (typeof p === 'string' && p in target) {
+                if (elt.contains(target[p]))
+                    return target[p];
+                delete target[p];
+                return false;
+            }
+            return undefined;
+        }
+        return {
+            ids: {
+                enumerable: true,
+                writable: false,
+                value: new Proxy(target, {
+                    apply: idsInaccessible,
+                    construct: idsInaccessible,
+                    defineProperty: idsInaccessible,
+                    deleteProperty: idsInaccessible,
+                    set: idsInaccessible,
+                    setPrototypeOf: idsInaccessible,
+                    getPrototypeOf() { return null; },
+                    isExtensible() { return false; },
+                    preventExtensions() { return true; },
+                    getOwnPropertyDescriptor(target, p) {
+                        if (this.get(target, p, null))
+                            return Reflect.getOwnPropertyDescriptor(target, p);
+                    },
+                    has(target, p) {
+                        const r = this.get(target, p, null);
+                        return Boolean(r);
+                    },
+                    ownKeys(target) {
+                        return Array.from(elt.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id; });
+                    },
+                    get(target, p, receiver) {
+                        if (typeof p === 'string') {
+                            const v = validTarget(p);
+                            if (v)
+                                return v;
+                            const e = elt.querySelector(`#${p}`);
+                            if (e)
+                                target[p] = e;
+                            return e ?? undefined;
+                        }
+                    }
+                })
+            }
+        };
+    }
     function nodes(...c) {
         const appended = [];
         (function children(c) {
@@ -644,7 +659,8 @@ export const tag = function (_1, _2, _3) {
                     ? thisDoc.createElementNS(nameSpace, k.toLowerCase())
                     : thisDoc.createElement(k);
                 e.constructor = tagCreator;
-                deepDefine(e, tagPrototypes);
+                deepDefine(e, fixedTagPrototypes);
+                Object.defineProperties(e, instanceTagPrototypes(e));
                 assignProps(e, attrs);
                 // Append any children
                 e.append(...nodes(...children));
