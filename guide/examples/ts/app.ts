@@ -31,6 +31,9 @@ since that's the tag we've extended.
 
 */
 const App = div.extended({
+  declare:{
+    name: 'mat'
+  },
   constructed() {
     // When we're constructed, create a few children within the element by default */
     return [

@@ -36,8 +36,8 @@ export type WhenReturn<S extends WhenParameters> =
       WhenIteratedType<S>>>;
 
 type SpecialWhenEvents = {
-  "@start": { [k: string]: undefined },  // Always fires when referenced
-  "@ready": { [k: string]: undefined }  // Fires when all Element specified sources are mounted in the DOM
+  "@start": {},  // Always fires when referenced
+  "@ready": {}   // Fires when all Element specified sources are mounted in the DOM
 };
 type WhenEvents = GlobalEventHandlersEventMap & SpecialWhenEvents;
 type EventNameList<T extends string> = T extends keyof WhenEvents
@@ -89,10 +89,13 @@ type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
   container: Element
   selector: string | null
 };
-const eventObservations = new Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>();
+const eventObservations = new WeakMap<Document, Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>();
 
 function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: Document, ev: GlobalEventHandlersEventMap[EventName]) {
-  const observations = eventObservations.get(ev.type as keyof GlobalEventHandlersEventMap);
+  if (!eventObservations.has(this))
+    eventObservations.set(this, new Map());
+
+  const observations = eventObservations.get(this)!.get(ev.type as keyof GlobalEventHandlersEventMap);
   if (observations) {
     for (const o of observations) {
       try {
@@ -147,15 +150,18 @@ function doThrow(message: string):never {
 function whenEvent<EventName extends string>(container: Element, what: IsValidWhenSelector<EventName>) {
   const [selector, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: "+what);
 
-  if (!eventObservations.has(eventName)) {
-    document.addEventListener(eventName, docEventHandler, {
+  if (!eventObservations.has(container.ownerDocument))
+    eventObservations.set(container.ownerDocument, new Map());
+
+  if (!eventObservations.get(container.ownerDocument)!.has(eventName)) {
+    container.ownerDocument.addEventListener(eventName, docEventHandler, {
       passive: true,
       capture: true
     });
-    eventObservations.set(eventName, new Set());
+    eventObservations.get(container.ownerDocument)!.set(eventName, new Set());
   }
 
-  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(eventName)?.delete(details));
+  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
 
   const details: EventObservation<keyof GlobalEventHandlersEventMap> /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
     push: queue.push,
@@ -165,7 +171,7 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-    .then(_ => eventObservations.get(eventName)!.add(details));
+    .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName)!.add(details));
 
   return queue.multi() ;
 }
@@ -284,7 +290,7 @@ function elementIsInDOM(elt: Element): Promise<void> {
         resolve();
       }
     }
-  }).observe(document.body, {
+  }).observe(elt.ownerDocument.body, {
     subtree: true,
     childList: true
   }));

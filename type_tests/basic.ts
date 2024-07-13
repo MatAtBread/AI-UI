@@ -113,6 +113,16 @@ Decl().x === 1;
 const t = Decl().fn2();
 (<AssertEqual<typeof t, 'a' | 'b'>>{}).true;
 
+
+const Excess = Same.extended({
+  xx: 0
+});
+
+(<AssertEqual<typeof Excess, {
+  "The extended tag defintion contains unknown or incorrectly typed keys": "xx"
+}>>{}).true;
+
+
 /*
 const Decl2 = Decl.extended({
   declare:{

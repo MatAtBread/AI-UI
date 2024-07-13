@@ -1,7 +1,7 @@
 import { DEBUG, console } from "./debug.js"
 import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferred.js"
 
-/* IterableProperties can't be correctly typed in TS right now, either the declaratiin
+/* IterableProperties can't be correctly typed in TS right now, either the declaratiion
   works for retrieval (the getter), or it works for assignments (the setter), but there's
   no TS syntax that permits correct type-checking at present.
 
@@ -18,13 +18,13 @@ import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferr
     this.prop = value;  // Valid, as long as valus has the same type as the prop
   ...and when retrieved it will be the value type, and optionally the async iterator:
     Div(this.prop) ; // the value
-    this.prop.map!(....)  // the iterator (not the trailing '!' to assert non-null value)
+    this.prop.map!(....)  // the iterator (note the trailing '!' to assert non-null value)
 
-  This relies on a hack to `wrapAsyncHelper` in iterators.ts when *accepts* a Partial<AsyncIterator>
+  This relies on a hack to `wrapAsyncHelper` in iterators.ts which *accepts* a Partial<AsyncIterator>
   but casts it to a AsyncIterator before use.
 
   The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
-  By default, the currently implementation does a one-level deep mapping, so an iterable property 'obj' is itself
+  By default, the current implementation does a deep mapping, so an iterable property 'obj' is itself
   iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
   iterable, but it's membetrs are just POJS values.
 */
@@ -32,7 +32,7 @@ import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferr
 // Base types that can be made defined as iterable: basically anything, _except_ a function
 export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
 // We should exclude AsyncIterable from the types that can be assigned to iterables (and therefore passed to defineIterableProperty)
-export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue};
+export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue };
 
 export const Iterability = Symbol("Iterability");
 export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
@@ -46,17 +46,17 @@ declare global {
   // since it could be overriddem. However, in that case, a TS defn should also override
   // it, like Number, String, Boolean etc do.
   interface Array<T> {
-    valueOf():Array<T>;
+    valueOf(): Array<T>;
   }
   // As above, the return type could be T rather than Object, since this is the default impl,
   // but it's not, for some reason.
   interface Object {
-    valueOf<T>(this:T): T extends IterableType<infer Z> ? Z : Object;
+    valueOf<T>(this: T): T extends IterableType<infer Z> ? Z : Object;
   }
 }
 
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
-  [K in keyof Omit<IP,typeof Iterability>]: IterableType<IP[K]>
+  [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>
 } : ({
   [K in keyof IP]: (
     IP[K] extends Array<infer E>
@@ -125,7 +125,7 @@ const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(
 function assignHidden<D extends {}, S extends {}>(d: D, s: S) {
   const keys = [...Object.getOwnPropertyNames(s), ...Object.getOwnPropertySymbols(s)];
   for (const k of keys) {
-    Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false});
+    Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false });
   }
   return d as D & S;
 }
@@ -264,7 +264,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
     extras[Symbol.asyncIterator] = mi[Symbol.asyncIterator];
     push = bi.push;
     extraKeys.forEach(k => // @ts-ignore
-       extras[k] = b[k as keyof typeof b]);
+      extras[k] = b[k as keyof typeof b]);
     if (!(_proxiedAsyncIterator in a))
       assignHidden(a, extras);
     return b;
@@ -273,10 +273,10 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
   // Create stubs that lazily create the AsyncExtraIterable interface when invoked
   function lazyAsyncMethod<M extends keyof typeof asyncExtras>(method: M) {
     return {
-      [method]:function (this: unknown, ...args: any[]) {
-      initIterator();
-      // @ts-ignore - Fix
-      return a[method].apply(this, args);
+      [method]: function (this: unknown, ...args: any[]) {
+        initIterator();
+        // @ts-ignore - Fix
+        return a[method].apply(this, args);
       } as (typeof asyncExtras)[M]
     }[method];
   }
@@ -326,15 +326,15 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           let stack = DEBUG ? new Error() : undefined;
           if (DEBUG)
             console.info(new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
-          consume.call(v,y => {
+          consume.call(v, y => {
             if (v !== piped) {
               // We're being piped from something else. We want to stop that one and get piped from this one
-              throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`,{ cause: stack });
+              throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`, { cause: stack });
             }
             push(y?.valueOf() as V)
           })
-          .catch(ex => console.info(ex))
-          .finally(() => (v === piped) && (piped = undefined));
+            .catch(ex => console.info(ex))
+            .finally(() => (v === piped) && (piped = undefined));
 
           // Early return as we're going to pipe values in later
           return;
@@ -368,29 +368,29 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           toJSON() { return a.valueOf() }
         }));
       case 'object':
-          // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
-          // The proxies are recursive, so that if an object contains objects, they too are proxied. Objects containing primitives remain proxied to
-          // handle the get/set/selete in place of the usual primitive boxing via Object(primitiveValue)
-          // @ts-ignore
-          return boxObject(a, pds);
+        // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
+        // The proxies are recursive, so that if an object contains objects, they too are proxied. Objects containing primitives remain proxied to
+        // handle the get/set/selete in place of the usual primitive boxing via Object(primitiveValue)
+        // @ts-ignore
+        return boxObject(a, pds);
 
     }
     throw new TypeError('Iterable properties cannot be of type "' + typeof a + '"');
   }
 
-  type WithPath = { [_proxiedAsyncIterator]: { a: V, path: string | null }};
+  type WithPath = { [_proxiedAsyncIterator]: { a: V, path: string | null } };
   type PossiblyWithPath = V | WithPath;
   function isProxiedAsyncIterator(o: PossiblyWithPath): o is WithPath {
     return isObjectLike(o) && _proxiedAsyncIterator in o;
   }
   function destructure(o: any, path: string) {
     const fields = path.split('.').slice(1);
-    for (let i = 0; i < fields.length && ((o = o?.[fields[i]]) !== undefined); i++) ;
+    for (let i = 0; i < fields.length && ((o = o?.[fields[i]]) !== undefined); i++);
     return o;
   }
   function boxObject(a: V, pds: AsyncExtraIterable<PossiblyWithPath>) {
-    let withPath:  AsyncExtraIterable<WithPath[typeof _proxiedAsyncIterator]>;
-    let withoutPath:  AsyncExtraIterable<V>;
+    let withPath: AsyncExtraIterable<WithPath[typeof _proxiedAsyncIterator]>;
+    let withoutPath: AsyncExtraIterable<V>;
     return new Proxy(a as object, handler()) as V & AsyncExtraIterable<V>;
 
     function handler(path = ''): ProxyHandler<object> {
@@ -401,17 +401,17 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
         },
         // When a key is set in the target, push the change
         set(target, key, value, receiver) {
-          if (Object.hasOwn(pds,key)) {
+          if (Object.hasOwn(pds, key)) {
             throw new Error(`Cannot set ${name.toString()}${path}.${key.toString()} as it is part of asyncIterator`);
           }
           if (Reflect.get(target, key, receiver) !== value) {
-            push({ [_proxiedAsyncIterator]: {a,path} } as any);
+            push({ [_proxiedAsyncIterator]: { a, path } } as any);
           }
           return Reflect.set(target, key, value, receiver);
         },
         deleteProperty(target, key) {
           if (Reflect.deleteProperty(target, key)) {
-            push({ [_proxiedAsyncIterator]: {a,path} } as any);
+            push({ [_proxiedAsyncIterator]: { a, path } } as any);
             return true;
           }
           return false;
@@ -419,7 +419,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
         // When getting the value of a boxed object member, prefer asyncExtraIterable over target keys
         get(target, key, receiver) {
           // If the key is an asyncExtraIterable member, create the mapped queue to generate it
-          if (Object.hasOwn(pds,key)) {
+          if (Object.hasOwn(pds, key)) {
             if (!path.length) {
               withoutPath ??= filterMap(pds, o => isProxiedAsyncIterator(o) ? o[_proxiedAsyncIterator].a : o);
               return withoutPath[key as keyof typeof pds];
@@ -428,7 +428,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
 
               let ai = filterMap(withPath, (o, p) => {
                 const v = destructure(o.a, path);
-                return p !== v || o.path === null || o.path.startsWith(path) ? v : Ignore ;
+                return p !== v || o.path === null || o.path.startsWith(path) ? v : Ignore;
               }, Ignore, destructure(a, path));
               return ai[key as keyof typeof ai];
             }
@@ -438,7 +438,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
           if (key === 'valueOf') return () => destructure(a, path);
           if (key === Symbol.toPrimitive) {
             // Special case, since Symbol.toPrimitive is in ha(), we need to implement it
-            return function(hint?:'string'|'number'|'default') {
+            return function (hint?: 'string' | 'number' | 'default') {
               if (Reflect.has(target, key))
                 return Reflect.get(target, key, target).call(target, hint);
               if (hint === 'string') return target.toString();
@@ -465,6 +465,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
 /*
   Extensions to the AsyncIterable:
 */
+const forever = new Promise<any>(() => { });
 
 /* Merge asyncIterables into a single asyncIterable */
 
@@ -474,10 +475,10 @@ type CollapseIterableTypes<T> = AsyncIterable<CollapseIterableType<T>>;
 
 export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>>[], TYield, TReturn, TNext>(...ai: A) => {
   const it: (undefined | AsyncIterator<any>)[] = new Array(ai.length);
-  const promises: Promise<{idx: number, result: IteratorResult<any>}>[] = new Array(ai.length);
+  const promises: Promise<{ idx: number, result: IteratorResult<any> }>[] = new Array(ai.length);
 
   let init = () => {
-    init = ()=>{}
+    init = () => { }
     for (let n = 0; n < ai.length; n++) {
       const a = ai[n] as AsyncIterable<TYield> | AsyncIterator<TYield, TReturn, TNext>;
       promises[n] = (it[n] = Symbol.asyncIterator in a
@@ -489,7 +490,6 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
   }
 
   const results: (TYield | TReturn)[] = [];
-  const forever = new Promise<any>(() => { });
   let count = promises.length;
 
   const merged: AsyncIterableIterator<A[number]> = {
@@ -508,8 +508,8 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
           } else {
             // `ex` is the underlying async iteration exception
             promises[idx] = it[idx]
-              ? it[idx]!.next().then(result => ({ idx, result })).catch(ex => ({ idx, result: { done: true, value: ex }}))
-              : Promise.resolve({ idx, result: {done: true, value: undefined} })
+              ? it[idx]!.next().then(result => ({ idx, result })).catch(ex => ({ idx, result: { done: true, value: ex } }))
+              : Promise.resolve({ idx, result: { done: true, value: undefined } })
             return result;
           }
         }).catch(ex => {
@@ -555,18 +555,17 @@ export interface CombineOptions {
 
 export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions = {}): CombinedIterableResult<S> => {
   const accumulated: CombinedIterableType<S> = {};
-  let pc: Promise<{idx: number, k: string, ir: IteratorResult<any>}>[];
+  let pc: Promise<{ idx: number, k: string, ir: IteratorResult<any> }>[];
   let si: AsyncIterator<any>[] = [];
-  let active:number = 0;
-  const forever = new Promise<any>(() => {});
+  let active: number = 0;
   const ci = {
     [Symbol.asyncIterator]() { return ci },
     next(): Promise<IteratorResult<CombinedIterableType<S>>> {
       if (pc === undefined) {
-        pc = Object.entries(src).map(([k,sit], idx) => {
+        pc = Object.entries(src).map(([k, sit], idx) => {
           active += 1;
           si[idx] = sit[Symbol.asyncIterator]!();
-          return si[idx].next().then(ir => ({si,idx,k,ir}));
+          return si[idx].next().then(ir => ({ si, idx, k, ir }));
         });
       }
 
@@ -591,16 +590,16 @@ export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions
         })
       })();
     },
-    return(v?: any){
-      pc.forEach((p,idx) => {
+    return(v?: any) {
+      pc.forEach((p, idx) => {
         if (p !== forever) {
           si[idx].return?.(v)
         }
       });
       return Promise.resolve({ done: true, value: v });
     },
-    throw(ex: any){
-      pc.forEach((p,idx) => {
+    throw(ex: any) {
+      pc.forEach((p, idx) => {
         if (p !== forever) {
           si[idx].throw?.(ex)
         }
@@ -626,7 +625,7 @@ export function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncE
 }
 
 export function generatorHelpers<G extends (...args: any[]) => R, R extends AsyncGenerator>(g: G) {
-  return function (...args:Parameters<G>): ReturnType<G> {
+  return function (...args: Parameters<G>): ReturnType<G> {
     const ai = g(...args);
     return iterableHelpers(ai) as ReturnType<G>;
   } as (...args: Parameters<G>) => ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T> ? T : unknown>
@@ -638,8 +637,8 @@ export function generatorHelpers<G extends (...args: any[]) => R, R extends Asyn
   iterable properties don't complain on every access as they are declared as V & Partial<AsyncIterable<V>>
   due to the setters and getters having different types, but undeclarable in TS due to syntax limitations */
 type HelperAsyncIterable<Q extends Partial<AsyncIterable<any>>> = HelperAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
-type HelperAsyncIterator<F, And = {}, Or = never> =
-  F extends ()=>AsyncIterator<infer T>
+type HelperAsyncIterator<F> =
+  F extends () => AsyncIterator<infer T>
   ? T : never;
 
 async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: HelperAsyncIterable<U>) => void | PromiseLike<void>): Promise<void> {
@@ -658,9 +657,9 @@ export const Ignore = Symbol("Ignore");
 
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
-function resolveSync<Z,R>(v: MaybePromised<Z>, then:(v:Z)=>R, except:(x:any)=>any): MaybePromised<R> {
+function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: any) => any): MaybePromised<R> {
   if (isPromiseLike(v))
-    return v.then(then,except);
+    return v.then(then, except);
   try { return then(v) } catch (ex) { return except(ex) }
 }
 

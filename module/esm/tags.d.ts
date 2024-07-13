@@ -94,8 +94,13 @@ type CheckConstructedReturn<SuppliedDefinitions, Result> = SuppliedDefinitions e
     constructed: any;
 } ? SuppliedDefinitions extends Constructed ? Result : {
     "constructed` does not return ChildTags": SuppliedDefinitions['constructed'];
-} : Result;
-export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
+} : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never ? Result : {
+    "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed>;
+};
+export type TagCreationOptions = {
+    debugger?: boolean;
+};
+export type TagCreatorArgs<A> = [] | [A & TagCreationOptions] | [A & TagCreationOptions, ...ChildTags[]] | ChildTags[];
 export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReadWriteAttributes<ReTypedEventHandlers<Base>>;
 type ExTagCreator<Base extends object, Super extends (unknown | ExTagCreator<any>) = unknown, SuperDefs extends Overrides = {}, Statics = {}> = TagCreatorFunction<Base> & {
     extended: ExtendedTag;

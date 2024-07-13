@@ -1,11 +1,14 @@
 import { WhenParameters, WhenReturn } from './when.js';
-import { ChildTags, TagCreator, TagCreatorFunction } from './tags.js';
+import type { ChildTags, TagCreator, TagCreatorFunction } from './tags.js';
 export { when } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js';
 export * as Iterators from './iterators.js';
 export declare const UniqueID: unique symbol;
-type TagFunctionOptions<OtherMembers extends {} = {}> = {
-    commonProperties: OtherMembers;
+type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> = {
+    commonProperties?: OtherMembers;
+    document?: Document;
+    /** @deprecated - legacy support */
+    enableOnRemovedFromDOM?: boolean;
 };
 interface PoElementMethods {
     get ids(): {};
@@ -35,5 +38,3 @@ export interface TagLoader {
     <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement;
 }
 export declare const tag: TagLoader;
-export declare let enableOnRemovedFromDOM: () => void;
-export declare function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>): Record<string, Element> | undefined;

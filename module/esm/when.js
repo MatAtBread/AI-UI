@@ -1,9 +1,11 @@
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
-const eventObservations = new Map();
+const eventObservations = new WeakMap();
 function docEventHandler(ev) {
-    const observations = eventObservations.get(ev.type);
+    if (!eventObservations.has(this))
+        eventObservations.set(this, new Map());
+    const observations = eventObservations.get(this).get(ev.type);
     if (observations) {
         for (const o of observations) {
             try {
@@ -56,14 +58,16 @@ function doThrow(message) {
 }
 function whenEvent(container, what) {
     const [selector, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: " + what);
-    if (!eventObservations.has(eventName)) {
-        document.addEventListener(eventName, docEventHandler, {
+    if (!eventObservations.has(container.ownerDocument))
+        eventObservations.set(container.ownerDocument, new Map());
+    if (!eventObservations.get(container.ownerDocument).has(eventName)) {
+        container.ownerDocument.addEventListener(eventName, docEventHandler, {
             passive: true,
             capture: true
         });
-        eventObservations.set(eventName, new Set());
+        eventObservations.get(container.ownerDocument).set(eventName, new Set());
     }
-    const queue = queueIteratableIterator(() => eventObservations.get(eventName)?.delete(details));
+    const queue = queueIteratableIterator(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
     const details /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
@@ -71,7 +75,7 @@ function whenEvent(container, what) {
         selector: selector || null
     };
     containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-        .then(_ => eventObservations.get(eventName).add(details));
+        .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName).add(details));
     return queue.multi();
 }
 async function* neverGonnaHappen() {
@@ -173,7 +177,7 @@ function elementIsInDOM(elt) {
                 resolve();
             }
         }
-    }).observe(document.body, {
+    }).observe(elt.ownerDocument.body, {
         subtree: true,
         childList: true
     }));
