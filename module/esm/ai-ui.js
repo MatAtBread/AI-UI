@@ -66,6 +66,7 @@ export const tag = function (_1, _2, _3) {
     const poStyleElt = thisDoc.createElement("STYLE");
     poStyleElt.id = "--ai-ui-extended-tag-styles-";
     /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
+    const warned = new Set();
     const tagPrototypes = Object.create(null, {
         when: {
             writable: false,
@@ -95,7 +96,7 @@ export const tag = function (_1, _2, _3) {
             set: idsInaccessible,
             get() {
                 // Now we've been accessed, create the proxy
-                const value = new Proxy(Object.create(null), {
+                const idProxy = new Proxy(Object.create(null), {
                     apply: idsInaccessible,
                     construct: idsInaccessible,
                     defineProperty: idsInaccessible,
@@ -123,7 +124,20 @@ export const tag = function (_1, _2, _3) {
                                     return target[p];
                                 delete target[p];
                             }
-                            const e = this.querySelector(`#${p}`) ?? undefined;
+                            let e;
+                            if (DEBUG) {
+                                const nl = this.querySelectorAll(`#${p}`);
+                                if (nl.length > 1) {
+                                    if (!warned.has(p)) {
+                                        warned.add(p);
+                                        console.log(`Element contains multiple, shadowed decendants with ID "${p}"` /*,`\n\t${logNode(this)}`*/);
+                                    }
+                                }
+                                e = nl[0];
+                            }
+                            else {
+                                e = this.querySelector(`#${p}`) ?? undefined;
+                            }
                             if (e)
                                 target[p] = e;
                             return e;
@@ -132,14 +146,14 @@ export const tag = function (_1, _2, _3) {
                 });
                 // ..and replace the getter with the Proxy
                 Object.defineProperty(this, 'ids', {
-                    writable: false,
                     configurable: true,
                     enumerable: true,
-                    value
+                    set: idsInaccessible,
+                    get() { return idProxy; }
                 });
                 // ...and return that from the getter, so subsequent property
                 // accesses go via the Proxy
-                return value;
+                return idProxy;
             }
         }
     });

@@ -151,6 +151,7 @@ export const tag = <TagLoader>function <Tags extends string,
   poStyleElt.id = "--ai-ui-extended-tag-styles-";
   
   /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
+  const warned = new Set<string>();
   const tagPrototypes: PoElementMethods = Object.create(
     null,
     {
@@ -183,7 +184,7 @@ export const tag = <TagLoader>function <Tags extends string,
         set: idsInaccessible,
         get(this: Element) {
           // Now we've been accessed, create the proxy
-          const value = new Proxy(Object.create(null), {
+          const idProxy = new Proxy(Object.create(null), {
             apply: idsInaccessible,
             construct: idsInaccessible,
             defineProperty: idsInaccessible,
@@ -211,7 +212,19 @@ export const tag = <TagLoader>function <Tags extends string,
                     return target[p];
                   delete target[p];
                 }
-                const e = this.querySelector(`#${p}`) ?? undefined;
+                let e: Element | undefined;
+                if (DEBUG) {
+                  const nl = this.querySelectorAll(`#${p}`);
+                  if (nl.length > 1) {
+                    if (!warned.has(p)) {
+                      warned.add(p);
+                      console.log(`Element contains multiple, shadowed decendants with ID "${p}"`/*,`\n\t${logNode(this)}`*/);
+                    }
+                  }
+                  e = nl[0];
+                } else {
+                  e = this.querySelector(`#${p}`) ?? undefined;
+                }
                 if (e) target[p] =  e;
                 return e;
               }
@@ -219,14 +232,14 @@ export const tag = <TagLoader>function <Tags extends string,
           });
           // ..and replace the getter with the Proxy
           Object.defineProperty(this,'ids',{
-            writable: false,
             configurable: true,
             enumerable: true,
-            value
+            set: idsInaccessible,
+            get() { return idProxy }
           });
           // ...and return that from the getter, so subsequent property
           // accesses go via the Proxy
-          return value;
+          return idProxy;
         }
       }
     }
