@@ -13,6 +13,8 @@ type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> 
 interface PoElementMethods {
     get ids(): {};
     when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
+    set attributes(attrs: object);
+    get attributes(): NamedNodeMap;
 }
 export interface CreateElement {
     createElement(name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]): Node;

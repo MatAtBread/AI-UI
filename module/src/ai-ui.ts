@@ -26,9 +26,10 @@ type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> 
 interface PoElementMethods {
   get ids(): {}
   when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
-  /* also
-  set attributes(...possible attributes); // has to be enclosed by tag() to access assignProps
-  */
+  // This is a very incomplete type. In practice, set(attrs) requires a deeply partial set of
+  // attributes, in exactly the same way as a TagFunction's first object parameter
+  set attributes(attrs: object);
+  get attributes(): NamedNodeMap
 }
 
 // Support for https://www.npmjs.com/package/htm (or import htm from 'https://cdn.jsdelivr.net/npm/htm/dist/htm.module.js')
@@ -149,7 +150,8 @@ export const tag = <TagLoader>function <Tags extends string,
   const poStyleElt = thisDoc.createElement("STYLE");
   poStyleElt.id = "--ai-ui-extended-tag-styles-";
   
-  const fixedTagPrototypes = Object.create(
+  /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
+  const tagPrototypes: PoElementMethods = Object.create(
     null,
     {
       when: {
@@ -172,61 +174,67 @@ export const tag = <TagLoader>function <Tags extends string,
           }
           else assignProps(this, a);
         }
+      },
+      ids: {
+        // .ids is a getter that when invoked for the first time
+        // lazily creates a Proxy that provides live access to children by id
+        configurable: true,
+        enumerable: false,
+        set: idsInaccessible,
+        get(this: Element) {
+          // Now we've been accessed, create the proxy
+          const value = new Proxy(Object.create(null), {
+            apply: idsInaccessible,
+            construct: idsInaccessible,
+            defineProperty: idsInaccessible,
+            deleteProperty: idsInaccessible,
+            set: idsInaccessible,
+            setPrototypeOf: idsInaccessible,
+            getPrototypeOf() { return null },
+            isExtensible() { return false },
+            preventExtensions() { return true },
+            getOwnPropertyDescriptor(target, p) {
+              if (this.get!(target, p, null))
+                return Reflect.getOwnPropertyDescriptor(target, p);
+            },
+            has(target, p) {
+              const r = this.get!(target, p, null);
+              return Boolean(r);
+            },
+            ownKeys: (target) => {
+              return Array.from(this.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id });
+            },
+            get: (target, p, receiver) => {
+              if (typeof p === 'string') {
+                if (p in target) {
+                  if (this.contains(target[p]))
+                    return target[p];
+                  delete target[p];
+                }
+                const e = this.querySelector(`#${p}`) ?? undefined;
+                if (e) target[p] =  e;
+                return e;
+              }
+            }
+          });
+          // ..and replace the getter with the Proxy
+          Object.defineProperty(this,'ids',{
+            writable: false,
+            configurable: true,
+            enumerable: false,
+            value
+          });
+          // ...and return that from the getter, so subsequent property
+          // accesses go via the Proxy
+          return value;
+        }
       }
     }
   );
-  if (commonProperties)
-    deepDefine(fixedTagPrototypes, commonProperties);
 
-  function instanceTagPrototypes(elt: Element): PropertyDescriptorMap {
-    const target: Record<string, Element> = Object.create(null);
-    function validTarget(p: string | symbol) {
-      if (typeof p === 'string' && p in target) {
-        if (elt.contains(target[p]))
-          return target[p];
-        delete target[p];
-        return false;
-      }
-      return undefined;
-    }
-    return {
-      ids: { 
-        enumerable: true,
-        writable: false,
-        value: new Proxy(target, {
-          apply: idsInaccessible,
-          construct: idsInaccessible,
-          defineProperty: idsInaccessible,
-          deleteProperty: idsInaccessible,
-          set: idsInaccessible,
-          setPrototypeOf: idsInaccessible,
-          getPrototypeOf() { return null },
-          isExtensible() { return false },
-          preventExtensions() { return true },
-          getOwnPropertyDescriptor(target, p) {
-            if (this.get!(target, p, null))
-              return Reflect.getOwnPropertyDescriptor(target, p);
-          },
-          has(target, p) {
-            const r = this.get!(target, p, null);
-            return Boolean(r);
-          },
-          ownKeys(target) {
-            return Array.from(elt.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id });
-          },
-          get(target, p, receiver): Element | undefined {
-            if (typeof p === 'string') {
-              const v = validTarget(p);
-              if (v) return v;
-              const e = elt.querySelector(`#${p}`);
-              if (e) target[p] =  e;
-              return e ?? undefined;
-            }
-          }
-        })
-      }
-    };
-  }
+  /* Add any user supplied prototypes */
+  if (commonProperties)
+    deepDefine(tagPrototypes, commonProperties);
 
   function nodes(...c: ChildTags[]) {
     const appended: Node[] = [];
@@ -780,8 +788,7 @@ export const tag = <TagLoader>function <Tags extends string,
           : thisDoc.createElement(k);
         e.constructor = tagCreator;
 
-        deepDefine(e, fixedTagPrototypes);
-        Object.defineProperties(e, instanceTagPrototypes(e));
+        deepDefine(e, tagPrototypes);
         assignProps(e, attrs);
 
         // Append any children

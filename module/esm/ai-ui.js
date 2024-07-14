@@ -65,7 +65,8 @@ export const tag = function (_1, _2, _3) {
     }
     const poStyleElt = thisDoc.createElement("STYLE");
     poStyleElt.id = "--ai-ui-extended-tag-styles-";
-    const fixedTagPrototypes = Object.create(null, {
+    /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
+    const tagPrototypes = Object.create(null, {
         when: {
             writable: false,
             configurable: true,
@@ -85,26 +86,16 @@ export const tag = function (_1, _2, _3) {
                 else
                     assignProps(this, a);
             }
-        }
-    });
-    if (commonProperties)
-        deepDefine(fixedTagPrototypes, commonProperties);
-    function instanceTagPrototypes(elt) {
-        const target = Object.create(null);
-        function validTarget(p) {
-            if (typeof p === 'string' && p in target) {
-                if (elt.contains(target[p]))
-                    return target[p];
-                delete target[p];
-                return false;
-            }
-            return undefined;
-        }
-        return {
-            ids: {
-                enumerable: true,
-                writable: false,
-                value: new Proxy(target, {
+        },
+        ids: {
+            // .ids is a getter that when invoked for the first time
+            // lazily creates a Proxy that provides live access to children by id
+            configurable: true,
+            enumerable: false,
+            set: idsInaccessible,
+            get() {
+                // Now we've been accessed, create the proxy
+                const value = new Proxy(Object.create(null), {
                     apply: idsInaccessible,
                     construct: idsInaccessible,
                     defineProperty: idsInaccessible,
@@ -122,24 +113,39 @@ export const tag = function (_1, _2, _3) {
                         const r = this.get(target, p, null);
                         return Boolean(r);
                     },
-                    ownKeys(target) {
-                        return Array.from(elt.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id; });
+                    ownKeys: (target) => {
+                        return Array.from(this.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id; });
                     },
-                    get(target, p, receiver) {
+                    get: (target, p, receiver) => {
                         if (typeof p === 'string') {
-                            const v = validTarget(p);
-                            if (v)
-                                return v;
-                            const e = elt.querySelector(`#${p}`);
+                            if (p in target) {
+                                if (this.contains(target[p]))
+                                    return target[p];
+                                delete target[p];
+                            }
+                            const e = this.querySelector(`#${p}`) ?? undefined;
                             if (e)
                                 target[p] = e;
-                            return e ?? undefined;
+                            return e;
                         }
                     }
-                })
+                });
+                // ..and replace the getter with the Proxy
+                Object.defineProperty(this, 'ids', {
+                    writable: false,
+                    configurable: true,
+                    enumerable: false,
+                    value
+                });
+                // ...and return that from the getter, so subsequent property
+                // accesses go via the Proxy
+                return value;
             }
-        };
-    }
+        }
+    });
+    /* Add any user supplied prototypes */
+    if (commonProperties)
+        deepDefine(tagPrototypes, commonProperties);
     function nodes(...c) {
         const appended = [];
         (function children(c) {
@@ -659,8 +665,7 @@ export const tag = function (_1, _2, _3) {
                     ? thisDoc.createElementNS(nameSpace, k.toLowerCase())
                     : thisDoc.createElement(k);
                 e.constructor = tagCreator;
-                deepDefine(e, fixedTagPrototypes);
-                Object.defineProperties(e, instanceTagPrototypes(e));
+                deepDefine(e, tagPrototypes);
                 assignProps(e, attrs);
                 // Append any children
                 e.append(...nodes(...children));
