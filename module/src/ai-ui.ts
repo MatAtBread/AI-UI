@@ -179,7 +179,7 @@ export const tag = <TagLoader>function <Tags extends string,
         // .ids is a getter that when invoked for the first time
         // lazily creates a Proxy that provides live access to children by id
         configurable: true,
-        enumerable: false,
+        enumerable: true,
         set: idsInaccessible,
         get(this: Element) {
           // Now we've been accessed, create the proxy
@@ -221,7 +221,7 @@ export const tag = <TagLoader>function <Tags extends string,
           Object.defineProperty(this,'ids',{
             writable: false,
             configurable: true,
-            enumerable: false,
+            enumerable: true,
             value
           });
           // ...and return that from the getter, so subsequent property
