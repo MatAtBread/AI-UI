@@ -35,7 +35,7 @@ const ClickAndKill = RedBox.extended({
 
 // Create an element (with a red background), the destroys itself when you click it and append it to the document body.
 document.body.append(ClickAndKill("click me"));
-// Create an element (with a blue background), the destroys itself when you click it and append it to the document body.
+// Create an element (with a **blue** background), the destroys itself when you click it and append it to the document body.
 document.body.append(ClickAndKill({
   style:{
       backgroundColor: 'blue' // Overrides the value in RedBox
@@ -44,7 +44,7 @@ document.body.append(ClickAndKill({
 
 ```
 
-`overrides` must be of the correct type. Typescript will generate a warning if you try to assign, for example, a number to string attribute. Note that most DOM attributes are strings, even if they are numeric in nature, for example `style.opacity` is a string. In these cases, use the standard JavaScript literals/expressions like `${num}`, or casts like `String(0.5)` or `num.toString()`.
+`overrides` must be of the correct type. TypeScript will generate a warning if you try to assign, for example, a number to string attribute. Note that most DOM attributes are strings, even if they are numeric in nature, for example `style.opacity` is a string. In these cases, use the standard JavaScript literals/expressions like `${num}`, or casts like `String(0.5)` or `num.toString()`.
 
 > AI-UI `element.attributes`
 >
@@ -65,7 +65,7 @@ document.body.append(ClickAndKill({
 
 ## declare
 
-`declare` is just like override, except it's for defining new properties that don't exist in the base tag you're extending. You'll get a Typescript error if you try to declate an attribute that already exists in the base tag.
+`declare` is just like override, except it's for defining new properties that don't exist in the base tag you're extending. You'll get a TypeScript error if you try to declate an attribute that already exists in the base tag.
 
 ```typescript
 const NamedBox = div.extended({
@@ -98,10 +98,9 @@ const BetterButton = button.extended({
   override:{
     onclick() { this.inactive = true },
     onmouseout() { this.inactive = false }
-  }
-  // More about this later
+  },
   constructed() {
-    // Set the attributes of this element
+    // Set the attributes of this element "declaritively"
     this.attributes = {
       style:{
         color: this.inactive.map!(f => f ? 'grey' : 'red')
@@ -109,7 +108,8 @@ const BetterButton = button.extended({
       disabled: this.inactive.map!(f => f)
     };
     // The above is actually the same as - the code style is a matter of personal preference.
-    this.inactive.consume(f => {
+    // Set the attributes "procedurally"
+    this.inactive.consume!(f => {
       this.style.color = f ? 'grey' : 'red';
       this.disabled = f;
     });
@@ -130,7 +130,7 @@ myButton.inactive = true; // Logs "Button inactive", updates the text after "Act
 ```
 
 ### Caveats
-Iterable properties are implemented by wrapping primitives in their respective "boxed" objects - the same as you'd get from `new Number(123)` or `new Boolean(true)`. This means that while you can do simple things like: `console.log(elt.numIter + 3, elt.numIter > 10); elt.numIter += 10;`, you need to be cautious with falsy/truthy expressions and equality tests.
+Iterable properties are implemented by wrapping primitives in their respective "boxed" objects - the same as you'd get from `new Number(123)` or `new Boolean(true)`. This means that while you can do simple things like: `console.log(elt.numIter + 3, elt.numIter > 10); elt.numIter += 10;`, you need to be cautious with falsy/truthy expressions and equality tests **which are not coerced by JavaScript**.
 
 In Javascript, objects are _always_ truthy (except for `null`), so
 ```javascript
@@ -159,64 +159,75 @@ if (elt1.boolIter == elt2.boolIter.valueOf())             // ✅ Works - RHS is 
 if (elt1.boolIter.valueOf() === elt2.boolIter.valueOf())  // ✅ Works - Both are primitive, no coercion required
 ```
 
-The way iterables are implemented, you can always call `.valueOf()` to get the underlying primitive value the iterable represents, as in the example above. You might find the MDN article on [Type coercion](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#type_coercion) helpful in understanding JavaScript coerces types.
+The way iterables are implemented, you can always call `.valueOf()` to get the underlying primitive value the iterable represents, as in the example above. You might find the MDN article on [Type coercion](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#type_coercion) helpful in understanding how JavaScript coerces types.
 
 ### iterable `object` properties
 
-If the `iterable` declares an object rather than a primtive (string, number, bigint, ...), it is _always_ spread (shallow-copied) into a new object before being turned into an async iterable, so the source object doesn't hold inappropriate references to the iterable that might prevent garbage collection. Note that this also means changes to the source do not cause the iterable to yield updates - you have to update the property on the element, not what it was assigned from.
+If the `iterable` declares an object rather than a primtive (string, number, bigint, ...), it is Proxied into an async iterable. This means changes to the source do not cause the iterable to yield updates - you have to update the property on the element, not what it was assigned from.
 
 This means that:
 ```javascript
-const p = { x: 10, y: 20};
+const p = { x: 10, y: 20 };
 elt.center = p; // `centre` is an iterable property that is an object
 
-if (elt.center === p)           // ❌ Never true: p has been spread into elt.center, not referenced.
-if (elt.center.valueOf() === p) // ❌ Never true: p has been spread into elt.center, not referenced.
+if (elt.center === p)           // ❌ Never true: p has been proxied into elt.center, not referenced.
+if (elt.center.valueOf() === p) // ✅ True - the value of the proxy is the same as the original object
 
-p.x = 20;                       // ❌ No change - the source object `p` was spread into elt.center & is a standalone object
-elt.center.x = 20;              // ✅ Works - elt.center is iterable and will yield 20 to any consumers
+p.x = 20;                       // ❌ No change - the source object `p` was proxied into elt.center & is a standalone object
+elt.center.x = 30;              // ✅ Works - elt.center is iterable and will yield 30 to any consumers
+p.x === 30;                     // ✅ Works - the underlying object was modified by the proxied assignment
 ```
 
-#### iterable object properties must be declared
-Additonally, the members of the `iterable` object must exist (even if `undefined` or `null`) in the iterable declaration:
-```typescript
-const X = div.extended({
-  iterable:{
-    info:{
-      name: undefined as (string | undefined),
-      phone: null as (string | null)
+### Iterable `object` yield hierarchy
+
+Consider that you have an `iterable` property that is a nested object, eg:
+```javascript
+iterable: {
+  obj: {
+    n: 123,
+    nest: {
+      s: 'abc',
+      flags: {
+        b: false
+      }
     }
   }
-});
-const i = X();
-i.info.name = 'Matt';        // ✅ Works - info contains a member called "name"
-i.info.phone = '01234567';   // ✅ Works - info contains a member called "phone"
-i.info.country = 'UK';       // ❌ Silently fails - no member called "country" was declared in info
+}
 ```
 
-#### iterables can't be arrays
-Currently, for implementation reasons, iterables can't be arrays (mainly as their `map` and `filter` properties clash with those of helped async iterators). If you really want an iterable to be an array type, place the array inside an object. To access the Array methods, `call` the Array prototype functions:
+When you assigned to a value, such as `elt.obj.nest.s = 'def';`, not only does `elt.obj.nest.s` yield, but all it's ancestors (`elt.obj.nest`, `elt.obj`), since they have changed as well. Similarly, when you assign an object value, all children that you are consuming that have changed (even if created or removed) will also yield, since changing an object changes all of it's members.
+
+> Note: Prior to v0.14.x, the follwing semantic differences also existed
+> - iterable object properties must be declared
+> - iterables can't be arrays
+> - hierarchical yielding was inconsistent
+
+### iterable `array` properties
+
+As of v0.14.x, iterables can be arrays, however some caution is needed because `map` and `filter` properties clash with those of helped async iterators. To access the `Array` methods, `call` the Array prototype functions:
+
 ```typescript
 const Chart = div.extended({
   iterable:{
-    // data: [] as number[]  // WRONG: doesn't work as intended
-    data:{
-      values: [] as number[]; // Correct
-    }
+    data: [] as number[]  // WRONG: doesn't work as intended
   },
   declare:{
     myFunc() {
       // ✅ Works - `slice` is member of data.values
-      return this.data.values.slice(0,-1);
+      return this.data.slice(0,-1);
     },
     myOtherFunc() {
+      // We want to map members of the array held in this.data, NOT map the async iterator this.data
+
       // ❌ `map` is the async helper function `map`. This fails as "n" represent the whole array when it changes
-      return this.data.values.map(n => -n);
+      return this.data.map(n => -n); // This will yield asynchronously when this.data changes!
+
       // ✅ Works - call Array#map on the array value
-      return Array.prototype.map.call(this.data.values, n => -n);
+      return Array.prototype.map.call(this.data, n => -n);
+
       // ✅ Works - alternative syntax is a bit easier to read, but slightly less efficient
-      return [].map.call(this.data.values, n => -n);
-    },
+      return [].map.call(this.data, n => -n);
+    }
   }
 });
 
@@ -225,12 +236,18 @@ ch.data = { values: [10,4,7,2] }; // Causes the chart to redraw since it's consu
 
 const ch2 = Chart({ data: { values: [9.11.4.7] }}); // Creates a chart with default data for the iterable
 ```
-Typescript will warn you if you try to create an iterable that is an array.
 
-#### iterable 'async helpers' need a tweak to pass type-checking
-Finally, due to a limitation of Typescript, although iterable properties are _always_ created with [helpers](./iterators.md), so you can `map`, `filter` and `merge` (they are built `multi`, so you never need to do this), they appear in the type declarations as optional. Without this, Typescript will conplain that expressions like `elt.numIter = 10` aren't valid, as `elt.numIter` would require a defintion of `map`, `[Symbol.asyncIterator]`, etc.
+Note, you get proxied Array members like `length` for free:
 
-To avoid this issue in Typescript, follow the helper with a [`!`](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#non-null-assertion-operator-postfix-) to tell Typescript that the helper really is present, since it always is:
+```typescript
+  ch.data.length.consume(n => console.log("Data length", n));
+  ch.data.push(12); // Causes the above to to yield and output "Data length: 3"
+```
+
+#### iterable 'async helpers' need a tweak to pass TypeScript type-checking
+Finally, due to a limitation of TypeScript, although iterable properties are _always_ created with [helpers](./iterators.md), so you can `map`, `filter` and `merge` (they are built `multi`, so you never need to do this), they appear in the type declarations as optional. Without this, TypeScript will conplain that expressions like `elt.numIter = 10` aren't valid, as `elt.numIter` would require a defintion of `map`, `[Symbol.asyncIterator]`, etc.
+
+To avoid this issue in TypeScript, follow the helper with a [`!`](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#non-null-assertion-operator-postfix-) to tell TypeScript that the helper really is present, since it always is:
 ```typescript
 this.numIter.map!(n => -n).consume(n => console.log(n))
 // Here.........↑

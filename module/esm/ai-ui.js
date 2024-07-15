@@ -18,19 +18,9 @@ const standandTags = [
     "strong", "style", "sub", "summary", "sup", "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead", "time",
     "title", "tr", "track", "u", "ul", "var", "video", "wbr"
 ];
-const elementProtype = Object.getOwnPropertyDescriptors({
-    get ids() {
-        return getElementIdMap(this);
-    },
-    set ids(v) {
-        throw new Error('Cannot set ids on ' + this.valueOf());
-    },
-    when: function (...what) {
-        return when(this, ...what);
-    }
-});
-const poStyleElt = document.createElement("STYLE");
-poStyleElt.id = "--ai-ui-extended-tag-styles-";
+function idsInaccessible() {
+    throw new Error("<elt>.ids is a read-only map of Elements");
+}
 function isChildTag(x) {
     return typeof x === 'string'
         || typeof x === 'number'
@@ -62,25 +52,112 @@ export const tag = function (_1, _2, _3) {
         : Array.isArray(_1)
             ? [null, _1, _2]
             : [null, standandTags, _1];
-    const removedNodes = mutationTracker(document, 'removedNodes');
     const commonProperties = options?.commonProperties;
-    /* Note: we use property defintion (and not object spread) so getters (like `ids`)
-      are not evaluated until called */
-    const tagPrototypes = Object.create(null, elementProtype);
-    // We do this here and not in elementProtype as there's no syntax
-    // to copy a getter/setter pair from another object
-    Object.defineProperty(tagPrototypes, 'attributes', {
-        ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
-        set(a) {
-            if (isAsyncIter(a)) {
-                const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
-                const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn(ex));
-                step();
+    const thisDoc = options?.document ?? globalThis.document;
+    const removedNodes = mutationTracker(thisDoc, 'removedNodes', options?.enableOnRemovedFromDOM);
+    function DomPromiseContainer() {
+        return thisDoc.createComment(DEBUG
+            ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
+            : "promise");
+    }
+    function DyamicElementError({ error }) {
+        return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
+    }
+    const poStyleElt = thisDoc.createElement("STYLE");
+    poStyleElt.id = "--ai-ui-extended-tag-styles-";
+    /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
+    const warned = new Set();
+    const tagPrototypes = Object.create(null, {
+        when: {
+            writable: false,
+            configurable: true,
+            enumerable: false,
+            value: function (...what) {
+                return when(this, ...what);
             }
-            else
-                assignProps(this, a);
+        },
+        attributes: {
+            ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
+            set(a) {
+                if (isAsyncIter(a)) {
+                    const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
+                    const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn(ex));
+                    step();
+                }
+                else
+                    assignProps(this, a);
+            }
+        },
+        ids: {
+            // .ids is a getter that when invoked for the first time
+            // lazily creates a Proxy that provides live access to children by id
+            configurable: true,
+            enumerable: true,
+            set: idsInaccessible,
+            get() {
+                // Now we've been accessed, create the proxy
+                const idProxy = new Proxy(Object.create(null), {
+                    apply: idsInaccessible,
+                    construct: idsInaccessible,
+                    defineProperty: idsInaccessible,
+                    deleteProperty: idsInaccessible,
+                    set: idsInaccessible,
+                    setPrototypeOf: idsInaccessible,
+                    getPrototypeOf() { return null; },
+                    isExtensible() { return false; },
+                    preventExtensions() { return true; },
+                    getOwnPropertyDescriptor(target, p) {
+                        if (this.get(target, p, null))
+                            return Reflect.getOwnPropertyDescriptor(target, p);
+                    },
+                    has(target, p) {
+                        const r = this.get(target, p, null);
+                        return Boolean(r);
+                    },
+                    ownKeys: (target) => {
+                        return Array.from(this.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id; });
+                    },
+                    get: (target, p, receiver) => {
+                        if (typeof p === 'string') {
+                            if (p in target) {
+                                if (this.contains(target[p]))
+                                    return target[p];
+                                delete target[p];
+                            }
+                            let e;
+                            if (DEBUG) {
+                                const nl = this.querySelectorAll(`#${p}`);
+                                if (nl.length > 1) {
+                                    if (!warned.has(p)) {
+                                        warned.add(p);
+                                        console.log(`Element contains multiple, shadowed decendants with ID "${p}"` /*,`\n\t${logNode(this)}`*/);
+                                    }
+                                }
+                                e = nl[0];
+                            }
+                            else {
+                                e = this.querySelector(`#${p}`) ?? undefined;
+                            }
+                            if (e)
+                                target[p] = e;
+                            return e;
+                        }
+                    }
+                });
+                // ..and replace the getter with the Proxy
+                Object.defineProperty(this, 'ids', {
+                    configurable: true,
+                    enumerable: true,
+                    set: idsInaccessible,
+                    get() { return idProxy; }
+                });
+                // ...and return that from the getter, so subsequent property
+                // accesses go via the Proxy
+                return idProxy;
+            }
         }
     });
+    /* Add any user supplied prototypes */
     if (commonProperties)
         deepDefine(tagPrototypes, commonProperties);
     function nodes(...c) {
@@ -172,7 +249,7 @@ export const tag = function (_1, _2, _3) {
                 ap.next().then(update).catch(error);
                 return;
             }
-            appended.push(document.createTextNode(c.toString()));
+            appended.push(thisDoc.createTextNode(c.toString()));
         })(c);
         return appended;
     }
@@ -279,7 +356,7 @@ export const tag = function (_1, _2, _3) {
                 // static props before getters/setters
                 const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
                 if (!Array.isArray(s)) {
-                    sourceEntries.sort((a, b) => {
+                    sourceEntries.sort(a => {
                         const desc = Object.getOwnPropertyDescriptor(d, a[0]);
                         if (desc) {
                             if ('value' in desc)
@@ -287,7 +364,7 @@ export const tag = function (_1, _2, _3) {
                             if ('set' in desc)
                                 return 1;
                             if ('get' in desc)
-                                return 0.5;
+                                return 1;
                         }
                         return 0;
                     });
@@ -443,9 +520,9 @@ export const tag = function (_1, _2, _3) {
         let staticExtensions = instanceDefinition({ [UniqueID]: uniqueTagID });
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
-            poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
-            if (!document.head.contains(poStyleElt)) {
-                document.head.appendChild(poStyleElt);
+            poStyleElt.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
+            if (!thisDoc.head.contains(poStyleElt)) {
+                thisDoc.head.appendChild(poStyleElt);
             }
         }
         // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
@@ -587,7 +664,6 @@ export const tag = function (_1, _2, _3) {
             // @ts-ignore
             return baseTagCreators[k];
         const tagCreator = (attrs, ...children) => {
-            let doc = document;
             if (isChildTag(attrs)) {
                 children.unshift(attrs);
                 attrs = {};
@@ -598,14 +674,10 @@ export const tag = function (_1, _2, _3) {
                     debugger;
                     delete attrs.debugger;
                 }
-                if (attrs.document) {
-                    doc = attrs.document;
-                    delete attrs.document;
-                }
                 // Create element
                 const e = nameSpace
-                    ? doc.createElementNS(nameSpace, k.toLowerCase())
-                    : doc.createElement(k);
+                    ? thisDoc.createElementNS(nameSpace, k.toLowerCase())
+                    : thisDoc.createElement(k);
                 e.constructor = tagCreator;
                 deepDefine(e, tagPrototypes);
                 assignProps(e, attrs);
@@ -632,28 +704,7 @@ export const tag = function (_1, _2, _3) {
     // @ts-ignore
     return baseTagCreators;
 };
-function DomPromiseContainer() {
-    return document.createComment(DEBUG
-        ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
-        : "promise");
-}
-function DyamicElementError({ error }) {
-    return document.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
-}
-export let enableOnRemovedFromDOM = function () {
-    enableOnRemovedFromDOM = function () { }; // Only create the observer once
-    new MutationObserver((mutations) => {
-        mutations.forEach(function (m) {
-            if (m.type === 'childList') {
-                m.removedNodes.forEach(removed => removed && removed instanceof Element &&
-                    [...removed.getElementsByTagName("*"), removed].filter(elt => !elt.isConnected).forEach(elt => {
-                        'onRemovedFromDOM' in elt && typeof elt.onRemovedFromDOM === 'function' && elt.onRemovedFromDOM();
-                    }));
-            }
-        });
-    }).observe(document.body, { subtree: true, childList: true });
-};
-function mutationTracker(root, track) {
+function mutationTracker(root, track, enableOnRemovedFromDOM) {
     const tracked = new WeakSet();
     function walk(nodes) {
         for (const node of nodes) {
@@ -661,12 +712,15 @@ function mutationTracker(root, track) {
             if ((track === 'addedNodes') === node.isConnected) {
                 walk(node.childNodes);
                 tracked.add(node);
+                // Legacy onRemovedFromDOM support
+                if (enableOnRemovedFromDOM && 'onRemovedFromDOM' in node && typeof node.onRemovedFromDOM === 'function')
+                    node.onRemovedFromDOM();
             }
         }
     }
     new MutationObserver((mutations) => {
         mutations.forEach(function (m) {
-            if (m.type === 'childList' && m.removedNodes.length) {
+            if (m.type === 'childList' && m[track].length) {
                 walk(m[track]);
             }
         });
@@ -674,24 +728,4 @@ function mutationTracker(root, track) {
     return function (node) {
         return tracked.has(node);
     };
-}
-const warned = new Set();
-export function getElementIdMap(node, ids) {
-    node = node || document;
-    ids = ids || Object.create(null);
-    if (node.querySelectorAll) {
-        node.querySelectorAll("[id]").forEach(function (elt) {
-            if (elt.id) {
-                if (!ids[elt.id])
-                    ids[elt.id] = elt;
-                else if (DEBUG) {
-                    if (!warned.has(elt.id)) {
-                        warned.add(elt.id);
-                        console.info("Shadowed multiple element IDs", elt.id /*, elt, ids![elt.id]*/);
-                    }
-                }
-            }
-        });
-    }
-    return ids;
 }

@@ -1,12 +1,12 @@
 import { ChildTags } from "./ai-ui.js";
-declare const AIUIJSX: (name: Node | keyof HTMLElementTagNameMap | import("./tags.js").TagCreatorFunction<Element>, attrs: any, ...children: ChildTags[]) => Node;
+declare const AIUIJSX: (name: import("./tags.js").TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]) => Node;
 export declare const jsx: <T extends {
-    children?: ChildTags[] | undefined;
+    children?: ChildTags[];
 }>(tagName: Parameters<typeof AIUIJSX>[0], attrs: T) => Node;
 export declare const jsxs: <T extends {
-    children?: ChildTags[] | undefined;
+    children?: ChildTags[];
 }>(tagName: Parameters<typeof AIUIJSX>[0], attrs: T) => Node;
-export declare const Fragment: (name: Node | keyof HTMLElementTagNameMap | import("./tags.js").TagCreatorFunction<Element>, attrs: any, ...children: ChildTags[]) => Node;
+export declare const Fragment: (name: import("./tags.js").TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]) => Node;
 declare global {
     var React: unknown;
     namespace JSX {
@@ -16,6 +16,6 @@ declare global {
     }
 }
 declare const _default: {
-    AIUIJSX: (name: Node | keyof HTMLElementTagNameMap | import("./tags.js").TagCreatorFunction<Element>, attrs: any, ...children: ChildTags[]) => Node;
+    AIUIJSX: (name: import("./tags.js").TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]) => Node;
 };
 export default _default;

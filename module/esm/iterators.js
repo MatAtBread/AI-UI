@@ -347,6 +347,10 @@ export function defineIterableProperty(obj, name, v) {
         }
     }
 }
+/*
+  Extensions to the AsyncIterable:
+*/
+const forever = new Promise(() => { });
 export const merge = (...ai) => {
     const it = new Array(ai.length);
     const promises = new Array(ai.length);
@@ -362,7 +366,6 @@ export const merge = (...ai) => {
         }
     };
     const results = [];
-    const forever = new Promise(() => { });
     let count = promises.length;
     const merged = {
         [Symbol.asyncIterator]() { return merged; },
@@ -418,7 +421,6 @@ export const combine = (src, opts = {}) => {
     let pc;
     let si = [];
     let active = 0;
-    const forever = new Promise(() => { });
     const ci = {
         [Symbol.asyncIterator]() { return ci; },
         next() {

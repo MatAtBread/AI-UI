@@ -1,10 +1,10 @@
 # Type safe elements using `ids`
 
-> _Although this feature talks about Typescript a lot, even vanilla JS developers should look at the final section on [#maintaining-references], which explains how AIUI features help you manage children in extended tags_
+> _Although this feature talks about TypeScript a lot, even vanilla JS developers should look at the final section on [maintaining references](#maintaining-references), which explains how AIUI features help you manage children in extended tags_
 
-One of the irritations in writing DOM code in Typescript is that there is no clear relationship between the DOM APIs and the types of the underlying elements.
+One of the irritations in writing DOM code in TypeScript is that there is no clear relationship between the DOM APIs and the types of the underlying elements.
 
-A call to `document.getElementById("thing")` will return `null | HTMLElement`. You can use generics on some functions where you're _telling_ Typescript what the type should be, but you'll still have to litter your code with these type parameters.
+A call to `document.getElementById("thing")` will return `null | HTMLElement`. You can use generics on some functions where you're _telling_ TypeScript what the type should be, but you'll still have to litter your code with these type parameters.
 
 AI-UI allows you to codify the types of children in extended tags in a way that avoids you having to repeat yourself everywhere.
 
@@ -103,7 +103,7 @@ Let's go back to our original code and add the calls.
       this.querySelector('[type=checkbox]').checked = this.product.stock > 0;
     }
 ```
-Ok, but Typescript will complain about the `.checked` member, since it's not really able to work out that this string really refers to an DOM HTMLInputElement, so we're back to type casts and generic parameters.
+Ok, but TypeScript will complain about the `.checked` member, since it's not really able to work out that this string really refers to an DOM HTMLInputElement, so we're back to type casts and generic parameters.
 
 AIUI allows extended tags to define a set of types and ids, like this:
 
@@ -137,13 +137,17 @@ const InfoBlock = div.extended({
 })
 ```
 
-The key features here are the `ids: { .... }` block which relates the ids to the tag functions that create them, and the use of `this.ids.stockLevel`. All elements created by AIUI have an `ids` property that essentially works like "element.getElementById(...)", but does so in a type-safe manner by referring to the `ids` block.
+The key features here are the `ids: { .... }` block which relates the ids to the tag functions that create them, and the use of `this.ids.stockLevel`. All elements created by AIUI have an `ids` property that essentially works like "element.getElementById(...)" (which doesn't actually exist), but does so in a type-safe manner by referring to the `ids` block.
 
 ### Maintaining references
 
-You can declare as many ids as you need, and they will be resolved at run-time. If the element `xxx.ids.yyy` refers to is destoyed and recreated or upadted by an async operation (or anything else), it will continue to be referenced for example by "updateStockLevel" in our example. Local variables (or instance variables) can't do this - they hold a reference to a _specific_ DOM element, not a reference to a position within a DOM tree.
+You can declare as many `ids` as you need, and they will be resolved at run-time. If the element `xxx.ids.yyy` refers to is destoyed and recreated or updated by an async operation (or anything else), it will continue to be referenced for example by "updateStockLevel" in our example. Local variables (or instance variables) can't do this - they hold a reference to a _specific_ DOM element, not a reference to a position within a DOM tree.
 
-> _TODO: add example_
+> Important! Avoiding leaks
+
+If your input was itself dynamic (for example if defined you `product` as `iterable`, and updated the `product` after the `InfoBlock` was constructed), AI-UI could destroy and re-create it, and now your local variable holds a reference to an un-mounted element, which will leak, and more importantly, won't work: if you update the `stockLevel.checked`, you're now updating the un-mounted DOM element, and nothing will change in the UI.
+
+Use `this.ids...` and it will always refer to the mounted child with than ID, if it exists.
 ____
 
 | < Prev | ^ |  Next > |

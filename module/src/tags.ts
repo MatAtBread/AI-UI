@@ -198,12 +198,18 @@ interface ExtendedTag {
 
 type CheckConstructedReturn<SuppliedDefinitions, Result> =
 SuppliedDefinitions extends { constructed: any }
-? SuppliedDefinitions extends Constructed
-  ? Result
-  : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
-: Result
+  ? SuppliedDefinitions extends Constructed
+    ? Result
+    : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
+  : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never 
+    ? Result 
+    : { "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed> }
 
-export type TagCreatorArgs<A> = [] | [A] | [A, ...ChildTags[]] | ChildTags[];
+export type TagCreationOptions = {
+  debugger?: boolean
+};
+
+export type TagCreatorArgs<A> = [] | [A & TagCreationOptions] | [A & TagCreationOptions, ...ChildTags[]] | ChildTags[];
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */

@@ -33,7 +33,7 @@ export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
 export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
-    filterMap<U extends Partial<AsyncIterable<any>>, R>(this: U, fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;
+    filterMap<U extends PartialIterable, R>(this: U, fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;
     map: typeof map;
     filter: typeof filter;
     unique: typeof unique;
@@ -42,8 +42,8 @@ export declare const asyncExtras: {
     initially: typeof initially;
     consume: typeof consume;
     merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T>>, ...A][number]>>;
-    combine<T_1, S extends CombinedIterable>(this: Partial<AsyncIterable<T_1>>, others: S): CombinedIterableResult<{
-        _this: Partial<AsyncIterable<T_1>>;
+    combine<T, S extends CombinedIterable>(this: PartialIterable<T>, others: S): CombinedIterableResult<{
+        _this: Partial<AsyncIterable<T>>;
     } & S>;
 };
 export declare const queueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T>;
@@ -74,9 +74,9 @@ export interface CombineOptions {
 }
 export declare const combine: <S extends CombinedIterable>(src: S, opts?: CombineOptions) => CombinedIterableResult<S>;
 export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown>;
-export declare function generatorHelpers<G extends (...args: any[]) => R, R extends AsyncGenerator>(g: G): (...args: Parameters<G>) => ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T, any, unknown> ? T : unknown>;
+export declare function generatorHelpers<G extends (...args: any[]) => R, R extends AsyncGenerator>(g: G): (...args: Parameters<G>) => ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T> ? T : unknown>;
 type HelperAsyncIterable<Q extends Partial<AsyncIterable<any>>> = HelperAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
-type HelperAsyncIterator<F, And = {}, Or = never> = F extends () => AsyncIterator<infer T> ? T : never;
+type HelperAsyncIterator<F> = F extends () => AsyncIterator<infer T> ? T : never;
 declare function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: HelperAsyncIterable<U>) => void | PromiseLike<void>): Promise<void>;
 type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>);
 type MaybePromised<T> = PromiseLike<T> | T;

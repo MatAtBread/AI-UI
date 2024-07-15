@@ -1,8 +1,8 @@
 import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
-import { ChildTags, Constructed, Instance, Overrides, TagCreator, TagCreatorFunction } from './tags.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
+import type { ChildTags, Constructed, Instance, Overrides, TagCreationOptions, TagCreator, TagCreatorFunction } from './tags.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
@@ -11,21 +11,25 @@ export * as Iterators from './iterators.js';
 
 export const UniqueID = Symbol("Unique ID");
 
-const logNode = DEBUG ? ((n: Node) => `"${'innerHTML' in n ? n.innerHTML : n.textContent}"`) : (n: Node)=>undefined;
+const logNode = DEBUG ? ((n: Node) => `"${'innerHTML' in n ? n.innerHTML : n.textContent}"`) : (n: Node) => undefined;
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
-type TagFunctionOptions<OtherMembers extends {} = {}> = {
-  commonProperties: OtherMembers
+type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> = {
+  commonProperties?: OtherMembers
+  document?: Document
+  /** @deprecated - legacy support */
+  enableOnRemovedFromDOM?: boolean
 }
 
 /* Members applied to EVERY tag created, even base tags */
 interface PoElementMethods {
   get ids(): {}
   when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
-  /* also
-  set attributes(...possible attributes); // has to be enclosed by tag() to access assignProps
-  */
+  // This is a very incomplete type. In practice, set(attrs) requires a deeply partial set of
+  // attributes, in exactly the same way as a TagFunction's first object parameter
+  set attributes(attrs: object);
+  get attributes(): NamedNodeMap
 }
 
 // Support for https://www.npmjs.com/package/htm (or import htm from 'https://cdn.jsdelivr.net/npm/htm/dist/htm.module.js')
@@ -71,30 +75,19 @@ export interface TagLoader {
 
 let idCount = 0;
 const standandTags = [
-  "a","abbr","address","area","article","aside","audio","b","base","bdi","bdo","blockquote","body","br","button",
-  "canvas","caption","cite","code","col","colgroup","data","datalist","dd","del","details","dfn","dialog","div",
-  "dl","dt","em","embed","fieldset","figcaption","figure","footer","form","h1","h2","h3","h4","h5","h6","head",
-  "header","hgroup","hr","html","i","iframe","img","input","ins","kbd","label","legend","li","link","main","map",
-  "mark","menu","meta","meter","nav","noscript","object","ol","optgroup","option","output","p","picture","pre",
-  "progress","q","rp","rt","ruby","s","samp","script","search","section","select","slot","small","source","span",
-  "strong","style","sub","summary","sup","table","tbody","td","template","textarea","tfoot","th","thead","time",
-  "title","tr","track","u","ul","var","video","wbr"
+  "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
+  "canvas", "caption", "cite", "code", "col", "colgroup", "data", "datalist", "dd", "del", "details", "dfn", "dialog", "div",
+  "dl", "dt", "em", "embed", "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "head",
+  "header", "hgroup", "hr", "html", "i", "iframe", "img", "input", "ins", "kbd", "label", "legend", "li", "link", "main", "map",
+  "mark", "menu", "meta", "meter", "nav", "noscript", "object", "ol", "optgroup", "option", "output", "p", "picture", "pre",
+  "progress", "q", "rp", "rt", "ruby", "s", "samp", "script", "search", "section", "select", "slot", "small", "source", "span",
+  "strong", "style", "sub", "summary", "sup", "table", "tbody", "td", "template", "textarea", "tfoot", "th", "thead", "time",
+  "title", "tr", "track", "u", "ul", "var", "video", "wbr"
 ] as const;
 
-const elementProtype = Object.getOwnPropertyDescriptors({
-  get ids() {
-    return getElementIdMap(this);
-  },
-  set ids(v: any) {
-    throw new Error('Cannot set ids on ' + this.valueOf());
-  },
-  when: function (...what) {
-    return when(this, ...what)
-  }
-} as PoElementMethods & ThisType<Element & PoElementMethods>);
-
-const poStyleElt = document.createElement("STYLE");
-poStyleElt.id = "--ai-ui-extended-tag-styles-";
+function idsInaccessible(): never {
+  throw new Error("<elt>.ids is a read-only map of Elements")
+}
 
 function isChildTag(x: any): x is ChildTags {
   return typeof x === 'string'
@@ -140,32 +133,119 @@ export const tag = <TagLoader>function <Tags extends string,
       ? [null, _1 as Tags[], _2 as TagFunctionOptions<Q>]
       : [null, standandTags, _1 as TagFunctionOptions<Q>];
 
-  const removedNodes = mutationTracker(document,'removedNodes');
-
   const commonProperties = options?.commonProperties;
-  /* Note: we use property defintion (and not object spread) so getters (like `ids`)
-    are not evaluated until called */
-  const tagPrototypes = Object.create(
+  const thisDoc = options?.document ?? globalThis.document;
+
+  const removedNodes = mutationTracker(thisDoc, 'removedNodes', options?.enableOnRemovedFromDOM);
+
+  function DomPromiseContainer() {
+    return thisDoc.createComment(DEBUG
+      ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
+      : "promise")
+  }
+  
+  function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
+    return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
+  }
+  const poStyleElt = thisDoc.createElement("STYLE");
+  poStyleElt.id = "--ai-ui-extended-tag-styles-";
+  
+  /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
+  const warned = new Set<string>();
+  const tagPrototypes: PoElementMethods = Object.create(
     null,
-    elementProtype
+    {
+      when: {
+        writable: false,
+        configurable: true,
+        enumerable: false,
+        value:function (...what: WhenParameters) {
+          return when(this, ...what)
+        }
+      },
+      attributes: {
+        ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
+        set(this: Element, a: object) {
+          if (isAsyncIter(a)) {
+            const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
+            const step = () => ai.next().then(
+              ({ done, value }) => { assignProps(this, value); done || step() },
+              ex => console.warn(ex));
+            step();
+          }
+          else assignProps(this, a);
+        }
+      },
+      ids: {
+        // .ids is a getter that when invoked for the first time
+        // lazily creates a Proxy that provides live access to children by id
+        configurable: true,
+        enumerable: true,
+        set: idsInaccessible,
+        get(this: Element) {
+          // Now we've been accessed, create the proxy
+          const idProxy = new Proxy(Object.create(null), {
+            apply: idsInaccessible,
+            construct: idsInaccessible,
+            defineProperty: idsInaccessible,
+            deleteProperty: idsInaccessible,
+            set: idsInaccessible,
+            setPrototypeOf: idsInaccessible,
+            getPrototypeOf() { return null },
+            isExtensible() { return false },
+            preventExtensions() { return true },
+            getOwnPropertyDescriptor(target, p) {
+              if (this.get!(target, p, null))
+                return Reflect.getOwnPropertyDescriptor(target, p);
+            },
+            has(target, p) {
+              const r = this.get!(target, p, null);
+              return Boolean(r);
+            },
+            ownKeys: (target) => {
+              return Array.from(this.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id });
+            },
+            get: (target, p, receiver) => {
+              if (typeof p === 'string') {
+                if (p in target) {
+                  if (this.contains(target[p]))
+                    return target[p];
+                  delete target[p];
+                }
+                let e: Element | undefined;
+                if (DEBUG) {
+                  const nl = this.querySelectorAll(`#${p}`);
+                  if (nl.length > 1) {
+                    if (!warned.has(p)) {
+                      warned.add(p);
+                      console.log(`Element contains multiple, shadowed decendants with ID "${p}"`/*,`\n\t${logNode(this)}`*/);
+                    }
+                  }
+                  e = nl[0];
+                } else {
+                  e = this.querySelector(`#${p}`) ?? undefined;
+                }
+                if (e) target[p] =  e;
+                return e;
+              }
+            }
+          });
+          // ..and replace the getter with the Proxy
+          Object.defineProperty(this,'ids',{
+            configurable: true,
+            enumerable: true,
+            set: idsInaccessible,
+            get() { return idProxy }
+          });
+          // ...and return that from the getter, so subsequent property
+          // accesses go via the Proxy
+          return idProxy;
+        }
+      }
+    }
   );
 
-  // We do this here and not in elementProtype as there's no syntax
-  // to copy a getter/setter pair from another object
-  Object.defineProperty(tagPrototypes, 'attributes', {
-    ...Object.getOwnPropertyDescriptor(Element.prototype,'attributes'),
-    set(this: Element, a: object) {
-      if (isAsyncIter(a)) {
-        const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
-        const step = ()=> ai.next().then(
-          ({ done, value }) => { assignProps(this, value); done || step() },
-          ex => console.warn(ex));
-        step();
-      }
-      else assignProps(this, a);
-    }
-  });
-
+  /* Add any user supplied prototypes */
   if (commonProperties)
     deepDefine(tagPrototypes, commonProperties);
 
@@ -178,9 +258,9 @@ export const tag = <TagLoader>function <Tags extends string,
         const g: ChildNode = DomPromiseContainer();
         appended.push(g);
         c.then(r => g.replaceWith(...nodes(r)),
-          (x:any) => {
-            console.warn(x,logNode(g));
-            g.replaceWith(DyamicElementError({error: x}));
+          (x: any) => {
+            console.warn(x, logNode(g));
+            g.replaceWith(DyamicElementError({ error: x }));
           }
         );
         return;
@@ -217,11 +297,11 @@ export const tag = <TagLoader>function <Tags extends string,
         const error = (errorValue: any) => {
           const n = t.filter(n => Boolean(n?.parentNode)) as ChildNode[];
           if (n.length) {
-            t = [DyamicElementError({error: errorValue})];
+            t = [DyamicElementError({ error: errorValue })];
             n[0].replaceWith(...t);
             n.slice(1).forEach(e => e?.parentNode!.removeChild(e));
           }
-          else console.warn( "Can't report error", errorValue, createdBy, t.map(logNode));
+          else console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
           t = [];
           ap.return?.(error);
         }
@@ -244,7 +324,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
-                console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`,createdBy, t.map(logNode));
+                console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t.map(logNode));
               }
               t = nodes(unbox(es.value) as ChildTags);
               // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
@@ -262,13 +342,13 @@ export const tag = <TagLoader>function <Tags extends string,
         ap.next().then(update).catch(error);
         return;
       }
-      appended.push(document.createTextNode(c.toString()));
+      appended.push(thisDoc.createTextNode(c.toString()));
     })(c);
     return appended;
   }
 
   if (!nameSpace) {
-    Object.assign(tag,{
+    Object.assign(tag, {
       nodes,    // Build DOM Node[] from ChildTags
       UniqueID
     });
@@ -345,7 +425,7 @@ export const tag = <TagLoader>function <Tags extends string,
           Object.defineProperty(d, k, srcDesc);
         }
       } catch (ex: unknown) {
-        console.warn( "deepAssign", k, s[k], ex);
+        console.warn("deepAssign", k, s[k], ex);
         throw ex;
       }
     }
@@ -353,7 +433,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
   function unbox(a: unknown): unknown {
     const v = a?.valueOf();
-    return Array.isArray(v) ? Array.prototype.map.call(v,unbox) : v;
+    return Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v;
   }
 
   function assignProps(base: Node, props: Record<string, any>) {
@@ -365,12 +445,12 @@ export const tag = <TagLoader>function <Tags extends string,
         // static props before getters/setters
         const sourceEntries = Object.entries(Object.getOwnPropertyDescriptors(s));
         if (!Array.isArray(s)) {
-          sourceEntries.sort((a,b) => {
-            const desc = Object.getOwnPropertyDescriptor(d,a[0]);
+          sourceEntries.sort(a => {
+            const desc = Object.getOwnPropertyDescriptor(d, a[0]);
             if (desc) {
               if ('value' in desc) return -1;
               if ('set' in desc) return 1;
-              if ('get' in desc) return 0.5;
+              if ('get' in desc) return 1;
             }
             return 0;
           });
@@ -409,7 +489,7 @@ export const tag = <TagLoader>function <Tags extends string,
               Object.defineProperty(d, k, srcDesc);
             }
           } catch (ex: unknown) {
-            console.warn( "assignProps", k, s[k], ex);
+            console.warn("assignProps", k, s[k], ex);
             throw ex;
           }
         }
@@ -424,18 +504,18 @@ export const tag = <TagLoader>function <Tags extends string,
             if (!es.done) {
               const value = unbox(es.value);
               if (typeof value === 'object' && value !== null) {
-                  /*
-                THIS IS JUST A HACK: `style` has to be set member by member, eg:
-                  e.style.color = 'blue'        --- works
-                  e.style = { color: 'blue' }   --- doesn't work
-                whereas in general when assigning to property we let the receiver
-                do any work necessary to parse the object. This might be better handled
-                by having a setter for `style` in the PoElementMethods that is sensitive
-                to the type (string|object) being passed so we can just do a straight
-                assignment all the time, or making the decsion based on the location of the
-                property in the prototype chain and assuming anything below "PO" must be
-                a primitive
-                */
+                /*
+              THIS IS JUST A HACK: `style` has to be set member by member, eg:
+                e.style.color = 'blue'        --- works
+                e.style = { color: 'blue' }   --- doesn't work
+              whereas in general when assigning to property we let the receiver
+              do any work necessary to parse the object. This might be better handled
+              by having a setter for `style` in the PoElementMethods that is sensitive
+              to the type (string|object) being passed so we can just do a straight
+              assignment all the time, or making the decsion based on the location of the
+              property in the prototype chain and assuming anything below "PO" must be
+              a primitive
+              */
                 const destDesc = Object.getOwnPropertyDescriptor(d, k);
                 if (k === 'style' || !destDesc?.set)
                   assign(d[k], value);
@@ -463,7 +543,7 @@ export const tag = <TagLoader>function <Tags extends string,
             }
           }
           const error = (errorValue: any) => {
-            console.warn( "Dynamic attribute error", errorValue, k, d, createdBy, logNode(base));
+            console.warn("Dynamic attribute error", errorValue, k, d, createdBy, logNode(base));
             ap.return?.(errorValue);
             base.appendChild(DyamicElementError({ error: errorValue }));
           }
@@ -514,9 +594,7 @@ export const tag = <TagLoader>function <Tags extends string,
       const eltNewDiv = NewDiv({attrs},...children)
   */
 
-  type ExtendTagFunction = (attrs:{
-    debugger?: unknown;
-    document?: Document;
+  type ExtendTagFunction = (attrs: TagCreationOptions & {
     [callStackSymbol]?: Overrides[];
     [k: string]: unknown;
   } | ChildTags, ...children: ChildTags[]) => Element
@@ -538,16 +616,16 @@ export const tag = <TagLoader>function <Tags extends string,
 
   function extended(this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) {
     const instanceDefinition = (typeof _overrides !== 'function')
-      ? (instance: Instance) => Object.assign({},_overrides,instance)
+      ? (instance: Instance) => Object.assign({}, _overrides, instance)
       : _overrides
 
-    const uniqueTagID = Date.now().toString(36)+(idCount++).toString(36)+Math.random().toString(36).slice(2);
+    const uniqueTagID = Date.now().toString(36) + (idCount++).toString(36) + Math.random().toString(36).slice(2);
     let staticExtensions: Overrides = instanceDefinition({ [UniqueID]: uniqueTagID });
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
-      poStyleElt.appendChild(document.createTextNode(staticExtensions.styles + '\n'));
-      if (!document.head.contains(poStyleElt)) {
-        document.head.appendChild(poStyleElt);
+      poStyleElt.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
+      if (!thisDoc.head.contains(poStyleElt)) {
+        thisDoc.head.appendChild(poStyleElt);
       }
     }
 
@@ -555,9 +633,9 @@ export const tag = <TagLoader>function <Tags extends string,
     // Here's where we actually create the tag, by accumulating all the base attributes and
     // (finally) assigning those specified by the instantiation
     const extendTagFn: ExtendTagFunction = (attrs, ...children) => {
-      const noAttrs = isChildTag(attrs) ;
+      const noAttrs = isChildTag(attrs);
       const newCallStack: (Constructed & Overrides)[] = [];
-      const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack  }
+      const combinedAttrs = { [callStackSymbol]: (noAttrs ? newCallStack : attrs[callStackSymbol]) ?? newCallStack }
       const e = noAttrs ? this(combinedAttrs, attrs, ...children) : this(combinedAttrs, ...children);
       e.constructor = extendTag;
       const tagDefinition = instanceDefinition({ [UniqueID]: uniqueTagID });
@@ -570,13 +648,13 @@ export const tag = <TagLoader>function <Tags extends string,
           return false;
         }
         if (tagDefinition.declare) {
-          const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this,d));
+          const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this, d));
           if (clash.length) {
             console.log(`Declared keys '${clash}' in ${extendTag.name} already exist in base '${this.valueOf()}'`);
           }
         }
         if (tagDefinition.override) {
-          const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this,d));
+          const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this, d));
           if (clash.length) {
             console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
           }
@@ -665,7 +743,7 @@ export const tag = <TagLoader>function <Tags extends string,
     const callSite = DEBUG ? (new Error().stack?.split('\n')[2] ?? '') : '';
 
     Object.defineProperty(extendTag, "name", {
-      value: "<ai-" + creatorName.replace(/\s+/g,'-') + callSite+">"
+      value: "<ai-" + creatorName.replace(/\s+/g, '-') + callSite + ">"
     });
 
     if (DEBUG) {
@@ -687,14 +765,14 @@ export const tag = <TagLoader>function <Tags extends string,
       name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap,
       attrs: any,
       ...children: ChildTags[]): Node {
-        return (name === baseTagCreators.createElement ? nodes(...children)
-          : typeof name === 'function' ? name(attrs, children)
-          : typeof name === 'string' && name in baseTagCreators ?
-          // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
-          baseTagCreators[name](attrs, children)
-          : name instanceof Node ? name
-          : DyamicElementError({ error: new Error("Illegal type in createElement:" + name)})) as Node
-      }
+      return (name === baseTagCreators.createElement ? nodes(...children)
+        : typeof name === 'function' ? name(attrs, children)
+        : typeof name === 'string' && name in baseTagCreators ?
+        // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
+            baseTagCreators[name](attrs, children)
+        : name instanceof Node ? name
+        : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) })) as Node
+    }
   }
 
   function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>;
@@ -704,11 +782,7 @@ export const tag = <TagLoader>function <Tags extends string,
       // @ts-ignore
       return baseTagCreators[k];
 
-    const tagCreator = (attrs: Q & PoElementMethods & Partial<{
-      debugger?: any;
-      document?: Document;
-    }> | ChildTags, ...children: ChildTags[]) => {
-      let doc = document;
+    const tagCreator = (attrs: Q & PoElementMethods & TagCreationOptions | ChildTags, ...children: ChildTags[]) => {
       if (isChildTag(attrs)) {
         children.unshift(attrs);
         attrs = {} as any;
@@ -720,15 +794,11 @@ export const tag = <TagLoader>function <Tags extends string,
           debugger;
           delete attrs.debugger;
         }
-        if (attrs.document) {
-          doc = attrs.document;
-          delete attrs.document;
-        }
 
         // Create element
         const e = nameSpace
-          ? doc.createElementNS(nameSpace as string, k.toLowerCase())
-          : doc.createElement(k);
+          ? thisDoc.createElementNS(nameSpace as string, k.toLowerCase())
+          : thisDoc.createElement(k);
         e.constructor = tagCreator;
 
         deepDefine(e, tagPrototypes);
@@ -741,7 +811,7 @@ export const tag = <TagLoader>function <Tags extends string,
     }
 
     const includingExtender = <TagCreator<Element>><unknown>Object.assign(tagCreator, {
-      super: ()=>{ throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement().") },
+      super: () => { throw new Error("Can't invoke native elemenet constructors directly. Use document.createElement().") },
       extended, // How to extend this (base) tag
       valueOf() { return `TagCreator: <${nameSpace || ''}${nameSpace ? '::' : ''}${k}>` }
     });
@@ -763,78 +833,32 @@ export const tag = <TagLoader>function <Tags extends string,
   return baseTagCreators;
 }
 
-function DomPromiseContainer() {
-  return document.createComment(DEBUG 
-    ? new Error("promise").stack?.replace(/^Error: /, '') || "promise" 
-    : "promise")
-}
-
-function DyamicElementError({ error }:{ error: Error | IteratorResult<Error>}) {
-  return document.createComment(error instanceof Error ? error.toString() : 'Error:\n'+JSON.stringify(error,null,2));
-}
-
-export let enableOnRemovedFromDOM = function () {
-  enableOnRemovedFromDOM = function () {} // Only create the observer once
-  new MutationObserver((mutations) => {
-    mutations.forEach(function (m) {
-      if (m.type === 'childList') {
-        m.removedNodes.forEach(
-          removed => removed && removed instanceof Element &&
-            [...removed.getElementsByTagName("*"), removed].filter(elt => !elt.isConnected).forEach(
-              elt => {
-                'onRemovedFromDOM' in elt && typeof elt.onRemovedFromDOM === 'function' && elt.onRemovedFromDOM()
-              }
-            ));
-      }
-    });
-  }).observe(document.body, { subtree: true, childList: true });
-}
-
 /* DOM node removal logic */
 type PickByType<T, Value> = {
   [P in keyof T as T[P] extends Value | undefined ? P : never]: T[P]
 }
-function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, NodeList>){
+function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, NodeList>, enableOnRemovedFromDOM?: boolean) {
   const tracked = new WeakSet<Node>();
-  function walk(nodes: NodeList){
+  function walk(nodes: NodeList) {
     for (const node of nodes) {
       // In case it's be re-added/moved
       if ((track === 'addedNodes') === node.isConnected) {
         walk(node.childNodes);
         tracked.add(node);
+        // Legacy onRemovedFromDOM support
+        if (enableOnRemovedFromDOM && 'onRemovedFromDOM' in node && typeof node.onRemovedFromDOM === 'function') node.onRemovedFromDOM();
       }
     }
   }
   new MutationObserver((mutations) => {
     mutations.forEach(function (m) {
-      if (m.type === 'childList' && m.removedNodes.length) {
+      if (m.type === 'childList' && m[track].length) {
         walk(m[track])
       }
     });
   }).observe(root, { subtree: true, childList: true });
 
-  return function(node: Node) {
+  return function (node: Node) {
     return tracked.has(node);
   }
-}
-
-const warned = new Set<string>();
-export function getElementIdMap(node?: Element | Document, ids?: Record<string, Element>) {
-  node = node || document;
-  ids = ids || Object.create(null);
-  if (node.querySelectorAll) {
-    node.querySelectorAll("[id]").forEach(function (elt) {
-      if (elt.id) {
-        if (!ids![elt.id])
-          ids![elt.id] = elt;
-        else if (DEBUG) {
-          if (!warned.has(elt.id)) {
-            warned.add(elt.id)
-            console.info("Shadowed multiple element IDs", elt.id /*, elt, ids![elt.id]*/);
-          }
-        }
-      }
-    });
-  }
-  return ids;
 }
