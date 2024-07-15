@@ -141,9 +141,13 @@ The key features here are the `ids: { .... }` block which relates the ids to the
 
 ### Maintaining references
 
-You can declare as many `ids` as you need, and they will be resolved at run-time. If the element `xxx.ids.yyy` refers to is destoyed and recreated or upadted by an async operation (or anything else), it will continue to be referenced for example by "updateStockLevel" in our example. Local variables (or instance variables) can't do this - they hold a reference to a _specific_ DOM element, not a reference to a position within a DOM tree.
+You can declare as many `ids` as you need, and they will be resolved at run-time. If the element `xxx.ids.yyy` refers to is destoyed and recreated or updated by an async operation (or anything else), it will continue to be referenced for example by "updateStockLevel" in our example. Local variables (or instance variables) can't do this - they hold a reference to a _specific_ DOM element, not a reference to a position within a DOM tree.
 
-This is an important point. If your input was itself dynamic (for example if you `product` as `iterable`, and updated the `product` after the `InfoBlock` was constructed), AI-UI could destroy and re-create it, and now your local variable holds a reference to an un-mounted element, which will leak, and more importantly, won't work: if you update the `stockLevel.checked`, you're now updating the un-mounted DOM element, and nothing will change in the UI.
+> Important! Avoiding leaks
+
+If your input was itself dynamic (for example if defined you `product` as `iterable`, and updated the `product` after the `InfoBlock` was constructed), AI-UI could destroy and re-create it, and now your local variable holds a reference to an un-mounted element, which will leak, and more importantly, won't work: if you update the `stockLevel.checked`, you're now updating the un-mounted DOM element, and nothing will change in the UI.
+
+Use `this.ids...` and it will always refer to the mounted child with than ID, if it exists.
 ____
 
 | < Prev | ^ |  Next > |
