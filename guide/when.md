@@ -8,10 +8,10 @@ The method signature is:
 when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
 ```
 
-In it's simplest form, `when` provides a way to receive and handle DOM events dispatched by an element. 
+In it's simplest form, `when` provides a way to receive and handle DOM events dispatched by an element.
 
 ```typescript
-// Create an async iterable that yields change events dispatched by the specified element  
+// Create an async iterable that yields change events dispatched by the specified element
 elt.when('change').consume(event => console.log(event));
 
 // This is essentially equivalent to
@@ -21,12 +21,12 @@ Unlike the basic DOM event model, the iterator can be instantiated multiple time
 
 `elt.when` accepts a variable argument list, and the events will be merged:
 ```typescript
-// Create an async iterable that yields change events dispatched by the specified element  
+// Create an async iterable that yields change events dispatched by the specified element
 elt.when('change','input','click').consume(event => console.log(event.type)); // Outputs change, input or click
 ```
 As well as listening for events on the specified element, the arguments can also listen for events on children (and sub-children) of the specified element:
 ```typescript
-// Create an async iterable that yields change events dispatched by the specified children  
+// Create an async iterable that yields change events dispatched by the specified children
 elt.when('change:#info','click:#done').consume(event => console.log(event.target.id)); // Outputs done or info
 ```
 This is especially useful within [extended](./extended.md) tags you create yourself.
@@ -51,7 +51,7 @@ const SearcPanel = div.extended({
           return results.map(result => SearchResult(result))
         })
       )
-    ]   
+    ]
   }
 });
 ```
@@ -97,7 +97,7 @@ const SearcPanel = div.extended({
           return results.map(result => SearchResult(result))
         })
       )
-    ]   
+    ]
   }
 });
 ```
@@ -126,7 +126,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
 when(container, 'click:#go', 'mouseover:.ListItem')(...)...
 // ...is the same as
 container.when('click:#go', 'mouseover:.ListItem')(...)...
-// ..,but can be used with elements created by something else
+// ...but can be used with elements created by something else
 when(document.body, 'click:#go', 'mouseover:.ListItem')(...)...
 ```
 

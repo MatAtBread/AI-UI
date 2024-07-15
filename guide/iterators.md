@@ -261,6 +261,24 @@ c.consume(n => console.log("B",n)); // A1, A3, A5, A7, A9
 // These are evenly distributed by an `async function *` becuase the consumers are synchronous and complete at the same speed
 
 ```
+
+## filterMap
+```typescript
+export function filterMap<U extends PartialIterable, R>(source: U,
+  fn: Mapper<HelperAsyncIterable<U>, R>,
+  initialValue: R | typeof Ignore = Ignore,
+  prev: R | typeof Ignore = Ignore
+): AsyncExtraIterable<R>
+```
+
+Some of the above helpers are actually implemented by the more general helper `filterMap`.
+
+This function can artibrarily insert a single yield before mapping & filtering the source, and on each callback provides the previous value allowing you to filter similar (or different) values on each pass. `map`, `filter`, `unique` and `initially` use this more general function.
+
+## Async iterable "prototype"
+
+Because there is no async iterable "prototype", all these helper functions are exported via the identifier `asyncExtras`, so if necessary you can call them indirectly via `call` and `apply`. In each case, they expect `this` to be an async iterable.
+
 # Chaining iterables and helpers
 
 All the helpers (except consume) themselves return "helped" async iterables, so you can chain them together:

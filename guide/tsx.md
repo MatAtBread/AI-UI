@@ -1,6 +1,6 @@
 # JSX & HTM
 
-AIUI can be used with JSX & HTM. Specifically, it has been tested with Typescript's JSX transpiler, and [htm v3](https://www.npmjs.com/package/htm).
+AIUI can be used with JSX & HTM. Specifically, it has been tested with TypeScript's JSX transpiler, and [htm v3](https://www.npmjs.com/package/htm).
 
 These are *syntactic* helpers. They don't extend or restrict the functionality of AI-UI. You can still use async iterators and have minimal updates irrespective of the syntax you use to layout your markup.
 
@@ -68,7 +68,7 @@ You can see this example here: [source](./examples/ts/htm.ts), [Live demo](https
 
 ## Should I use JSX?
 
-Typescript (by design, at the time of writing) does not expose the types of the elements being created, as mentioned [here](https://www.typescriptlang.org/docs/handbook/jsx.html#the-jsx-result-type).
+TypeScript (by design, at the time of writing) does not expose the types of the elements being created, as mentioned [here](https://www.typescriptlang.org/docs/handbook/jsx.html#the-jsx-result-type).
 
 This means that you lose much of the safety provided by the strong-typing built into AI-UI. Properties like `when`, `ids` all the standard HTMLElement properties & methods, as well as those declared by your extended tags are now "any", and therefore it's very easy to make mistakes.
 
@@ -95,7 +95,7 @@ You should set the following fields in the `compilerOptions` of your [tsconfig.j
 You can if you wish use a name other than "React" for the factory names and your identified import.
 
 ## React &gt;= v17
-With these settings, Typescript automatically generates an import to reference the jsx functions.
+With these settings, TypeScript automatically generates an import to reference the jsx functions.
 
 You should set the following fields in the `compilerOptions` of your [tsconfig.json](https://www.typescriptlang.org/tsconfig#jsxFactory)
 ```json

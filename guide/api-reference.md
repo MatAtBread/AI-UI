@@ -1,7 +1,7 @@
 
 # Tag API reference
 
-The following sections list the full `tag` export API, tag functions (base and extended) and the elements they create. Most of these functions are detailed elsewhere in the guide. A few are documented here for completeness, but are used only in specialised or unusual contexts. Some of the functions that are members of the `tag` function are also exported directly for simplicity of use within environments supporting JavaScript imports and Typescript, but the functions are the same in all cases.
+The following sections list the full `tag` export API, tag functions (base and extended) and the elements they create. Most of these functions are detailed elsewhere in the guide. A few are documented here for completeness, but are used only in specialised or unusual contexts. Some of the functions that are members of the `tag` function are also exported directly for simplicity of use within environments supporting JavaScript imports and TypeScript, but the functions are the same in all cases.
 
 Note, these are function/data exports. Type definitions & declarations can be found clicking on the links.
 
@@ -110,7 +110,7 @@ Elements created by tag creating functions (base or extended tag functions) are 
 Creates an async iterator that yields event from the element, or it's children. See [when](./when.md)
 
 ### elt.ids
-Provides type-safe access to children of an element. For extended tag defintions with an `ids` member, Typescript types will be provided for the child. See [ids](./ids.md)
+Provides type-safe access to children of an element. For extended tag defintions with an `ids` member, TypeScript types will be provided for the child. See [ids](./ids.md)
 
 ### elt.constructor
 References the tag creating function that create the element.
