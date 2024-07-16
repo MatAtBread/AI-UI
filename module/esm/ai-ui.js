@@ -123,9 +123,12 @@ export const tag = function (_1, _2, _3) {
                     },
                     get: (target, p, receiver) => {
                         if (typeof p === 'string') {
+                            // Check if we've cached this ID already
                             if (p in target) {
-                                if (this.contains(target[p]))
-                                    return target[p];
+                                // Check the element is still contained within this element with the same ID
+                                const ref = target[p].deref();
+                                if (ref && ref.id === p && this.contains(ref))
+                                    return ref;
                                 delete target[p];
                             }
                             let e;
@@ -143,7 +146,7 @@ export const tag = function (_1, _2, _3) {
                                 e = this.querySelector('#' + CSS.escape(p)) ?? undefined;
                             }
                             if (e)
-                                target[p] = e;
+                                target[p] = new WeakRef(e);
                             return e;
                         }
                     }
