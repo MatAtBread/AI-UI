@@ -143,13 +143,13 @@ export const tag = <TagLoader>function <Tags extends string,
       ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
       : "promise")
   }
-  
+
   function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
     return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
   }
   const poStyleElt = thisDoc.createElement("STYLE");
   poStyleElt.id = "--ai-ui-extended-tag-styles-";
-  
+
   /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
   const warned = new Set<string>();
   const tagPrototypes: PoElementMethods = Object.create(
@@ -159,7 +159,7 @@ export const tag = <TagLoader>function <Tags extends string,
         writable: false,
         configurable: true,
         enumerable: false,
-        value:function (...what: WhenParameters) {
+        value: function (...what: WhenParameters) {
           return when(this, ...what)
         }
       },
@@ -203,7 +203,11 @@ export const tag = <TagLoader>function <Tags extends string,
               return Boolean(r);
             },
             ownKeys: (target) => {
-              return Array.from(this.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id });
+              const ids = [...this.querySelectorAll(`[id]`)].map(e => e.id);
+              const unique = [...new Set(ids)];
+              if (DEBUG && ids.length !== unique.length)
+                console.log(`Element contains multiple, shadowed decendant ids`, unique);
+              return unique;
             },
             get: (target, p, receiver) => {
               if (typeof p === 'string') {
@@ -214,7 +218,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 }
                 let e: Element | undefined;
                 if (DEBUG) {
-                  const nl = this.querySelectorAll(`#${p}`);
+                  const nl = this.querySelectorAll('#' + CSS.escape(p));
                   if (nl.length > 1) {
                     if (!warned.has(p)) {
                       warned.add(p);
@@ -223,15 +227,15 @@ export const tag = <TagLoader>function <Tags extends string,
                   }
                   e = nl[0];
                 } else {
-                  e = this.querySelector(`#${p}`) ?? undefined;
+                  e = this.querySelector('#' + CSS.escape(p)) ?? undefined;
                 }
-                if (e) target[p] =  e;
+                if (e) target[p] = e;
                 return e;
               }
             }
           });
           // ..and replace the getter with the Proxy
-          Object.defineProperty(this,'ids',{
+          Object.defineProperty(this, 'ids', {
             configurable: true,
             enumerable: true,
             set: idsInaccessible,
@@ -303,7 +307,7 @@ export const tag = <TagLoader>function <Tags extends string,
           }
           else console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
           t = [];
-          ap.return?.(error);
+          ap.return?.(errorValue);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {

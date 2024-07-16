@@ -107,6 +107,11 @@ async function captureLogs(file: string) {
   const window = new JSDOM().window;
   Object.assign(globalThis, {
 //    DEBUG: true,
+    CSS: {
+      escape(s:string) {
+        return s.replaceAll('.','\\.').replaceAll(' ','\\ ')
+      }
+    },
     document: window.document,
     Element: window.Element,
     Node: window.Node,
