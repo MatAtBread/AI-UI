@@ -214,7 +214,7 @@ export const tag = function (_1, _2, _3) {
                     else
                         console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
                     t = [];
-                    ap.return?.(error);
+                    ap.return?.(errorValue);
                 };
                 const update = (es) => {
                     if (!es.done) {

@@ -307,7 +307,7 @@ export const tag = <TagLoader>function <Tags extends string,
           }
           else console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
           t = [];
-          ap.return?.(error);
+          ap.return?.(errorValue);
         }
 
         const update = (es: IteratorResult<ChildTags>) => {
