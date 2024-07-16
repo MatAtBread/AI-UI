@@ -115,7 +115,11 @@ export const tag = function (_1, _2, _3) {
                         return Boolean(r);
                     },
                     ownKeys: (target) => {
-                        return Array.from(this.querySelectorAll('[id]'), e => { target[e.id] = e; return e.id; });
+                        const ids = [...this.querySelectorAll(`[id]`)].map(e => e.id);
+                        const unique = [...new Set(ids)];
+                        if (DEBUG && ids.length !== unique.length)
+                            console.log(`Element contains multiple, shadowed decendant ids`, unique);
+                        return unique;
                     },
                     get: (target, p, receiver) => {
                         if (typeof p === 'string') {
@@ -126,7 +130,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             let e;
                             if (DEBUG) {
-                                const nl = this.querySelectorAll(`#${p}`);
+                                const nl = this.querySelectorAll('#' + CSS.escape(p));
                                 if (nl.length > 1) {
                                     if (!warned.has(p)) {
                                         warned.add(p);
@@ -136,7 +140,7 @@ export const tag = function (_1, _2, _3) {
                                 e = nl[0];
                             }
                             else {
-                                e = this.querySelector(`#${p}`) ?? undefined;
+                                e = this.querySelector('#' + CSS.escape(p)) ?? undefined;
                             }
                             if (e)
                                 target[p] = e;
