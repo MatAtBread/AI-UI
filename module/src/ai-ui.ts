@@ -184,7 +184,7 @@ export const tag = <TagLoader>function <Tags extends string,
         set: idsInaccessible,
         get(this: Element) {
           // Now we've been accessed, create the proxy
-          const idProxy = new Proxy(Object.create(null), {
+          const idProxy = new Proxy(Object.create(null) as Record<string, WeakRef<Element>>, {
             apply: idsInaccessible,
             construct: idsInaccessible,
             defineProperty: idsInaccessible,
@@ -211,9 +211,12 @@ export const tag = <TagLoader>function <Tags extends string,
             },
             get: (target, p, receiver) => {
               if (typeof p === 'string') {
+                // Check if we've cached this ID already
                 if (p in target) {
-                  if (this.contains(target[p]))
-                    return target[p];
+                  // Check the element is still contained within this element with the same ID
+                  const ref = target[p].deref();
+                  if (ref && ref.id === p && this.contains(ref))
+                    return ref;
                   delete target[p];
                 }
                 let e: Element | undefined;
@@ -229,7 +232,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 } else {
                   e = this.querySelector('#' + CSS.escape(p)) ?? undefined;
                 }
-                if (e) target[p] = e;
+                if (e) target[p] = new WeakRef(e);
                 return e;
               }
             }
