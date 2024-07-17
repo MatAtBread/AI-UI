@@ -1,10 +1,10 @@
-import { tag } from '../../../module/esm/ai-ui.js';
+import { tag, when } from '../../../module/esm/ai-ui.js';
 import { merge } from '../../../module/esm/iterators.js';
 
 /* Specify what base tags you reference in your UI */
 const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
 
-const App = div.extended({
+const App = div.extended(({
   declare:{
     reset() {
       this.num = 0;
@@ -18,7 +18,9 @@ const App = div.extended({
     dir: ''
   },
   ids:{
-    rounded: input
+    rounded: input,
+    prototype: div,
+    arguments: h2
   },
   styles:`button { margin: 0.5em; }`,
   constructed() {
@@ -33,8 +35,9 @@ const App = div.extended({
     };
 
     return [
-      h2("Hello World"),
-      input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded!.checked }}),
+      this.ids({ id: 'arguments' }, "Hello World"),
+      this.ids({ id: 'prototype' }, "Proto"),
+      this.ids({ type: 'checkbox', id: 'rounded', onclick: (e) => { this.rounded = this.ids.rounded!.checked } }),
       button({
         style: { borderRadius },
         onclick: () => this.num = this.num + 1
@@ -52,7 +55,7 @@ const App = div.extended({
       div(merge(this.rounded, this.num).map!(_ => this.num * (this.rounded == true ? 1 : -1))), // Dynamic - we map the value
     ]
   }
-});
+}));
 
 /* Add add it to the document so the user can see it! */
 const app = App({

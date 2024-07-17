@@ -2,7 +2,8 @@ import { isPromiseLike } from './deferred.js';
 import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
-import type { ChildTags, Constructed, Instance, Overrides, TagCreationOptions, TagCreator, TagCreatorFunction } from './tags.js';
+import type { ChildTags, Constructed, Instance, Overrides, TagCreationOptions, TagCreator, TagCreatorFunction, ExtendTagFunctionInstance, ExtendTagFunction } from './tags.js';
+import { callStackSymbol } from './tags.js';
 
 /* Export useful stuff for users of the bundled code */
 export { when } from './when.js';
@@ -89,6 +90,13 @@ function idsInaccessible(): never {
   throw new Error("<elt>.ids is a read-only map of Elements")
 }
 
+/* Symbols used to hold IDs that clash with function prototype names, so that the Proxy for ids can be made callable */
+const safeFunctionSymbols = [...Object.keys(Object.getOwnPropertyDescriptors(Function.prototype))].reduce((a,b) => {
+  a[b] = Symbol(b);
+  return a;
+},{} as Record<string, symbol>);
+function keyFor(id: string | symbol) { return id in safeFunctionSymbols ? safeFunctionSymbols[id as keyof typeof safeFunctionSymbols] : id };
+
 function isChildTag(x: any): x is ChildTags {
   return typeof x === 'string'
     || typeof x === 'number'
@@ -106,7 +114,6 @@ function isChildTag(x: any): x is ChildTags {
 }
 
 /* tag */
-const callStackSymbol = Symbol('callStack');
 
 export const tag = <TagLoader>function <Tags extends string,
   T1 extends (string | Tags[] | TagFunctionOptions<Q>),
@@ -184,8 +191,14 @@ export const tag = <TagLoader>function <Tags extends string,
         set: idsInaccessible,
         get(this: Element) {
           // Now we've been accessed, create the proxy
-          const idProxy = new Proxy(Object.create(null) as Record<string, WeakRef<Element>>, {
-            apply: idsInaccessible,
+          const idProxy = new Proxy((()=>{}) as unknown as Record<string | symbol, WeakRef<Element>>, {
+            apply(target, thisArg, args) {
+              try {
+                return thisArg.constructor.definition.ids[args[0].id](...args)
+              } catch (ex) {
+                throw new Error(`<elt>.ids.${args?.[0]?.id} is not a tag-creating function`, { cause: ex });
+              }
+            },
             construct: idsInaccessible,
             defineProperty: idsInaccessible,
             deleteProperty: idsInaccessible,
@@ -195,8 +208,9 @@ export const tag = <TagLoader>function <Tags extends string,
             isExtensible() { return false },
             preventExtensions() { return true },
             getOwnPropertyDescriptor(target, p) {
+              console.log("getOwnPropertyDescriptor",target,p);
               if (this.get!(target, p, null))
-                return Reflect.getOwnPropertyDescriptor(target, p);
+                return Reflect.getOwnPropertyDescriptor(target, keyFor(p));
             },
             has(target, p) {
               const r = this.get!(target, p, null);
@@ -207,17 +221,20 @@ export const tag = <TagLoader>function <Tags extends string,
               const unique = [...new Set(ids)];
               if (DEBUG && ids.length !== unique.length)
                 console.log(`Element contains multiple, shadowed decendant ids`, unique);
+              console.log("ownKeys",target,unique);
               return unique;
             },
             get: (target, p, receiver) => {
+              console.log("get",target,p);
               if (typeof p === 'string') {
+                const pk = keyFor(p);
                 // Check if we've cached this ID already
-                if (p in target) {
+                if (pk in target) {
                   // Check the element is still contained within this element with the same ID
-                  const ref = target[p].deref();
+                  const ref = target[pk].deref();
                   if (ref && ref.id === p && this.contains(ref))
                     return ref;
-                  delete target[p];
+                  delete target[pk];
                 }
                 let e: Element | undefined;
                 if (DEBUG) {
@@ -232,7 +249,8 @@ export const tag = <TagLoader>function <Tags extends string,
                 } else {
                   e = this.querySelector('#' + CSS.escape(p)) ?? undefined;
                 }
-                if (e) target[p] = new WeakRef(e);
+                if (e)
+                  Reflect.set(target, pk, new WeakRef(e), target);
                 return e;
               }
             }
@@ -600,18 +618,6 @@ export const tag = <TagLoader>function <Tags extends string,
          ...later...
       const eltNewDiv = NewDiv({attrs},...children)
   */
-
-  type ExtendTagFunction = (attrs: TagCreationOptions & {
-    [callStackSymbol]?: Overrides[];
-    [k: string]: unknown;
-  } | ChildTags, ...children: ChildTags[]) => Element
-
-  interface ExtendTagFunctionInstance extends ExtendTagFunction {
-    super: TagCreator<Element>;
-    definition: Overrides;
-    valueOf: () => string;
-    extended: (this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) => ExtendTagFunctionInstance;
-  }
 
   function tagHasInstance(this: ExtendTagFunctionInstance, e: any) {
     for (let c = e.constructor; c; c = c.super) {
