@@ -56,7 +56,7 @@ type EventNameUnion<T extends string> = T extends keyof WhenEvents
 
 
 type EventAttribute = `${keyof GlobalEventHandlersEventMap}`
-type CSSIdentifier<IDS extends string = string> = `#${IDS}` |`.${string}` | `[${string}]`
+type CSSIdentifier<IDS extends string = string> = `#${IDS}` | `#${IDS}>` | `.${string}` | `[${string}]`
 
 /* ValidWhenSelectors are:
     @start
@@ -89,8 +89,15 @@ type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
   push: (ev: GlobalEventHandlersEventMap[EventName])=>void;
   terminate: (ex: Error)=>void;
   container: Element
-  selector: string | null
+  selector: string | null;
+  includeChildren: boolean;
 };
+
+function childless<T extends string | null>(sel: T): T extends null ? { includeChildren: true, selector: null } : { includeChildren: boolean, selector: T } {
+  const includeChildren = !sel || !sel.endsWith('>')
+  return { includeChildren, selector: includeChildren ? sel : sel.slice(0,-1) } as any;
+}
+
 const eventObservations = new WeakMap<Document, Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>();
 
 function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: Document, ev: GlobalEventHandlersEventMap[EventName]) {
@@ -101,7 +108,7 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
   if (observations) {
     for (const o of observations) {
       try {
-        const { push, terminate, container, selector } = o;
+        const { push, terminate, container, selector, includeChildren } = o;
         if (!container.isConnected) {
           const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
           observations.delete(o);
@@ -111,11 +118,11 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
             if (selector) {
               const nodes = container.querySelectorAll(selector);
               for (const n of nodes) {
-                if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
+                if ((includeChildren ? n.contains(ev.target) : ev.target === n) && container.contains(n))
                   push(ev)
               }
             } else {
-              if ((ev.target === container || container.contains(ev.target)))
+              if (includeChildren ? container.contains(ev.target) : ev.target === container )
                 push(ev)
             }
           }
@@ -131,16 +138,16 @@ function isCSSSelector(s: string): s is CSSIdentifier {
   return Boolean(s && (s.startsWith('#') || s.startsWith('.') || (s.startsWith('[') && s.endsWith(']'))));
 }
 
-function parseWhenSelector<EventName extends string>(what: IsValidWhenSelector<EventName>): undefined | [CSSIdentifier | null, keyof GlobalEventHandlersEventMap] {
+function parseWhenSelector<EventName extends string>(what: IsValidWhenSelector<EventName>): undefined | [ReturnType<typeof childless>, keyof GlobalEventHandlersEventMap] {
   const parts = what.split(':');
   if (parts.length === 1) {
     if (isCSSSelector(parts[0]))
-      return [parts[0],"change"];
-    return [null, parts[0] as keyof GlobalEventHandlersEventMap];
+      return [childless(parts[0]),"change"];
+    return [{ includeChildren: true, selector: null }, parts[0] as keyof GlobalEventHandlersEventMap];
   }
   if (parts.length === 2) {
     if (isCSSSelector(parts[1]) && !isCSSSelector(parts[0]))
-    return [parts[1], parts[0] as keyof GlobalEventHandlersEventMap]
+    return [childless(parts[1]), parts[0] as keyof GlobalEventHandlersEventMap]
   }
   return undefined;
 }
@@ -150,7 +157,7 @@ function doThrow(message: string):never {
 }
 
 function whenEvent<EventName extends string>(container: Element, what: IsValidWhenSelector<EventName>) {
-  const [selector, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: "+what);
+  const [{ includeChildren, selector}, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: "+what);
 
   if (!eventObservations.has(container.ownerDocument))
     eventObservations.set(container.ownerDocument, new Map());
@@ -165,11 +172,12 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
 
   const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
 
-  const details: EventObservation<keyof GlobalEventHandlersEventMap> /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
+  const details: EventObservation<keyof GlobalEventHandlersEventMap> = {
     push: queue.push,
     terminate(ex: Error) { queue.return?.(ex)},
     container,
-    selector: selector || null
+    includeChildren,
+    selector
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
@@ -232,11 +240,11 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
   if (sources.includes('@ready')) {
     const watchSelectors = sources.filter(isValidWhenSelector).map(what => parseWhenSelector(what)?.[0]);
 
-    function isMissing(sel: CSSIdentifier | null | undefined): sel is CSSIdentifier {
+    function isMissing(sel: CSSIdentifier | string | null | undefined): sel is CSSIdentifier {
       return Boolean(typeof sel === 'string' && !container.querySelector(sel));
     }
 
-    const missing = watchSelectors.filter(isMissing);
+    const missing = watchSelectors.map(w => w?.selector).filter(isMissing);
 
     let events: AsyncIterator<any, any, undefined> | undefined = undefined;
     const ai: AsyncIterableIterator<any> = {
