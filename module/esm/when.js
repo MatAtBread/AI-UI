@@ -1,6 +1,10 @@
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
+function childless(sel) {
+    const includeChildren = !sel || !sel.endsWith('>');
+    return { includeChildren, selector: includeChildren ? sel : sel.slice(0, -1) };
+}
 const eventObservations = new WeakMap();
 function docEventHandler(ev) {
     if (!eventObservations.has(this))
@@ -9,7 +13,7 @@ function docEventHandler(ev) {
     if (observations) {
         for (const o of observations) {
             try {
-                const { push, terminate, container, selector } = o;
+                const { push, terminate, container, selector, includeChildren } = o;
                 if (!container.isConnected) {
                     const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
@@ -20,12 +24,12 @@ function docEventHandler(ev) {
                         if (selector) {
                             const nodes = container.querySelectorAll(selector);
                             for (const n of nodes) {
-                                if ((ev.target === n || n.contains(ev.target)) && container.contains(n))
+                                if ((includeChildren ? n.contains(ev.target) : ev.target === n) && container.contains(n))
                                     push(ev);
                             }
                         }
                         else {
-                            if ((ev.target === container || container.contains(ev.target)))
+                            if (includeChildren ? container.contains(ev.target) : ev.target === container)
                                 push(ev);
                         }
                     }
@@ -44,12 +48,12 @@ function parseWhenSelector(what) {
     const parts = what.split(':');
     if (parts.length === 1) {
         if (isCSSSelector(parts[0]))
-            return [parts[0], "change"];
-        return [null, parts[0]];
+            return [childless(parts[0]), "change"];
+        return [{ includeChildren: true, selector: null }, parts[0]];
     }
     if (parts.length === 2) {
         if (isCSSSelector(parts[1]) && !isCSSSelector(parts[0]))
-            return [parts[1], parts[0]];
+            return [childless(parts[1]), parts[0]];
     }
     return undefined;
 }
@@ -57,7 +61,7 @@ function doThrow(message) {
     throw new Error(message);
 }
 function whenEvent(container, what) {
-    const [selector, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: " + what);
+    const [{ includeChildren, selector }, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: " + what);
     if (!eventObservations.has(container.ownerDocument))
         eventObservations.set(container.ownerDocument, new Map());
     if (!eventObservations.get(container.ownerDocument).has(eventName)) {
@@ -68,11 +72,12 @@ function whenEvent(container, what) {
         eventObservations.get(container.ownerDocument).set(eventName, new Set());
     }
     const queue = queueIteratableIterator(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
-    const details /*EventObservation<Exclude<ExtractEventNames<EventName>, keyof SpecialWhenEvents>>*/ = {
+    const details = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
         container,
-        selector: selector || null
+        includeChildren,
+        selector
     };
     containerAndSelectorsMounted(container, selector ? [selector] : undefined)
         .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName).add(details));
@@ -126,7 +131,7 @@ export function when(container, ...sources) {
         function isMissing(sel) {
             return Boolean(typeof sel === 'string' && !container.querySelector(sel));
         }
-        const missing = watchSelectors.filter(isMissing);
+        const missing = watchSelectors.map(w => w?.selector).filter(isMissing);
         let events = undefined;
         const ai = {
             [Symbol.asyncIterator]() { return ai; },

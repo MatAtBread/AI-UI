@@ -12,7 +12,7 @@ type WhenEvents = GlobalEventHandlersEventMap & SpecialWhenEvents;
 type EventNameList<T extends string> = T extends keyof WhenEvents ? T : T extends `${infer S extends keyof WhenEvents},${infer R}` ? EventNameList<R> extends never ? never : `${S},${EventNameList<R>}` : never;
 type EventNameUnion<T extends string> = T extends keyof WhenEvents ? T : T extends `${infer S extends keyof WhenEvents},${infer R}` ? EventNameList<R> extends never ? never : S | EventNameList<R> : never;
 type EventAttribute = `${keyof GlobalEventHandlersEventMap}`;
-type CSSIdentifier<IDS extends string = string> = `#${IDS}` | `.${string}` | `[${string}]`;
+type CSSIdentifier<IDS extends string = string> = `#${IDS}` | `#${IDS}>` | `.${string}` | `[${string}]`;
 export type ValidWhenSelector<IDS extends string = string> = `${keyof SpecialWhenEvents}` | `${EventAttribute}:${CSSIdentifier<IDS>}` | EventAttribute | CSSIdentifier<IDS>;
 type ExtractEventNames<S> = S extends keyof SpecialWhenEvents ? S : S extends `${infer V}:${infer L extends CSSIdentifier}` ? EventNameUnion<V> extends never ? never : EventNameUnion<V> : S extends `${infer L extends CSSIdentifier}` ? 'change' : never;
 type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];
