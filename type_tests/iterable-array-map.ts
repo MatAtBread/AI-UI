@@ -1,4 +1,4 @@
-import { tag } from '../module/src/ai-ui';
+import { tag } from '../module/src/ai-ui.js';
 
 /* Specify what base tags you reference in your UI */
 const { div } = tag();
@@ -8,11 +8,13 @@ function sum(a:number, b:number) {
 }
 
 const App = div.extended(({
+  styles:`.App > div { margin-bottom: 1em } .App > div > div { margin-left: 1em }`,
   override: {
+    className: 'App',
     onclick() {
-      this.data.unshift(this.data[0] + this.data[1]);
       // @ts-expect-error: see iterators.ts#IterableProperties
-      this.data = [1,2];
+      this.data = [200,400];
+      this.data.unshift(this.data[0] + this.data[1]);
     }
   },
   iterable: {
@@ -20,17 +22,20 @@ const App = div.extended(({
   },
   constructed() {
     const t = this.data;
+    const golden = () => this.data[0] / this.data[1];
     return [
       div('Array access',
         div('join: ',t.join(', ')),
         div('reduce: ',t.reduce(sum,0)),
-        div('map: ', Array.prototype.map.call(t, n => String(n)+' ') as string[])
+        div('map: ', Array.prototype.map.call(t, n => String(n)+' ') as string[]),
+        div("golden: ", golden())
       ),
 
       div('AsyncIterator array access',
         div('join: ', t.map!(d => d.join(', '))),
         div('reduce: ', t.map!(d => d.reduce(sum,0))),
-        div('map: ', t.map!(d => d.map( n => String(n)+' ')))
+        div('map: ', t.map!(d => d.map( n => String(n)+' '))),
+        div("golden: ", this.data.map!(golden))
       ),
 
       div('AsyncIterator array item access',
@@ -43,3 +48,4 @@ const App = div.extended(({
 
 /* Add add it to the document so the user can see it! */
 document.body.append(App());
+

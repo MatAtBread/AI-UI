@@ -9,9 +9,10 @@ function docEventHandler(ev) {
     if (observations) {
         for (const o of observations) {
             try {
-                const { push, terminate, container, selector, includeChildren } = o;
-                if (!container.isConnected) {
-                    const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
+                const { push, terminate, containerRef, selector, includeChildren } = o;
+                const container = containerRef.deref();
+                if (!container || !container.isConnected) {
+                    const msg = "Container `#" + container?.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
                     terminate(new Error(msg));
                 }
@@ -75,7 +76,7 @@ function whenEvent(container, what) {
     const details = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
-        container,
+        containerRef: new WeakRef(container),
         includeChildren,
         selector
     };

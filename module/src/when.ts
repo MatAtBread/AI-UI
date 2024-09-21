@@ -88,7 +88,7 @@ type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];
 type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
   push: (ev: GlobalEventHandlersEventMap[EventName])=>void;
   terminate: (ex: Error)=>void;
-  container: Element
+  containerRef: WeakRef<Element>
   selector: string | null;
   includeChildren: boolean;
 };
@@ -102,9 +102,10 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
   if (observations) {
     for (const o of observations) {
       try {
-        const { push, terminate, container, selector, includeChildren } = o;
-        if (!container.isConnected) {
-          const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
+        const { push, terminate, containerRef, selector, includeChildren } = o;
+        const container = containerRef.deref();
+        if (!container || !container.isConnected) {
+          const msg = "Container `#" + container?.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
           observations.delete(o);
           terminate(new Error(msg));
         } else {
@@ -174,7 +175,7 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   const details: EventObservation<keyof GlobalEventHandlersEventMap> = {
     push: queue.push,
     terminate(ex: Error) { queue.return?.(ex)},
-    container,
+    containerRef: new WeakRef(container),
     includeChildren,
     selector
   };
