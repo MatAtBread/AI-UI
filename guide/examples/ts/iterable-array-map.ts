@@ -1,4 +1,5 @@
 import { tag } from '../../../module/esm/ai-ui.js';
+import { AsyncExtraIterable } from '../../../module/esm/iterators.js';
 
 /* Specify what base tags you reference in your UI */
 const { div } = tag();
@@ -11,6 +12,8 @@ const App = div.extended(({
   override: {
     onclick() {
       this.data.unshift(this.data[0] + this.data[1])
+      // @ts-expect-error: see iterators.ts#IterableProperties
+      this.data = [1,2]
     }
   },
   iterable: {
@@ -18,6 +21,7 @@ const App = div.extended(({
   },
   constructed() {
     const t = this.data;
+    const w = t[0]
     return [
       div('Array access',
         div('join: ',t.join(', ')),
@@ -41,3 +45,4 @@ const App = div.extended(({
 
 /* Add add it to the document so the user can see it! */
 document.body.append(App());
+

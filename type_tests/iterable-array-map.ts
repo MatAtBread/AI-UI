@@ -10,7 +10,9 @@ function sum(a:number, b:number) {
 const App = div.extended(({
   override: {
     onclick() {
-      this.data.unshift(this.data[0] + this.data[1])
+      this.data.unshift(this.data[0] + this.data[1]);
+      // @ts-expect-error: see iterators.ts#IterableProperties
+      this.data = [1,2];
     }
   },
   iterable: {
