@@ -30,7 +30,7 @@ export declare function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>):
 export declare function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T>;
 export declare function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T>;
 export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
-export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
+export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, any>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
     filterMap<U extends PartialIterable, R>(this: U, fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;
