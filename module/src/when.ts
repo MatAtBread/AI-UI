@@ -91,9 +91,9 @@ type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
   container: Element
   selector: string | null
 };
-const eventObservations = new WeakMap<Document, Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>();
+const eventObservations = new WeakMap<DocumentFragment | Document, Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>();
 
-function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: Document, ev: GlobalEventHandlersEventMap[EventName]) {
+function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: DocumentFragment | Document, ev: GlobalEventHandlersEventMap[EventName]) {
   if (!eventObservations.has(this))
     eventObservations.set(this, new Map());
 

@@ -2,7 +2,7 @@ import { tag, when } from '../../../module/esm/ai-ui.js';
 import { merge } from '../../../module/esm/iterators.js';
 
 /* Specify what base tags you reference in your UI */
-const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
+const { h2, div, button, input, span } = tag();
 
 const App = div.extended(({
   declare:{
@@ -20,7 +20,9 @@ const App = div.extended(({
   ids:{
     rounded: input,
     prototype: div,
-    arguments: h2
+    arguments: h2,
+    length: span,
+    name: span
   },
   styles:`button { margin: 0.5em; }`,
   constructed() {
@@ -36,7 +38,7 @@ const App = div.extended(({
 
     return [
       this.ids({ id: 'arguments' }, "Hello World"),
-      this.ids({ id: 'prototype' }, "Proto"),
+      this.ids({ id: 'prototype' }, this.ids({id:'name'},"name"), ', ', this.ids({id:'length'},1)),
       this.ids({ type: 'checkbox', id: 'rounded', onclick: (e) => { this.rounded = this.ids.rounded!.checked } }),
       button({
         style: { borderRadius },

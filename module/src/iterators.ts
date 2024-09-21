@@ -1,7 +1,7 @@
 import { DEBUG, console } from "./debug.js"
 import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferred.js"
 
-/* IterableProperties can't be correctly typed in TS right now, either the declaratiion
+/* IterableProperties can't be correctly typed in TS right now, either the declaration
   works for retrieval (the getter), or it works for assignments (the setter), but there's
   no TS syntax that permits correct type-checking at present.
 
