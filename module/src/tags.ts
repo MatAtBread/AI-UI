@@ -135,7 +135,10 @@ type BaseIterables<Base> =
 
 type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> =
   {
-    ids: <const K extends keyof Exclude<D['ids'], undefined>, const TCF extends TagCreatorFunction<any> = Exclude<D['ids'], undefined>[K]>(
+    ids: <
+      const K extends keyof Exclude<D['ids'], undefined>, 
+      const TCF extends TagCreatorFunction<any> = Exclude<D['ids'], undefined>[K]
+    >(
       attrs:{ id: K } & Exclude<Parameters<TCF>[0], ChildTags>,
       ...children: ChildTags[]
     ) => ReturnType<TCF>

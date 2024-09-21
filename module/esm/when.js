@@ -1,10 +1,6 @@
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
-function childless(sel) {
-    const includeChildren = !sel || !sel.endsWith('>');
-    return { includeChildren, selector: includeChildren ? sel : sel.slice(0, -1) };
-}
 const eventObservations = new WeakMap();
 function docEventHandler(ev) {
     if (!eventObservations.has(this))
@@ -43,6 +39,10 @@ function docEventHandler(ev) {
 }
 function isCSSSelector(s) {
     return Boolean(s && (s.startsWith('#') || s.startsWith('.') || (s.startsWith('[') && s.endsWith(']'))));
+}
+function childless(sel) {
+    const includeChildren = !sel || !sel.endsWith('>');
+    return { includeChildren, selector: includeChildren ? sel : sel.slice(0, -1) };
 }
 function parseWhenSelector(what) {
     const parts = what.split(':');

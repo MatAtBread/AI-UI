@@ -208,7 +208,6 @@ export const tag = <TagLoader>function <Tags extends string,
             isExtensible() { return false },
             preventExtensions() { return true },
             getOwnPropertyDescriptor(target, p) {
-              console.log("getOwnPropertyDescriptor",target,p);
               if (this.get!(target, p, null))
                 return Reflect.getOwnPropertyDescriptor(target, keyFor(p));
             },
@@ -221,11 +220,9 @@ export const tag = <TagLoader>function <Tags extends string,
               const unique = [...new Set(ids)];
               if (DEBUG && ids.length !== unique.length)
                 console.log(`Element contains multiple, shadowed decendant ids`, unique);
-              console.log("ownKeys",target,unique);
               return unique;
             },
             get: (target, p, receiver) => {
-              console.log("get",target,p);
               if (typeof p === 'string') {
                 const pk = keyFor(p);
                 // Check if we've cached this ID already

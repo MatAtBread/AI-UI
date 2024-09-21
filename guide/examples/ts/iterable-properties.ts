@@ -8,11 +8,13 @@ const App = div.extended(({
   declare:{
     reset() {
       this.num = 0;
+      this.data = [2,3,5,8]
     }
   },
   iterable: {
     num: 100,
-    rounded: false as boolean
+    rounded: false as boolean,
+    data: [] as number[]
   },
   override: {
     dir: ''
@@ -55,6 +57,9 @@ const App = div.extended(({
       div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
       div(merge(this.rounded, this.num).map!(_ => this.num * (this.rounded == true ? 1 : -1))), // Dynamic - we map the value
+      div('total',this.data,'is',(<any>this.data).map!((m:any) => {
+        return m.reduce((a,b)=> a+b, 0)
+      }))
     ]
   }
 }));

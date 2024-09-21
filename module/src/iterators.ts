@@ -60,7 +60,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
 } : ({
   [K in keyof IP]: (
     IP[K] extends Array<infer E>
-    ? (IterableProperties<E>[] | IterableProperties<E[]>)
+    ? (Omit<E[] & Partial<AsyncExtraIterable<E>>[],keyof Array<E> & keyof AsyncIterableHelpers> & Partial<AsyncExtraIterable<E[]>>)
     : ((
       IP[K] extends object
       ? IterableProperties<IP[K]>

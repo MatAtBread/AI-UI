@@ -18,7 +18,7 @@ declare global {
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
     [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>;
 } : ({
-    [K in keyof IP]: (IP[K] extends Array<infer E> ? (IterableProperties<E>[] | IterableProperties<E[]>) : ((IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>));
+    [K in keyof IP]: (IP[K] extends Array<infer E> ? (Omit<E[] & Partial<AsyncExtraIterable<E>>[], keyof Array<E> & keyof AsyncIterableHelpers> & Partial<AsyncExtraIterable<E[]>>) : ((IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>));
 });
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
     push(value: T): boolean;
