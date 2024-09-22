@@ -1,7 +1,7 @@
 import { DEBUG, console } from "./debug.js"
 import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferred.js"
 
-/* IterableProperties can't be correctly typed in TS right now, either the declaratiion
+/* IterableProperties can't be correctly typed in TS right now, either the declaration
   works for retrieval (the getter), or it works for assignments (the setter), but there's
   no TS syntax that permits correct type-checking at present.
 
@@ -55,19 +55,30 @@ declare global {
   }
 }
 
+type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers;
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
   [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>
-} : ({
+} : {
   [K in keyof IP]: (
     IP[K] extends Array<infer E>
-    ? (IterableProperties<E>[] | IterableProperties<E[]>)
-    : ((
+    ? /*
+      Because TS doesn't implement separate types for read/write, or computed getter/setter names (which DO allow
+      different types for assignment and evaluation), it is not possible to define type for array members that permit
+      dereferencing of non-clashinh array keys such as `join` or `sort` and AsyncIterator methods which also allows
+      simple assignment of the form `this.iterableArrayMember = [...]`. 
+
+      The CORRECT type for these fields would be (if TS phas syntax for it):
+      get [K] (): Omit<Array<E & AsyncExtraIterable<E>, NonAccessibleIterableArrayKeys> & AsyncExtraIterable<E[]>
+      set [K] (): Array<E> | AsyncExtraIterable<E[]>
+      */
+      Omit<Array<E & Partial<AsyncExtraIterable<E>>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
+    : (
       IP[K] extends object
       ? IterableProperties<IP[K]>
       : IP[K]
-    ) & IterableType<IP[K]>)
+    ) & IterableType<IP[K]>
   )
-})
+}
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {

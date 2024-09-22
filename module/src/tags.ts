@@ -111,7 +111,7 @@ export type Overrides = {
   override?: object;
   declare?: object;
   iterable?: { [k: string]: IterablePropertyValue };
-  ids?: { [id: string]: ExTagCreator<any>; };
+  ids?: { [id: string]: TagCreatorFunction<any>; };
   styles?: string;
 }
 
@@ -134,14 +134,42 @@ type BaseIterables<Base> =
   : never;
 
 type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> =
-  D['declare']
+  {
+    ids: <
+      const K extends keyof Exclude<D['ids'], undefined>, 
+      const TCF extends TagCreatorFunction<any> = Exclude<D['ids'], undefined>[K]
+    >(
+      attrs:{ id: K } & Exclude<Parameters<TCF>[0], ChildTags>,
+      ...children: ChildTags[]
+    ) => ReturnType<TCF>
+  }
+  & D['declare']
   & D['override']
   & IDS<D['ids']>
   & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>;
 
 type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable'];
 
+export const callStackSymbol = Symbol('callStack');
+export type ConstructorCallStack = { [callStackSymbol]?: Overrides[] };
+
+export type ExtendTagFunction = (attrs: TagCreationOptions & ConstructorCallStack & {
+  [k: string]: unknown;
+} | ChildTags, ...children: ChildTags[]) => Element
+
+export interface ExtendTagFunctionInstance extends ExtendTagFunction {
+  super: TagCreator<Element>;
+  definition: Overrides;
+  valueOf: () => string;
+  extended: (this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) => ExtendTagFunctionInstance;
+}
+
+interface TagConstuctor<Base extends object> {
+  constructor: ExtendTagFunctionInstance;
+}
+
 type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> =
+  TagConstuctor<Base> &
   ReadWriteAttributes<
     IterableProperties<CombinedIterableProperties<Base,D>>
     & AsyncGeneratedObject<CombinedNonIterableProperties<Base,D>>,
@@ -201,8 +229,8 @@ SuppliedDefinitions extends { constructed: any }
   ? SuppliedDefinitions extends Constructed
     ? Result
     : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
-  : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never 
-    ? Result 
+  : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never
+    ? Result
     : { "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed> }
 
 export type TagCreationOptions = {

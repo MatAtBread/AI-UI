@@ -1,24 +1,30 @@
-import { tag } from '../../../module/esm/ai-ui.js';
+import { tag, when } from '../../../module/esm/ai-ui.js';
 import { merge } from '../../../module/esm/iterators.js';
 
 /* Specify what base tags you reference in your UI */
-const { h2, div, button, input } = tag(['h2', 'div', 'button', 'input']);
+const { h2, div, button, input, span } = tag();
 
-const App = div.extended({
+const App = div.extended(({
   declare:{
     reset() {
       this.num = 0;
+      this.data = [2,3,5,8]
     }
   },
   iterable: {
     num: 100,
-    rounded: false as boolean
+    rounded: false as boolean,
+    data: [] as number[]
   },
   override: {
     dir: ''
   },
   ids:{
-    rounded: input
+    rounded: input,
+    prototype: div,
+    arguments: h2,
+    length: span,
+    name: span
   },
   styles:`button { margin: 0.5em; }`,
   constructed() {
@@ -33,8 +39,9 @@ const App = div.extended({
     };
 
     return [
-      h2("Hello World"),
-      input({ type: 'checkbox', id: 'rounded', onclick:(e)=>{ this.rounded = this.ids.rounded!.checked }}),
+      this.ids({ id: 'arguments' }, "Hello World"),
+      this.ids({ id: 'prototype' }, this.ids({id:'name'},"name"), ', ', this.ids({id:'length'},1)),
+      this.ids({ type: 'checkbox', id: 'rounded', onclick: (e) => { this.rounded = this.ids.rounded!.checked } }),
       button({
         style: { borderRadius },
         onclick: () => this.num = this.num + 1
@@ -50,9 +57,12 @@ const App = div.extended({
       div(this.num, ' ', this.num.waitFor!(done => setTimeout(done, 500))),
       div(-this.num), // NOT dynamic, as it evaluates to a number
       div(merge(this.rounded, this.num).map!(_ => this.num * (this.rounded == true ? 1 : -1))), // Dynamic - we map the value
+      div('total',this.data,'is',(<any>this.data).map!((m:any) => {
+        return m.reduce((a,b)=> a+b, 0)
+      }))
     ]
   }
-});
+}));
 
 /* Add add it to the document so the user can see it! */
 const app = App({

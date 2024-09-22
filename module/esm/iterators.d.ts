@@ -15,11 +15,21 @@ declare global {
         valueOf<T>(this: T): T extends IterableType<infer Z> ? Z : Object;
     }
 }
+type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers;
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
     [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>;
-} : ({
-    [K in keyof IP]: (IP[K] extends Array<infer E> ? (IterableProperties<E>[] | IterableProperties<E[]>) : ((IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>));
-});
+} : {
+    [K in keyof IP]: (IP[K] extends Array<infer E> ? /*
+      Because TS doesn't implement separate types for read/write, or computed getter/setter names (which DO allow
+      different types for assignment and evaluation), it is not possible to define type for array members that permit
+      dereferencing of non-clashinh array keys such as `join` or `sort` and AsyncIterator methods which also allows
+      simple assignment of the form `this.iterableArrayMember = [...]`.
+
+      The CORRECT type for these fields would be (if TS phas syntax for it):
+      get [K] (): Omit<Array<E & AsyncExtraIterable<E>, NonAccessibleIterableArrayKeys> & AsyncExtraIterable<E[]>
+      set [K] (): Array<E> | AsyncExtraIterable<E[]>
+      */ Omit<Array<E & Partial<AsyncExtraIterable<E>>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>> : (IP[K] extends object ? IterableProperties<IP[K]> : IP[K]) & IterableType<IP[K]>);
+};
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
     push(value: T): boolean;
     readonly length: number;
@@ -30,7 +40,7 @@ export declare function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>):
 export declare function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T>;
 export declare function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T>;
 export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
-export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, undefined>;
+export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, any>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
     filterMap<U extends PartialIterable, R>(this: U, fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>, initialValue?: R | typeof Ignore): AsyncExtraIterable<R>;

@@ -1,10 +1,6 @@
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
-function childless(sel) {
-    const includeChildren = !sel || !sel.endsWith('>');
-    return { includeChildren, selector: includeChildren ? sel : sel.slice(0, -1) };
-}
 const eventObservations = new WeakMap();
 function docEventHandler(ev) {
     if (!eventObservations.has(this))
@@ -13,9 +9,10 @@ function docEventHandler(ev) {
     if (observations) {
         for (const o of observations) {
             try {
-                const { push, terminate, container, selector, includeChildren } = o;
-                if (!container.isConnected) {
-                    const msg = "Container `#" + container.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
+                const { push, terminate, containerRef, selector, includeChildren } = o;
+                const container = containerRef.deref();
+                if (!container || !container.isConnected) {
+                    const msg = "Container `#" + container?.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
                     observations.delete(o);
                     terminate(new Error(msg));
                 }
@@ -43,6 +40,10 @@ function docEventHandler(ev) {
 }
 function isCSSSelector(s) {
     return Boolean(s && (s.startsWith('#') || s.startsWith('.') || (s.startsWith('[') && s.endsWith(']'))));
+}
+function childless(sel) {
+    const includeChildren = !sel || !sel.endsWith('>');
+    return { includeChildren, selector: includeChildren ? sel : sel.slice(0, -1) };
 }
 function parseWhenSelector(what) {
     const parts = what.split(':');
@@ -75,7 +76,7 @@ function whenEvent(container, what) {
     const details = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
-        container,
+        containerRef: new WeakRef(container),
         includeChildren,
         selector
     };

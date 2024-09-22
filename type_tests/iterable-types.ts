@@ -31,6 +31,7 @@ declare var arr: IterableProperties<IP>;
 
   arr.a[0] = 'str';
   arr.b = 1;
+  // @ts-expect-error: see iterators.ts#IterableProperties
   arr.a = ['a','b'];
   arr.o.foo = 8;
   
