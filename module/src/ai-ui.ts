@@ -155,7 +155,7 @@ export const tag = <TagLoader>function <Tags extends string,
     return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
   }
   const poStyleElt = thisDoc.createElement("STYLE");
-  poStyleElt.id = "--ai-ui-extended-tag-styles-";
+  poStyleElt.id = "--ai-ui-extended-tag-styles-"+Date.now();
 
   /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
   const warned = new Set<string>();
@@ -307,24 +307,36 @@ export const tag = <TagLoader>function <Tags extends string,
         const ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
-        const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed as ChildTags)
+        const initialNodes = (unboxed === undefined || unboxed === c) ? [] : nodes(unboxed as ChildTags)
+        let replacementNodes = initialNodes.length ? initialNodes : [DomPromiseContainer()];
+        appended.push(...replacementNodes);
 
-        let t = dpm.length ? dpm : [DomPromiseContainer()];
-        appended.push(...t);
+        function setReplacementNodes(nodes: Node[]){
+          let itx = Number.MAX_SAFE_INTEGER;
+          if (itx < 0) debugger;
+          for (const n of replacementNodes) {
+            const i = appended.indexOf(n);
+            if (itx > i) itx = i;
+            appended.splice(i,1)
+          }
+          appended.splice(itx, 0, ...nodes);
+          replacementNodes = nodes;
+        }
+
         let notYetMounted = true;
         // DEBUG support
         let createdAt = Date.now() + timeOutWarn;
         const createdBy = DEBUG && new Error("Created by").stack;
 
         const error = (errorValue: any) => {
-          const n = t.filter(n => Boolean(n?.parentNode)) as ChildNode[];
+          const n = replacementNodes.filter(n => Boolean(n?.parentNode)) as ChildNode[];
           if (n.length) {
-            t = [DyamicElementError({ error: errorValue })];
-            n[0].replaceWith(...t);
+            setReplacementNodes([DyamicElementError({ error: errorValue })]);
+            n[0].replaceWith(...replacementNodes);
             n.slice(1).forEach(e => e?.parentNode!.removeChild(e));
           }
-          else console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
-          t = [];
+          else console.warn("Can't report error", errorValue, createdBy, replacementNodes.map(logNode));
+          setReplacementNodes([]);
           ap.return?.(errorValue);
         }
 
@@ -332,13 +344,13 @@ export const tag = <TagLoader>function <Tags extends string,
           if (!es.done) {
             try {
               // ChildNode[], since we tested .parentNode
-              const mounted = t.filter(e => e?.parentNode && e.isConnected);
-              const n = notYetMounted ? t : mounted;
-              if (mounted.length) notYetMounted = false;
+              const mounted = replacementNodes.filter(e => e?.parentNode && e.isConnected);
+              const n = notYetMounted ? replacementNodes : mounted;
+              if (notYetMounted && mounted.length) notYetMounted = false;
 
-              if (!n.length || t.every(e => removedNodes(e))) {
+              if (!n.length || replacementNodes.every(e => removedNodes(e))) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                t = [];
+                setReplacementNodes([]);
                 const msg = "Element(s) have been removed from the document: " + insertionStack;
                 ap.return?.(new Error(msg));
                 return;
@@ -346,22 +358,24 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
-                console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t.map(logNode));
+                console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, replacementNodes.map(logNode));
               }
-              t = nodes(unbox(es.value) as ChildTags);
+              setReplacementNodes(nodes(unbox(es.value) as ChildTags));
               // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-              if (!t.length) t.push(DomPromiseContainer());
-              (n[0] as ChildNode).replaceWith(...t);
-              n.slice(1).forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
+              if (!replacementNodes.length) replacementNodes.push(DomPromiseContainer());
+              (n[0] as ChildNode).replaceWith(...replacementNodes);
+              n.forEach(e => !replacementNodes.includes(e) && e.parentNode?.removeChild(e));
               ap.next().then(update).catch(error);
             } catch (ex) {
               // Something went wrong. Terminate the iterator source
-              t = [];
+              setReplacementNodes([]);
               ap.return?.(ex);
             }
           }
         }
-        ap.next().then(update).catch(error);
+        ap.next()
+        //.then(i => /* Force removal of retainers, since `t` will be reassigned */(appended.fill(null as unknown as Node), i))
+        .then(update).catch(error);
         return;
       }
       appended.push(thisDoc.createTextNode(c.toString()));

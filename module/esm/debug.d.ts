@@ -1,4 +1,4 @@
-export declare const DEBUG: any;
+export declare const DEBUG: boolean;
 export { _console as console };
 export declare const timeOutWarn = 5000;
 declare const _console: {
