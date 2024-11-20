@@ -13,23 +13,21 @@ const { div, button, span } = tag();
 function sleep(ms, v) {
   return new Promise(resolve => setTimeout(() => resolve(v), ms));
 }
-/*
+/**/
 const AutoClickButton = button.extended({
   iterable:{
     n: 0
   },
   override: {
-    onclick() {
-      this.n += 1;
-      console.log("self-click",this.n);
+    async onclick() {
+      for (let i=0; i<3; i++) {
+        this.n += 1;
+        this.dispatchEvent(new Event("change"));
+        await new Promise(queueMicrotask);
+      }
     }
   },
   constructed(){
-    for (let i=0; i<9; i++) {
-      this.click();
-      this.click();
-      sleep(1).then(() => this.click()).then(() => sleep(1)).then(() => this.click());
-    }
     return 'click'
   }
 });
@@ -42,8 +40,12 @@ const ClickCount = div.extended({
   constructed() {
     let n = 0;
     return [
-      AutoClickButton({ id: 'buttn'}),
-      this.when('click:#buttn').map(e => console.log(e))
+      this.when('change:#btn').map(() => {
+        const n = this.ids.btn.n.valueOf();
+        console.log("when",n);
+        return div({id:n.valueOf().toString()},n);
+      }),
+      AutoClickButton({ id: 'btn'})
     ]
   }
 });
@@ -61,8 +63,8 @@ document.body.append(...tag.nodes(
 //   sleep(2000).then(() => div("...bye")),
 //   sleep(1000,div("bye")),
 // ));
-*/
 /**/
+/**
 async function* rainbow() {
   try {
     while (true) {
@@ -70,7 +72,7 @@ async function* rainbow() {
         yield {
           color: `hsl(${i} 100% 20%)`
         };
-        await sleep(100);
+        await sleep(400);
       }
       break;
     }
@@ -116,10 +118,13 @@ const nodes = tag.nodes(
 //  Boxed(span({ id:'styled',style: rainbow() }, "Style" )),
 
 //  rainbow().map(s => div({ id: n, style: s }, "Mapped Mounted "+n++)),
+  div('Start'),
   rainbow().map(s => [
-    div({ id: n, style: s }, "Mapped Mounted "+n++),
+    //span("start - "),div({ id: n, style: s }, "Mapped Mounted "+n++), span(" - end")
+    div({ id: n, style: s }, "Mapped Mounted "+n++)
     //(div({ style: s }, "Mapped Detached"),null)
   ]),
+  div('End'),
 //  div({ id:'styled',style: rainbow() }, "Style"),
   // divs('A'),
 

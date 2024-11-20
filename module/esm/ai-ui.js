@@ -70,8 +70,8 @@ export const tag = function (_1, _2, _3) {
     function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     }
-    const poStyleElt = thisDoc.createElement("STYLE");
-    poStyleElt.id = "--ai-ui-extended-tag-styles-" + Date.now();
+    const aiuiExtendedTagStyles = thisDoc.createElement("STYLE");
+    aiuiExtendedTagStyles.id = "--ai-ui-extended-tag-styles-" + Date.now();
     /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
     const warned = new Set();
     const tagPrototypes = Object.create(null, {
@@ -198,6 +198,7 @@ export const tag = function (_1, _2, _3) {
                             debugger;
                     }
                     const replacement = nodes(r);
+                    removedNodes.add(appended[idx]);
                     appended.splice(idx, 1, ...replacement);
                     g.replaceWith(...replacement);
                 }, (x) => {
@@ -212,7 +213,7 @@ export const tag = function (_1, _2, _3) {
             }
             // We have an interesting case here where an iterable String is an object with both Symbol.iterator
             // (inherited from the String prototype) and Symbol.asyncIterator (as it's been augmented by boxed())
-            // but we're only interested in cases like HTMLCollection, NodeList, array, etc., not the fukny ones
+            // but we're only interested in cases like HTMLCollection, NodeList, array, etc., not the funky ones
             // It used to be after the isAsyncIter() test, but a non-AsyncIterator *may* also be a sync iterable
             // For now, we exclude (Symbol.asyncIterator in c) in this case.
             if (c && typeof c === 'object' && Symbol.iterator in c && !(Symbol.asyncIterator in c) && c[Symbol.iterator]) {
@@ -229,8 +230,19 @@ export const tag = function (_1, _2, _3) {
                 let replacementNodes = initialNodes.length ? initialNodes : [DomPromiseContainer()];
                 appended.push(...replacementNodes);
                 const setReplacementNodes = (nodes) => {
-                    const indices = replacementNodes.map(n => appended.indexOf(n)).map(i => i < 0 ? (console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.'), Number.MAX_SAFE_INTEGER) : i);
-                    indices.forEach(i => appended.splice(i, 1));
+                    const indices = replacementNodes.map(n => appended.indexOf(n)).sort((a, b) => b - a);
+                    if (indices[indices.length - 1] < 0) {
+                        console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.');
+                        if (DEBUG) {
+                            debugger;
+                        }
+                    }
+                    indices.forEach(i => {
+                        if (i >= 0) {
+                            removedNodes.add(appended[i]);
+                            appended.splice(i, 1);
+                        }
+                    });
                     if (nodes) {
                         // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
                         if (nodes.length === 0)
@@ -251,7 +263,7 @@ export const tag = function (_1, _2, _3) {
                         const n = notYetMounted ? replacementNodes : mounted;
                         if (notYetMounted && mounted.length)
                             notYetMounted = false;
-                        if (!n.length || replacementNodes.every(e => removedNodes(e))) {
+                        if (!n.length || replacementNodes.every(e => removedNodes.has(e))) {
                             // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
                             setReplacementNodes(null);
                             const msg = "Element(s) have been removed from the document: " + insertionStack;
@@ -260,7 +272,7 @@ export const tag = function (_1, _2, _3) {
                         }
                         if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
                             createdAt = Number.MAX_SAFE_INTEGER;
-                            console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, replacementNodes.map(logNode));
+                            console.warn(`Async element not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.`, createdBy, replacementNodes.map(logNode));
                         }
                         setReplacementNodes(nodes(unbox(es.value)));
                         n[0].replaceWith(...replacementNodes);
@@ -482,7 +494,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             const mounted = base.isConnected;
                             // If we have been mounted before, bit aren't now, remove the consumer
-                            if (removedNodes(base) || (!notYetMounted && !mounted)) {
+                            if (removedNodes.has(base) || (!notYetMounted && !mounted)) {
                                 console.info(`Element does not exist in document when setting async attribute '${k}' to:\n${logNode(base)}`);
                                 ap.return?.();
                                 return;
@@ -491,7 +503,7 @@ export const tag = function (_1, _2, _3) {
                                 notYetMounted = false;
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.warn(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.\nElement contains: ${logNode(base)}\n${createdBy}`);
+                                console.warn(`Element with async attribute '${k}' not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.\nElement contains: ${logNode(base)}\n${createdBy}`);
                             }
                             ap.next().then(update).catch(error);
                         }
@@ -562,9 +574,9 @@ export const tag = function (_1, _2, _3) {
         let staticExtensions = instanceDefinition({ [UniqueID]: uniqueTagID });
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
-            poStyleElt.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
-            if (!thisDoc.head.contains(poStyleElt)) {
-                thisDoc.head.appendChild(poStyleElt);
+            aiuiExtendedTagStyles.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
+            if (!thisDoc.head.contains(aiuiExtendedTagStyles)) {
+                thisDoc.head.appendChild(aiuiExtendedTagStyles);
             }
         }
         // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
@@ -767,7 +779,8 @@ function mutationTracker(root, track, enableOnRemovedFromDOM) {
             }
         });
     }).observe(root, { subtree: true, childList: true });
-    return function (node) {
-        return tracked.has(node);
-    };
+    return tracked;
+    // return function (node: Node) {
+    //   return tracked.has(node);
+    // }
 }

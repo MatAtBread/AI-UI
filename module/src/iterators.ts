@@ -65,7 +65,7 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
       Because TS doesn't implement separate types for read/write, or computed getter/setter names (which DO allow
       different types for assignment and evaluation), it is not possible to define type for array members that permit
       dereferencing of non-clashinh array keys such as `join` or `sort` and AsyncIterator methods which also allows
-      simple assignment of the form `this.iterableArrayMember = [...]`. 
+      simple assignment of the form `this.iterableArrayMember = [...]`.
 
       The CORRECT type for these fields would be (if TS phas syntax for it):
       get [K] (): Omit<Array<E & AsyncExtraIterable<E>, NonAccessibleIterableArrayKeys> & AsyncExtraIterable<E[]>
@@ -697,23 +697,26 @@ export function filterMap<U extends PartialIterable, R>(source: U,
           ai = source[Symbol.asyncIterator]!();
         ai.next(...args).then(
           p => p.done
-            ? resolve(p)
+            ? (prev = Ignore, resolve(p))
             : resolveSync(fn(p.value, prev),
               f => f === Ignore
                 ? step(resolve, reject)
                 : resolve({ done: false, value: prev = f }),
               ex => {
+                prev = Ignore; // Remove reference for GC
                 // The filter function failed...
                 ai.throw ? ai.throw(ex) : ai.return?.(ex) // Terminate the source - for now we ignore the result of the termination
                 reject({ done: true, value: ex }); // Terminate the consumer
               }
             ),
-
-          ex =>
+          ex => {
             // The source threw. Tell the consumer
+            prev = Ignore; // Remove reference for GC
             reject({ done: true, value: ex })
+          }
         ).catch(ex => {
           // The callback threw
+          prev = Ignore; // Remove reference for GC
           ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
           reject({ done: true, value: ex })
         })
@@ -765,11 +768,18 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
   // The source has produced a new result
   function step(it?: IteratorResult<T, any>) {
     if (it) current.resolve(it);
-    if (!it?.done) {
+    if (it?.done) {
+      // @ts-ignore: release reference
+      current = null;
+    } else {
       current = deferred<IteratorResult<T>>();
       ai!.next()
         .then(step)
-        .catch(error => current.reject({ done: true, value: error }));
+        .catch(error => {
+          current.reject({ done: true, value: error });
+          // @ts-ignore: release reference
+          current = null;
+        });
     }
   }
 
@@ -784,7 +794,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
         ai = source[Symbol.asyncIterator]!();
         step();
       }
-      return current//.then(zalgo => zalgo);
+      return current;
     },
 
     throw(ex: any) {

@@ -178,62 +178,66 @@ export function when(container, ...sources) {
             : (doneImmediately());
     return chainAsync(iterableHelpers(merged));
 }
-function elementIsInDOM(elt) {
-    if (elt.isConnected)
-        return Promise.resolve();
-    let reject;
-    const promise = new Promise((resolve, _reject) => {
-        reject = _reject;
-        return new MutationObserver((records, mutation) => {
+function containerAndSelectorsMounted(container, selectors) {
+    function elementIsInDOM() {
+        if (container.isConnected)
+            return Promise.resolve();
+        let reject;
+        const promise = new Promise((resolve, _reject) => {
+            reject = _reject;
+            return new MutationObserver((records, mutation) => {
+                if (records.some(r => r.addedNodes?.length)) {
+                    if (container.isConnected) {
+                        mutation.disconnect();
+                        resolve();
+                    }
+                }
+                if (records.some(r => [...r.removedNodes].includes(container))) {
+                    mutation.disconnect();
+                    _reject(new Error("Removed from DOM"));
+                }
+            }).observe(container.ownerDocument.body, {
+                subtree: true,
+                childList: true
+            });
+        });
+        if (DEBUG) {
+            const stack = new Error().stack?.replace(/^Error/, `Element not mounted after ${timeOutWarn / 1000} seconds:`);
+            const warnTimer = setTimeout(() => {
+                console.warn(stack + "\n" + container.outerHTML);
+                //reject(new Error("Element not mounted after 5 seconds"));
+            }, timeOutWarn);
+            promise.finally(() => clearTimeout(warnTimer));
+        }
+        return promise;
+    }
+    function allSelectorsPresent(missing) {
+        missing = missing.filter(sel => !container.querySelector(sel));
+        if (!missing.length) {
+            return Promise.resolve(); // Nothing is missing
+        }
+        const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
             if (records.some(r => r.addedNodes?.length)) {
-                if (elt.isConnected) {
+                if (missing.every(sel => container.querySelector(sel))) {
                     mutation.disconnect();
                     resolve();
                 }
             }
-        }).observe(elt.ownerDocument.body, {
+        }).observe(container, {
             subtree: true,
             childList: true
-        });
-    });
-    if (DEBUG) {
-        const stack = new Error().stack?.replace(/^Error/, "Element not mounted after 5 seconds:");
-        const warnTimer = setTimeout(() => {
-            console.warn(stack + "\n" + elt.outerHTML);
-            //reject(new Error("Element not mounted after 5 seconds"));
-        }, timeOutWarn);
-        promise.finally(() => clearTimeout(warnTimer));
-    }
-    return promise;
-}
-function containerAndSelectorsMounted(container, selectors) {
-    if (selectors?.length)
-        return elementIsInDOM(container).then(() => allSelectorsPresent(container, selectors));
-    return elementIsInDOM(container);
-}
-function allSelectorsPresent(container, missing) {
-    missing = missing.filter(sel => !container.querySelector(sel));
-    if (!missing.length) {
-        return Promise.resolve(); // Nothing is missing
-    }
-    const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
-        if (records.some(r => r.addedNodes?.length)) {
-            if (missing.every(sel => container.querySelector(sel))) {
-                mutation.disconnect();
-                resolve();
-            }
+        }));
+        /* debugging help: warn if waiting a long time for a selectors to be ready */
+        if (DEBUG) {
+            const stack = new Error().stack?.replace(/^Error/, `Missing selectors after ${timeOutWarn / 1000} seconds: `) ?? '??';
+            const warnTimer = setTimeout(() => {
+                console.warn(stack + missing + "\n");
+            }, timeOutWarn);
+            promise.finally(() => clearTimeout(warnTimer));
         }
-    }).observe(container, {
-        subtree: true,
-        childList: true
-    }));
-    /* debugging help: warn if waiting a long time for a selectors to be ready */
-    if (DEBUG) {
-        const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
-        const warnTimer = setTimeout(() => {
-            console.warn(stack, missing);
-        }, timeOutWarn);
-        promise.finally(() => clearTimeout(warnTimer));
+        return promise;
     }
-    return promise;
+    if (selectors?.length)
+        return elementIsInDOM().then(() => allSelectorsPresent(selectors));
+    return elementIsInDOM();
 }

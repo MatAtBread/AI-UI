@@ -524,17 +524,21 @@ export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
                 if (!ai)
                     ai = source[Symbol.asyncIterator]();
                 ai.next(...args).then(p => p.done
-                    ? resolve(p)
+                    ? (prev = Ignore, resolve(p))
                     : resolveSync(fn(p.value, prev), f => f === Ignore
                         ? step(resolve, reject)
                         : resolve({ done: false, value: prev = f }), ex => {
+                        prev = Ignore; // Remove reference for GC
                         // The filter function failed...
                         ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
                         reject({ done: true, value: ex }); // Terminate the consumer
-                    }), ex => 
-                // The source threw. Tell the consumer
-                reject({ done: true, value: ex })).catch(ex => {
+                    }), ex => {
+                    // The source threw. Tell the consumer
+                    prev = Ignore; // Remove reference for GC
+                    reject({ done: true, value: ex });
+                }).catch(ex => {
                     // The callback threw
+                    prev = Ignore; // Remove reference for GC
                     ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
                     reject({ done: true, value: ex });
                 });
@@ -577,11 +581,19 @@ function multi() {
     function step(it) {
         if (it)
             current.resolve(it);
-        if (!it?.done) {
+        if (it?.done) {
+            // @ts-ignore: release reference
+            current = null;
+        }
+        else {
             current = deferred();
             ai.next()
                 .then(step)
-                .catch(error => current.reject({ done: true, value: error }));
+                .catch(error => {
+                current.reject({ done: true, value: error });
+                // @ts-ignore: release reference
+                current = null;
+            });
         }
     }
     const mai = {
@@ -594,7 +606,7 @@ function multi() {
                 ai = source[Symbol.asyncIterator]();
                 step();
             }
-            return current; //.then(zalgo => zalgo);
+            return current;
         },
         throw(ex) {
             // The consumer wants us to exit with an exception. Tell the source if we're the final one
