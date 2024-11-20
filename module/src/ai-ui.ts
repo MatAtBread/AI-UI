@@ -279,8 +279,17 @@ export const tag = <TagLoader>function <Tags extends string,
       if (isPromiseLike(c)) {
         const g: ChildNode = DomPromiseContainer();
         appended.push(g);
-        c.then(r => g.replaceWith(...nodes(r)),
-          (x: any) => {
+        c.then(r => {
+          const idx = appended.indexOf(g);
+          if (idx < 0) {
+            console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.');
+            if (DEBUG) debugger;
+          }
+          const replacement = nodes(r);
+          appended.splice(idx, 1, ...replacement);
+          g.replaceWith(...replacement);
+        },
+        (x: any) => {
             console.warn(x, logNode(g));
             g.replaceWith(DyamicElementError({ error: x }));
           }
@@ -311,16 +320,15 @@ export const tag = <TagLoader>function <Tags extends string,
         let replacementNodes = initialNodes.length ? initialNodes : [DomPromiseContainer()];
         appended.push(...replacementNodes);
 
-        function setReplacementNodes(nodes: Node[]){
-          let itx = Number.MAX_SAFE_INTEGER;
-          if (itx < 0) debugger;
-          for (const n of replacementNodes) {
-            const i = appended.indexOf(n);
-            if (itx > i) itx = i;
-            appended.splice(i,1)
+        const setReplacementNodes = (nodes: Node[] | null) => {
+          const indices = replacementNodes.map(n => appended.indexOf(n)).map(i => i<0 ? (console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.'), Number.MAX_SAFE_INTEGER) : i);
+          indices.forEach(i => appended.splice(i,1));
+          if (nodes) {
+            // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
+            if (nodes.length === 0) nodes = [DomPromiseContainer()];
+            appended.splice(Math.min(...indices), 0, ...nodes);
           }
-          appended.splice(itx, 0, ...nodes);
-          replacementNodes = nodes;
+          replacementNodes = nodes || [];
         }
 
         let notYetMounted = true;
@@ -328,21 +336,9 @@ export const tag = <TagLoader>function <Tags extends string,
         let createdAt = Date.now() + timeOutWarn;
         const createdBy = DEBUG && new Error("Created by").stack;
 
-        const error = (errorValue: any) => {
-          const n = replacementNodes.filter(n => Boolean(n?.parentNode)) as ChildNode[];
-          if (n.length) {
-            setReplacementNodes([DyamicElementError({ error: errorValue })]);
-            n[0].replaceWith(...replacementNodes);
-            n.slice(1).forEach(e => e?.parentNode!.removeChild(e));
-          }
-          else console.warn("Can't report error", errorValue, createdBy, replacementNodes.map(logNode));
-          setReplacementNodes([]);
-          ap.return?.(errorValue);
-        }
-
-        const update = (es: IteratorResult<ChildTags>) => {
+        const step = () => ap.next()
+        .then(es => {
           if (!es.done) {
-            try {
               // ChildNode[], since we tested .parentNode
               const mounted = replacementNodes.filter(e => e?.parentNode && e.isConnected);
               const n = notYetMounted ? replacementNodes : mounted;
@@ -350,7 +346,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (!n.length || replacementNodes.every(e => removedNodes(e))) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                setReplacementNodes([]);
+                setReplacementNodes(null);
                 const msg = "Element(s) have been removed from the document: " + insertionStack;
                 ap.return?.(new Error(msg));
                 return;
@@ -360,22 +356,24 @@ export const tag = <TagLoader>function <Tags extends string,
                 createdAt = Number.MAX_SAFE_INTEGER;
                 console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, replacementNodes.map(logNode));
               }
-              setReplacementNodes(nodes(unbox(es.value) as ChildTags));
-              // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-              if (!replacementNodes.length) replacementNodes.push(DomPromiseContainer());
+              setReplacementNodes(nodes(unbox(es.value)));
               (n[0] as ChildNode).replaceWith(...replacementNodes);
               n.forEach(e => !replacementNodes.includes(e) && e.parentNode?.removeChild(e));
-              ap.next().then(update).catch(error);
-            } catch (ex) {
-              // Something went wrong. Terminate the iterator source
-              setReplacementNodes([]);
-              ap.return?.(ex);
-            }
+              step();
           }
-        }
-        ap.next()
-        //.then(i => /* Force removal of retainers, since `t` will be reassigned */(appended.fill(null as unknown as Node), i))
-        .then(update).catch(error);
+        })
+        .catch((errorValue: any) => {
+          const n = replacementNodes.filter(n => Boolean(n?.parentNode)) as ChildNode[];
+          if (n.length) {
+            setReplacementNodes([DyamicElementError({ error: errorValue })]);
+            n[0].replaceWith(...replacementNodes);
+            n.slice(1).forEach(e => e?.parentNode!.removeChild(e));
+          }
+          else console.warn("Can't report error", errorValue, createdBy, replacementNodes.map(logNode));
+          setReplacementNodes(null);
+          ap.return?.(errorValue);
+        });
+        step();
         return;
       }
       appended.push(thisDoc.createTextNode(c.toString()));
@@ -429,7 +427,7 @@ export const tag = <TagLoader>function <Tags extends string,
                 Object.defineProperty(d, k, srcDesc);
               } else {
                 if (value instanceof Node) {
-                  console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, logNode(value));
+                  console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${d instanceof Node ? logNode(d) : d}`);
                   d[k] = value;
                 } else {
                   if (d[k] !== value) {
@@ -467,9 +465,9 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   }
 
-  function unbox(a: unknown): unknown {
+  function unbox<T>(a: T): T {
     const v = a?.valueOf();
-    return Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v;
+    return (Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v) as T;
   }
 
   function assignProps(base: Node, props: Record<string, any>) {
@@ -536,6 +534,7 @@ export const tag = <TagLoader>function <Tags extends string,
           // DEBUG support
           let createdAt = Date.now() + timeOutWarn;
           const createdBy = DEBUG && new Error("Created by").stack;
+
           const update = (es: IteratorResult<unknown>) => {
             if (!es.done) {
               const value = unbox(es.value);
@@ -592,7 +591,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
         function assignObject(value: any, k: string) {
           if (value instanceof Node) {
-            console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes", k, logNode(value));
+            console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${base instanceof Node ? logNode(base) : base}`);
             d[k] = value;
           } else {
             // Note - if we're copying to ourself (or an array of different length),
@@ -611,7 +610,6 @@ export const tag = <TagLoader>function <Tags extends string,
             } else {
               if (Object.getOwnPropertyDescriptor(d, k)?.set)
                 d[k] = value;
-
               else
                 assign(d[k], value);
             }

@@ -190,7 +190,17 @@ export const tag = function (_1, _2, _3) {
             if (isPromiseLike(c)) {
                 const g = DomPromiseContainer();
                 appended.push(g);
-                c.then(r => g.replaceWith(...nodes(r)), (x) => {
+                c.then(r => {
+                    const idx = appended.indexOf(g);
+                    if (idx < 0) {
+                        console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.');
+                        if (DEBUG)
+                            debugger;
+                    }
+                    const replacement = nodes(r);
+                    appended.splice(idx, 1, ...replacement);
+                    g.replaceWith(...replacement);
+                }, (x) => {
                     console.warn(x, logNode(g));
                     g.replaceWith(DyamicElementError({ error: x }));
                 });
@@ -218,24 +228,47 @@ export const tag = function (_1, _2, _3) {
                 const initialNodes = (unboxed === undefined || unboxed === c) ? [] : nodes(unboxed);
                 let replacementNodes = initialNodes.length ? initialNodes : [DomPromiseContainer()];
                 appended.push(...replacementNodes);
-                function setReplacementNodes(nodes) {
-                    let itx = Number.MAX_SAFE_INTEGER;
-                    if (itx < 0)
-                        debugger;
-                    for (const n of replacementNodes) {
-                        const i = appended.indexOf(n);
-                        if (itx > i)
-                            itx = i;
-                        appended.splice(i, 1);
+                const setReplacementNodes = (nodes) => {
+                    const indices = replacementNodes.map(n => appended.indexOf(n)).map(i => i < 0 ? (console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.'), Number.MAX_SAFE_INTEGER) : i);
+                    indices.forEach(i => appended.splice(i, 1));
+                    if (nodes) {
+                        // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
+                        if (nodes.length === 0)
+                            nodes = [DomPromiseContainer()];
+                        appended.splice(Math.min(...indices), 0, ...nodes);
                     }
-                    appended.splice(itx, 0, ...nodes);
-                    replacementNodes = nodes;
-                }
+                    replacementNodes = nodes || [];
+                };
                 let notYetMounted = true;
                 // DEBUG support
                 let createdAt = Date.now() + timeOutWarn;
                 const createdBy = DEBUG && new Error("Created by").stack;
-                const error = (errorValue) => {
+                const step = () => ap.next()
+                    .then(es => {
+                    if (!es.done) {
+                        // ChildNode[], since we tested .parentNode
+                        const mounted = replacementNodes.filter(e => e?.parentNode && e.isConnected);
+                        const n = notYetMounted ? replacementNodes : mounted;
+                        if (notYetMounted && mounted.length)
+                            notYetMounted = false;
+                        if (!n.length || replacementNodes.every(e => removedNodes(e))) {
+                            // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                            setReplacementNodes(null);
+                            const msg = "Element(s) have been removed from the document: " + insertionStack;
+                            ap.return?.(new Error(msg));
+                            return;
+                        }
+                        if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
+                            createdAt = Number.MAX_SAFE_INTEGER;
+                            console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, replacementNodes.map(logNode));
+                        }
+                        setReplacementNodes(nodes(unbox(es.value)));
+                        n[0].replaceWith(...replacementNodes);
+                        n.forEach(e => !replacementNodes.includes(e) && e.parentNode?.removeChild(e));
+                        step();
+                    }
+                })
+                    .catch((errorValue) => {
                     const n = replacementNodes.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
                         setReplacementNodes([DyamicElementError({ error: errorValue })]);
@@ -244,46 +277,10 @@ export const tag = function (_1, _2, _3) {
                     }
                     else
                         console.warn("Can't report error", errorValue, createdBy, replacementNodes.map(logNode));
-                    setReplacementNodes([]);
+                    setReplacementNodes(null);
                     ap.return?.(errorValue);
-                };
-                const update = (es) => {
-                    if (!es.done) {
-                        try {
-                            // ChildNode[], since we tested .parentNode
-                            const mounted = replacementNodes.filter(e => e?.parentNode && e.isConnected);
-                            const n = notYetMounted ? replacementNodes : mounted;
-                            if (notYetMounted && mounted.length)
-                                notYetMounted = false;
-                            if (!n.length || replacementNodes.every(e => removedNodes(e))) {
-                                // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                                setReplacementNodes([]);
-                                const msg = "Element(s) have been removed from the document: " + insertionStack;
-                                ap.return?.(new Error(msg));
-                                return;
-                            }
-                            if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
-                                createdAt = Number.MAX_SAFE_INTEGER;
-                                console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, replacementNodes.map(logNode));
-                            }
-                            setReplacementNodes(nodes(unbox(es.value)));
-                            // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-                            if (!replacementNodes.length)
-                                replacementNodes.push(DomPromiseContainer());
-                            n[0].replaceWith(...replacementNodes);
-                            n.forEach(e => !replacementNodes.includes(e) && e.parentNode?.removeChild(e));
-                            ap.next().then(update).catch(error);
-                        }
-                        catch (ex) {
-                            // Something went wrong. Terminate the iterator source
-                            setReplacementNodes([]);
-                            ap.return?.(ex);
-                        }
-                    }
-                };
-                ap.next()
-                    //.then(i => /* Force removal of retainers, since `t` will be reassigned */(appended.fill(null as unknown as Node), i))
-                    .then(update).catch(error);
+                });
+                step();
                 return;
             }
             appended.push(thisDoc.createTextNode(c.toString()));
@@ -337,7 +334,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             else {
                                 if (value instanceof Node) {
-                                    console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, logNode(value));
+                                    console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${d instanceof Node ? logNode(d) : d}`);
                                     d[k] = value;
                                 }
                                 else {
@@ -382,7 +379,7 @@ export const tag = function (_1, _2, _3) {
     }
     function unbox(a) {
         const v = a?.valueOf();
-        return Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v;
+        return (Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v);
     }
     function assignProps(base, props) {
         // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
@@ -512,7 +509,7 @@ export const tag = function (_1, _2, _3) {
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {
-                        console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes", k, logNode(value));
+                        console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${base instanceof Node ? logNode(base) : base}`);
                         d[k] = value;
                     }
                     else {

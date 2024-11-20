@@ -186,7 +186,13 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   return queue.multi() ;
 }
 
+async function* doneImmediately<Z>(): AsyncIterableIterator<Z> {
+  console.log("doneImmediately");
+  return undefined as Z;
+}
+
 async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
+  console.log("neverGonnaHappen");
   await new Promise(() => {});
   yield undefined as Z; // Never should be executed
 }
@@ -265,11 +271,11 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
           ? merge(...iterators)
           : iterators.length === 1
             ? iterators[0]
-            : (neverGonnaHappen<WhenIteratedType<S>>());
+            : undefined;//(neverGonnaHappen<WhenIteratedType<S>>());
 
           // Now everything is ready, we simply delegate all async ops to the underlying
           // merged asyncIterator "events"
-          events = merged[Symbol.asyncIterator]();
+          events = merged?.[Symbol.asyncIterator]();
           if (!events)
             return { done: true, value: undefined };
 
@@ -284,7 +290,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
     ? merge(...iterators)
     : iterators.length === 1
       ? iterators[0]
-      : (neverGonnaHappen<WhenIteratedType<S>>());
+      : (doneImmediately<WhenIteratedType<S>>());
 
   return chainAsync(iterableHelpers(merged));
 }
@@ -293,7 +299,10 @@ function elementIsInDOM(elt: Element): Promise<void> {
   if (elt.isConnected)
     return Promise.resolve();
 
-  return new Promise<void>(resolve => new MutationObserver((records, mutation) => {
+  let reject: (reason?: any) => void;
+  const promise = new Promise<void>((resolve, _reject) => {
+    reject = _reject;
+    return new MutationObserver((records, mutation) => {
     if (records.some(r => r.addedNodes?.length)) {
       if (elt.isConnected) {
         mutation.disconnect();
@@ -303,15 +312,24 @@ function elementIsInDOM(elt: Element): Promise<void> {
   }).observe(elt.ownerDocument.body, {
     subtree: true,
     childList: true
-  }));
+  })});
+
+  if (DEBUG) {
+    const stack = new Error().stack?.replace(/^Error/, "Element not mounted after 5 seconds:");
+    const warnTimer = setTimeout(() => {
+      console.warn(stack + "\n" + elt.outerHTML);
+      //reject(new Error("Element not mounted after 5 seconds"));
+    }, timeOutWarn);
+
+    promise.finally(() => clearTimeout(warnTimer))
+  }
+
+  return promise;
 }
 
 function containerAndSelectorsMounted(container: Element, selectors?: string[]) {
   if (selectors?.length)
-    return Promise.all([
-      allSelectorsPresent(container, selectors),
-      elementIsInDOM(container)
-    ]);
+    return elementIsInDOM(container).then(() => allSelectorsPresent(container, selectors))
   return elementIsInDOM(container);
 }
 

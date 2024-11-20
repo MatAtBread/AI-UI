@@ -84,7 +84,12 @@ function whenEvent(container, what) {
         .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName).add(details));
     return queue.multi();
 }
+async function* doneImmediately() {
+    console.log("doneImmediately");
+    return undefined;
+}
 async function* neverGonnaHappen() {
+    console.log("neverGonnaHappen");
     await new Promise(() => { });
     yield undefined; // Never should be executed
 }
@@ -154,10 +159,10 @@ export function when(container, ...sources) {
                         ? merge(...iterators)
                         : iterators.length === 1
                             ? iterators[0]
-                            : (neverGonnaHappen());
+                            : undefined; //(neverGonnaHappen<WhenIteratedType<S>>());
                     // Now everything is ready, we simply delegate all async ops to the underlying
                     // merged asyncIterator "events"
-                    events = merged[Symbol.asyncIterator]();
+                    events = merged?.[Symbol.asyncIterator]();
                     if (!events)
                         return { done: true, value: undefined };
                     return { done: false, value: {} };
@@ -170,30 +175,40 @@ export function when(container, ...sources) {
         ? merge(...iterators)
         : iterators.length === 1
             ? iterators[0]
-            : (neverGonnaHappen());
+            : (doneImmediately());
     return chainAsync(iterableHelpers(merged));
 }
 function elementIsInDOM(elt) {
     if (elt.isConnected)
         return Promise.resolve();
-    return new Promise(resolve => new MutationObserver((records, mutation) => {
-        if (records.some(r => r.addedNodes?.length)) {
-            if (elt.isConnected) {
-                mutation.disconnect();
-                resolve();
+    let reject;
+    const promise = new Promise((resolve, _reject) => {
+        reject = _reject;
+        return new MutationObserver((records, mutation) => {
+            if (records.some(r => r.addedNodes?.length)) {
+                if (elt.isConnected) {
+                    mutation.disconnect();
+                    resolve();
+                }
             }
-        }
-    }).observe(elt.ownerDocument.body, {
-        subtree: true,
-        childList: true
-    }));
+        }).observe(elt.ownerDocument.body, {
+            subtree: true,
+            childList: true
+        });
+    });
+    if (DEBUG) {
+        const stack = new Error().stack?.replace(/^Error/, "Element not mounted after 5 seconds:");
+        const warnTimer = setTimeout(() => {
+            console.warn(stack + "\n" + elt.outerHTML);
+            //reject(new Error("Element not mounted after 5 seconds"));
+        }, timeOutWarn);
+        promise.finally(() => clearTimeout(warnTimer));
+    }
+    return promise;
 }
 function containerAndSelectorsMounted(container, selectors) {
     if (selectors?.length)
-        return Promise.all([
-            allSelectorsPresent(container, selectors),
-            elementIsInDOM(container)
-        ]);
+        return elementIsInDOM(container).then(() => allSelectorsPresent(container, selectors));
     return elementIsInDOM(container);
 }
 function allSelectorsPresent(container, missing) {
