@@ -13,7 +13,7 @@ const { div, button, span } = tag();
 function sleep(ms, v) {
   return new Promise(resolve => setTimeout(() => resolve(v), ms));
 }
-
+/*
 const AutoClickButton = button.extended({
   iterable:{
     n: 0
@@ -61,8 +61,8 @@ document.body.append(...tag.nodes(
 //   sleep(2000).then(() => div("...bye")),
 //   sleep(1000,div("bye")),
 // ));
-
-/*
+*/
+/**/
 async function* rainbow() {
   try {
     while (true) {
@@ -113,14 +113,14 @@ const Boxed = div.extended((instance) =>({
 }))
 
 const nodes = tag.nodes(
-  Boxed(span({ id:'styled',style: rainbow() }, "Style" )),
+//  Boxed(span({ id:'styled',style: rainbow() }, "Style" )),
 
-  // rainbow().map(s => div({ id: n, style: s }, "Mapped Mounted "+n++)),
-  // rainbow().map(s => [
-  //   div({ id: n, style: s }, "Mapped Mounted "+n++),
-  //   //(div({ style: s }, "Mapped Detached"),null)
-  // ]),
-  // div({ id:'styled',style: rainbow() }, "Style"),
+//  rainbow().map(s => div({ id: n, style: s }, "Mapped Mounted "+n++)),
+  rainbow().map(s => [
+    div({ id: n, style: s }, "Mapped Mounted "+n++),
+    //(div({ style: s }, "Mapped Detached"),null)
+  ]),
+//  div({ id:'styled',style: rainbow() }, "Style"),
   // divs('A'),
 
   // divs('B').map(d => d[0]),
@@ -130,4 +130,4 @@ const nodes = tag.nodes(
 //await sleep(1000);
 document.body.append(...nodes);
 
-*/
+/**/
