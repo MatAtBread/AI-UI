@@ -184,26 +184,26 @@ export const tag = function (_1, _2, _3) {
         deepDefine(tagPrototypes, commonProperties);
     function nodes(...c) {
         const appended = [];
-        (function children(c) {
+        const children = (c) => {
             if (c === undefined || c === null || c === Ignore)
                 return;
             if (isPromiseLike(c)) {
                 const g = DomPromiseContainer();
-                appended.push(g);
-                c.then(r => {
+                const replaceNode = (replacement) => {
                     const idx = appended.indexOf(g);
                     if (idx < 0) {
                         console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.');
                         if (DEBUG)
                             debugger;
                     }
-                    const replacement = nodes(r);
-                    removedNodes.add(appended[idx]);
+                    removedNodes.add(g);
                     appended.splice(idx, 1, ...replacement);
                     g.replaceWith(...replacement);
-                }, (x) => {
+                };
+                appended.push(g);
+                c.then(r => replaceNode(nodes(r)), (x) => {
                     console.warn(x, logNode(g));
-                    g.replaceWith(DyamicElementError({ error: x }));
+                    replaceNode([DyamicElementError({ error: x })]);
                 });
                 return;
             }
@@ -296,7 +296,8 @@ export const tag = function (_1, _2, _3) {
                 return;
             }
             appended.push(thisDoc.createTextNode(c.toString()));
-        })(c);
+        };
+        children(c);
         return appended;
     }
     if (!nameSpace) {

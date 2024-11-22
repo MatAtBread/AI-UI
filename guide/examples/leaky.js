@@ -15,15 +15,17 @@ function sleep(ms, v) {
 }
 /**/
 const AutoClickButton = button.extended({
-  iterable:{
+  declare:{
     n: 0
   },
   override: {
     async onclick() {
       for (let i=0; i<3; i++) {
         this.n += 1;
-        this.dispatchEvent(new Event("change"));
-        await new Promise(queueMicrotask);
+        this.dispatchEvent(new CustomEvent("change", { detail: this.n.valueOf() }));
+        this.n += 1;
+        this.dispatchEvent(new CustomEvent("change", { detail: this.n.valueOf() }));
+        await sleep(100);
       }
     }
   },
@@ -33,26 +35,25 @@ const AutoClickButton = button.extended({
 });
 
 const ClickCount = div.extended({
-  ids:{
-    btn: AutoClickButton,
-    counter: span
-  },
-  constructed() {
+  async constructed() {
     let n = 0;
     return [
-      this.when('change:#btn').map(() => {
-        const n = this.ids.btn.n.valueOf();
-        console.log("when",n);
-        return div({id:n.valueOf().toString()},n);
+      //this.when('change:#btn','@ready')
+      when(document.body, 'change:#btn', '@ready').map(_ => {
+        n += 1;
+        console.log("when", this.id, this.isConnected, _?.detail, n);
+        return sleep(10).then(() => div({id:n.valueOf().toString()},n));
       }),
-      AutoClickButton({ id: 'btn'})
+      //AutoClickButton({ id: 'btn' })
     ]
   }
 });
 
+let v = 0;
 document.body.append(...tag.nodes(
-  ClickCount()
-  // AutoClickButton({ id: 'buttn'}),
+  when(document.body, 'click:#btn', '@ready').map(_ => ClickCount({ id: 'V'+(v++)})),
+  //ClickCount(),
+  AutoClickButton({ id: 'btn' }),
   // when(document.body,'click:#buttn').map(e => console.log(e))
 ));
 

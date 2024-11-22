@@ -273,28 +273,27 @@ export const tag = <TagLoader>function <Tags extends string,
 
   function nodes(...c: ChildTags[]) {
     const appended: Node[] = [];
-    (function children(c: ChildTags): void {
+    const children = (c: ChildTags) => {
       if (c === undefined || c === null || c === Ignore)
         return;
       if (isPromiseLike(c)) {
         const g: ChildNode = DomPromiseContainer();
-        appended.push(g);
-        c.then(r => {
+        const replaceNode = (replacement: Node[]) => {
           const idx = appended.indexOf(g);
           if (idx < 0) {
             console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.');
             if (DEBUG) debugger;
           }
-          const replacement = nodes(r);
-          removedNodes.add(appended[idx]);
+          removedNodes.add(g);
           appended.splice(idx, 1, ...replacement);
           g.replaceWith(...replacement);
-        },
+        }
+        appended.push(g);
+        c.then(r => replaceNode(nodes(r)),
         (x: any) => {
-            console.warn(x, logNode(g));
-            g.replaceWith(DyamicElementError({ error: x }));
-          }
-        );
+          console.warn(x, logNode(g));
+          replaceNode([DyamicElementError({ error: x })]);
+        });
         return;
       }
       if (c instanceof Node) {
@@ -388,7 +387,8 @@ export const tag = <TagLoader>function <Tags extends string,
         return;
       }
       appended.push(thisDoc.createTextNode(c.toString()));
-    })(c);
+    };
+    children(c);
     return appended;
   }
 
