@@ -510,7 +510,12 @@ function resolveSync(v, then, except) {
 }
 export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
     let ai;
-    const fai = {
+    function done(v) {
+        // @ts-ignore - remove references for GC
+        ai = fai = null;
+        return { done: true, value: v?.value };
+    }
+    let fai = {
         [Symbol.asyncIterator]() {
             return fai;
         },
@@ -546,11 +551,11 @@ export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
         },
         throw(ex) {
             // The consumer wants us to exit with an exception. Tell the source
-            return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }));
+            return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(done);
         },
         return(v) {
             // The consumer told us to return, so we need to terminate the source
-            return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
+            return Promise.resolve(ai?.return?.(v)).then(done);
         }
     };
     return iterableHelpers(fai);
@@ -596,7 +601,12 @@ function multi() {
             });
         }
     }
-    const mai = {
+    function done(v) {
+        // @ts-ignore: remove references for GC
+        ai = mai = current = null;
+        return { done: true, value: v?.value };
+    }
+    let mai = {
         [Symbol.asyncIterator]() {
             consumers += 1;
             return mai;
@@ -615,7 +625,7 @@ function multi() {
             consumers -= 1;
             if (consumers)
                 return Promise.resolve({ done: true, value: ex });
-            return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }));
+            return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(done);
         },
         return(v) {
             // The consumer told us to return, so we need to terminate the source if we're the only one
@@ -624,7 +634,7 @@ function multi() {
             consumers -= 1;
             if (consumers)
                 return Promise.resolve({ done: true, value: v });
-            return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }));
+            return Promise.resolve(ai?.return?.(v)).then(done);
         }
     };
     return iterableHelpers(mai);

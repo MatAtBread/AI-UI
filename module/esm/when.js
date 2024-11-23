@@ -159,7 +159,7 @@ export function when(container, ...sources) {
                         ? merge(...iterators)
                         : iterators.length === 1
                             ? iterators[0]
-                            : undefined; //(neverGonnaHappen<WhenIteratedType<S>>());
+                            : undefined;
                     // Now everything is ready, we simply delegate all async ops to the underlying
                     // merged asyncIterator "events"
                     events = merged?.[Symbol.asyncIterator]();

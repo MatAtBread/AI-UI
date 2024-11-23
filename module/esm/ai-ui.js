@@ -7,7 +7,11 @@ import { callStackSymbol } from './tags.js';
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
 export const UniqueID = Symbol("Unique ID");
-const logNode = DEBUG ? ((n) => `"${'innerHTML' in n ? n.innerHTML : n.textContent}"`) : (n) => undefined;
+const logNode = DEBUG
+    ? ((n) => n instanceof Node
+        ? `"${'outerHTML' in n ? n.outerHTML : n.textContent}"`
+        : String(n))
+    : (n) => undefined;
 let idCount = 0;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
@@ -63,15 +67,16 @@ export const tag = function (_1, _2, _3) {
     const thisDoc = options?.document ?? globalThis.document;
     const removedNodes = mutationTracker(thisDoc, 'removedNodes', options?.enableOnRemovedFromDOM);
     function DomPromiseContainer() {
-        return thisDoc.createComment(DEBUG
-            ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
-            : "promise");
+        return thisDoc.createComment(/*DEBUG
+          ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
+          :*/ "promise");
     }
     function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     }
     const aiuiExtendedTagStyles = thisDoc.createElement("STYLE");
     aiuiExtendedTagStyles.id = "--ai-ui-extended-tag-styles-" + Date.now();
+    thisDoc.head.appendChild(aiuiExtendedTagStyles);
     /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
     const warned = new Set();
     const tagPrototypes = Object.create(null, {
@@ -182,8 +187,23 @@ export const tag = function (_1, _2, _3) {
     /* Add any user supplied prototypes */
     if (commonProperties)
         deepDefine(tagPrototypes, commonProperties);
+    let APPENDID = 1;
     function nodes(...c) {
-        const appended = [];
+        const ID = APPENDID++;
+        const appended = DEBUG ? new Proxy([], {
+            get(target, prop, receiver) {
+                const value = Reflect.get(target, prop, receiver);
+                if (typeof value === 'function') {
+                    return function (...args) {
+                        const r = value.call(target, ...args);
+                        if (prop === 'splice' || prop === 'push')
+                            console.log('ID:' + ID + ' ' + prop.toString() + '(', args.map(logNode), ')', target.map(logNode));
+                        return r;
+                    };
+                }
+                return value;
+            }
+        }) : [];
         const children = (c) => {
             if (c === undefined || c === null || c === Ignore)
                 return;
@@ -255,8 +275,7 @@ export const tag = function (_1, _2, _3) {
                 // DEBUG support
                 let createdAt = Date.now() + timeOutWarn;
                 const createdBy = DEBUG && new Error("Created by").stack;
-                const step = () => ap.next()
-                    .then(es => {
+                const step = () => ap.next().then(es => {
                     if (!es.done) {
                         // ChildNode[], since we tested .parentNode
                         const mounted = replacementNodes.filter(e => e?.parentNode && e.isConnected);
@@ -265,8 +284,8 @@ export const tag = function (_1, _2, _3) {
                             notYetMounted = false;
                         if (!n.length || replacementNodes.every(e => removedNodes.has(e))) {
                             // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                            const msg = "Element(s) have been removed from the document: " + replacementNodes.map(logNode).join('\n') + insertionStack;
                             setReplacementNodes(null);
-                            const msg = "Element(s) have been removed from the document: " + insertionStack;
                             ap.return?.(new Error(msg));
                             return;
                         }
@@ -279,8 +298,7 @@ export const tag = function (_1, _2, _3) {
                         n.forEach(e => !replacementNodes.includes(e) && e.parentNode?.removeChild(e));
                         step();
                     }
-                })
-                    .catch((errorValue) => {
+                }).catch((errorValue) => {
                     const n = replacementNodes.filter(n => Boolean(n?.parentNode));
                     if (n.length) {
                         setReplacementNodes([DyamicElementError({ error: errorValue })]);
@@ -576,9 +594,9 @@ export const tag = function (_1, _2, _3) {
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
             aiuiExtendedTagStyles.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
-            if (!thisDoc.head.contains(aiuiExtendedTagStyles)) {
-                thisDoc.head.appendChild(aiuiExtendedTagStyles);
-            }
+            // if (!thisDoc.head.contains(aiuiExtendedTagStyles)) {
+            //   thisDoc.head.appendChild(aiuiExtendedTagStyles);
+            // }
         }
         // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
         // Here's where we actually create the tag, by accumulating all the base attributes and
@@ -781,7 +799,4 @@ function mutationTracker(root, track, enableOnRemovedFromDOM) {
         });
     }).observe(root, { subtree: true, childList: true });
     return tracked;
-    // return function (node: Node) {
-    //   return tracked.has(node);
-    // }
 }

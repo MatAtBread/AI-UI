@@ -11,7 +11,7 @@ const _console = {
     if (DEBUG) console.warn('(AI-UI) WARN:', ...args, new Error().stack?.replace(/Error\n\s*.*\n/,'\n'))
   },
   info(...args: any) {
-    if (DEBUG) console.trace('(AI-UI) INFO:', ...args)
+    if (DEBUG) console.info('(AI-UI) INFO:', ...args)
   }
 }
 

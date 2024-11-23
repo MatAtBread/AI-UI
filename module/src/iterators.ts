@@ -671,7 +671,11 @@ type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: any) => any): MaybePromised<R> {
   if (isPromiseLike(v))
     return v.then(then, except);
-  try { return then(v) } catch (ex) { return except(ex) }
+  try { 
+    return then(v) 
+  } catch (ex) { 
+    return except(ex)
+  }
 }
 
 export function filterMap<U extends PartialIterable, R>(source: U,
@@ -680,7 +684,12 @@ export function filterMap<U extends PartialIterable, R>(source: U,
   prev: R | typeof Ignore = Ignore
 ): AsyncExtraIterable<R> {
   let ai: AsyncIterator<HelperAsyncIterable<U>>;
-  const fai: AsyncIterableIterator<R> = {
+  function done(v: IteratorResult<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator]>, any> | undefined){
+    // @ts-ignore - remove references for GC
+    ai = fai = null;
+    return { done: true, value: v?.value }
+  }
+  let fai: AsyncIterableIterator<R> = {
     [Symbol.asyncIterator]() {
       return fai;
     },
@@ -725,12 +734,12 @@ export function filterMap<U extends PartialIterable, R>(source: U,
 
     throw(ex: any) {
       // The consumer wants us to exit with an exception. Tell the source
-      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(done)
     },
 
     return(v?: any) {
       // The consumer told us to return, so we need to terminate the source
-      return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.return?.(v)).then(done)
     }
   };
   return iterableHelpers(fai)
@@ -783,7 +792,13 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
     }
   }
 
-  const mai: AsyncIterableIterator<T> = {
+  function done(v: IteratorResult<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator]>, any> | undefined) {
+    // @ts-ignore: remove references for GC
+    ai = mai = current = null;
+    return { done: true, value: v?.value }
+  }
+
+  let mai: AsyncIterableIterator<T> = {
     [Symbol.asyncIterator]() {
       consumers += 1;
       return mai;
@@ -804,7 +819,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
       consumers -= 1;
       if (consumers)
         return Promise.resolve({ done: true, value: ex });
-      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(done)
     },
 
     return(v?: any) {
@@ -814,7 +829,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
       consumers -= 1;
       if (consumers)
         return Promise.resolve({ done: true, value: v });
-      return Promise.resolve(ai?.return?.(v)).then(v => ({ done: true, value: v?.value }))
+      return Promise.resolve(ai?.return?.(v)).then(done)
     }
   };
   return iterableHelpers(mai);

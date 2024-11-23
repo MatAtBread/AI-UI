@@ -12,7 +12,11 @@ export * as Iterators from './iterators.js';
 
 export const UniqueID = Symbol("Unique ID");
 
-const logNode = DEBUG ? ((n: Node) => `"${'innerHTML' in n ? n.innerHTML : n.textContent}"`) : (n: Node) => undefined;
+const logNode = DEBUG 
+? ((n: any) => n instanceof Node 
+  ? `"${'outerHTML' in n ? n.outerHTML : n.textContent}"`
+  : String(n))
+: (n: Node) => undefined;
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
@@ -146,9 +150,9 @@ export const tag = <TagLoader>function <Tags extends string,
   const removedNodes = mutationTracker(thisDoc, 'removedNodes', options?.enableOnRemovedFromDOM);
 
   function DomPromiseContainer() {
-    return thisDoc.createComment(DEBUG
+    return thisDoc.createComment(/*DEBUG
       ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
-      : "promise")
+      :*/ "promise")
   }
 
   function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
@@ -156,6 +160,7 @@ export const tag = <TagLoader>function <Tags extends string,
   }
   const aiuiExtendedTagStyles = thisDoc.createElement("STYLE");
   aiuiExtendedTagStyles.id = "--ai-ui-extended-tag-styles-"+Date.now();
+  thisDoc.head.appendChild(aiuiExtendedTagStyles);
 
   /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
   const warned = new Set<string>();
@@ -271,8 +276,23 @@ export const tag = <TagLoader>function <Tags extends string,
   if (commonProperties)
     deepDefine(tagPrototypes, commonProperties);
 
+  let APPENDID = 1;
   function nodes(...c: ChildTags[]) {
-    const appended: Node[] = [];
+    const ID = APPENDID++;
+    const appended: Node[] = DEBUG ? new Proxy([] as any[],{
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value === 'function') {
+          return function(...args: any[]) {
+            const r = value.call(target,...args);
+            if (prop === 'splice' || prop === 'push')
+              console.log('ID:'+ID+' '+prop.toString()+'(',args.map(logNode),')',target.map(logNode));
+            return r;
+          }
+        }
+        return value;
+      }
+    }) : [];
     const children = (c: ChildTags) => {
       if (c === undefined || c === null || c === Ignore)
         return;
@@ -346,8 +366,7 @@ export const tag = <TagLoader>function <Tags extends string,
         let createdAt = Date.now() + timeOutWarn;
         const createdBy = DEBUG && new Error("Created by").stack;
 
-        const step = () => ap.next()
-        .then(es => {
+        const step = () => ap.next().then(es => {
           if (!es.done) {
               // ChildNode[], since we tested .parentNode
               const mounted = replacementNodes.filter(e => e?.parentNode && e.isConnected);
@@ -356,8 +375,8 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (!n.length || replacementNodes.every(e => removedNodes.has(e))) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                const msg = "Element(s) have been removed from the document: " + replacementNodes.map(logNode).join('\n') + insertionStack;
                 setReplacementNodes(null);
-                const msg = "Element(s) have been removed from the document: " + insertionStack;
                 ap.return?.(new Error(msg));
                 return;
               }
@@ -371,8 +390,7 @@ export const tag = <TagLoader>function <Tags extends string,
               n.forEach(e => !replacementNodes.includes(e) && e.parentNode?.removeChild(e));
               step();
           }
-        })
-        .catch((errorValue: any) => {
+        }).catch((errorValue: any) => {
           const n = replacementNodes.filter(n => Boolean(n?.parentNode)) as ChildNode[];
           if (n.length) {
             setReplacementNodes([DyamicElementError({ error: errorValue })]);
@@ -657,9 +675,9 @@ export const tag = <TagLoader>function <Tags extends string,
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
       aiuiExtendedTagStyles.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
-      if (!thisDoc.head.contains(aiuiExtendedTagStyles)) {
-        thisDoc.head.appendChild(aiuiExtendedTagStyles);
-      }
+      // if (!thisDoc.head.contains(aiuiExtendedTagStyles)) {
+      //   thisDoc.head.appendChild(aiuiExtendedTagStyles);
+      // }
     }
 
     // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
@@ -892,7 +910,4 @@ function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, Nod
   }).observe(root, { subtree: true, childList: true });
 
   return tracked;
-  // return function (node: Node) {
-  //   return tracked.has(node);
-  // }
 }
