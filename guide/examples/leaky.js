@@ -9,7 +9,7 @@ function sleep(ms, v) {
 async function* count() {
   try {
     await sleep(2000);
-    for (let n=0; n<15; n++) {
+    for (let n = 0; n < 15; n++) {
       //console.log("yield", n)
       yield n;
       //console.log("yielded", n-1)
@@ -27,21 +27,17 @@ function next() { return n++ }
 
 const App = div.extended({
   constructed() {
-    let btn = button({ id: 'btn', onclick() { this.dispatchEvent(new Event("click2")) } }, 'btn');
+    let btn1 = button({ id: 'btn', async onclick() { await sleep(300); this.dispatchEvent(new Event("click2")) } }, 'click2 > click');
+    let btn2 = button({ id: 'btn', async onclick() { await sleep(300); this.dispatchEvent(new Event("click2")) } }, 'click > click2');
     return [
-      btn,
-      btn.when("click2").map(next).map(f => {
-        const top = div("T"+f,
-          ' [ ', next(), 
-          btn.when("click").map(next).map(e => {
-            console.log('nested', e);
-            return [' [ ',"N"+e, ' ] '];
-          }),
-          ' ] ');
-        console.log('top', f);
-        return top;
-      }
-      )
+      btn1,
+      btn1.when("click2").map(next).map(f => div("1T" + f,
+        btn1.when("click").map(next).map(e => span(" 1N" + e))
+      )),
+      btn2,
+      btn2.when("click").map(next).map(f => div("2T" + f,
+        btn2.when("click2").map(next).map(e => span(" 2N" + e))
+      ))
     ]
   }
 });

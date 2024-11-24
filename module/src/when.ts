@@ -95,6 +95,10 @@ type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
 const eventObservations = new WeakMap<DocumentFragment | Document, Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>();
 
 function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: DocumentFragment | Document, ev: GlobalEventHandlersEventMap[EventName]) {
+  setTimeout(() => _docEventHandler.call(this, ev),1);
+}
+
+function _docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: DocumentFragment | Document, ev: GlobalEventHandlersEventMap[EventName]) {
   if (!eventObservations.has(this))
     eventObservations.set(this, new Map());
 
@@ -170,8 +174,8 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
     eventObservations.get(container.ownerDocument)!.set(eventName, new Set());
   }
 
-  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
-
+  const observations = eventObservations.get(container.ownerDocument)!.get(eventName);
+  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => observations!.delete(details));
   const details: EventObservation<keyof GlobalEventHandlersEventMap> = {
     push: queue.push,
     terminate(ex: Error) { queue.return?.(ex)},
@@ -181,7 +185,7 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-    .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName)!.add(details));
+    .then(_ => observations!.add(details));
 
   return queue.multi() ;
 }
@@ -246,9 +250,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
   if (sources.includes('@ready')) {
     const watchSelectors = sources.filter(isValidWhenSelector).map(what => parseWhenSelector(what)?.[0]);
 
-    function isMissing(sel: CSSIdentifier | string | null | undefined): sel is CSSIdentifier {
-      return Boolean(typeof sel === 'string' && !container.querySelector(sel));
-    }
+    const isMissing = (sel: CSSIdentifier | string | null | undefined): sel is CSSIdentifier => Boolean(typeof sel === 'string' && !container.querySelector(sel));
 
     const missing = watchSelectors.map(w => w?.selector).filter(isMissing);
 
@@ -300,9 +302,7 @@ function containerAndSelectorsMounted(container: Element, selectors?: string[]) 
     if (container.isConnected)
       return Promise.resolve();
 
-    let reject: (reason?: any) => void;
-    const promise = new Promise<void>((resolve, _reject) => {
-      reject = _reject;
+    const promise = new Promise<void>((resolve, reject) => {
       return new MutationObserver((records, mutation) => {
         if (records.some(r => r.addedNodes?.length)) {
           if (container.isConnected) {
@@ -310,9 +310,9 @@ function containerAndSelectorsMounted(container: Element, selectors?: string[]) 
             resolve();
           }
         }
-        if (records.some(r => [...r.removedNodes].includes(container))) {
+        if (records.some(r => [...r.removedNodes].some(r => r === container || r.contains(container)))) {
           mutation.disconnect();
-          _reject(new Error("Removed from DOM"));
+          reject(new Error("Removed from DOM"));
         }
       }).observe(container.ownerDocument.body, {
         subtree: true,

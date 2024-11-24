@@ -513,6 +513,7 @@ export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
     function done(v) {
         // @ts-ignore - remove references for GC
         ai = fai = null;
+        prev = Ignore;
         return { done: true, value: v?.value };
     }
     let fai = {

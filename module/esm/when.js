@@ -3,6 +3,9 @@ import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
 const eventObservations = new WeakMap();
 function docEventHandler(ev) {
+    setTimeout(() => _docEventHandler.call(this, ev), 1);
+}
+function _docEventHandler(ev) {
     if (!eventObservations.has(this))
         eventObservations.set(this, new Map());
     const observations = eventObservations.get(this).get(ev.type);
@@ -72,7 +75,8 @@ function whenEvent(container, what) {
         });
         eventObservations.get(container.ownerDocument).set(eventName, new Set());
     }
-    const queue = queueIteratableIterator(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
+    const observations = eventObservations.get(container.ownerDocument).get(eventName);
+    const queue = queueIteratableIterator(() => observations.delete(details));
     const details = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
@@ -81,7 +85,7 @@ function whenEvent(container, what) {
         selector
     };
     containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-        .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName).add(details));
+        .then(_ => observations.add(details));
     return queue.multi();
 }
 async function* doneImmediately() {
@@ -134,9 +138,7 @@ export function when(container, ...sources) {
     }
     if (sources.includes('@ready')) {
         const watchSelectors = sources.filter(isValidWhenSelector).map(what => parseWhenSelector(what)?.[0]);
-        function isMissing(sel) {
-            return Boolean(typeof sel === 'string' && !container.querySelector(sel));
-        }
+        const isMissing = (sel) => Boolean(typeof sel === 'string' && !container.querySelector(sel));
         const missing = watchSelectors.map(w => w?.selector).filter(isMissing);
         let events = undefined;
         const ai = {
@@ -182,9 +184,7 @@ function containerAndSelectorsMounted(container, selectors) {
     function elementIsInDOM() {
         if (container.isConnected)
             return Promise.resolve();
-        let reject;
-        const promise = new Promise((resolve, _reject) => {
-            reject = _reject;
+        const promise = new Promise((resolve, reject) => {
             return new MutationObserver((records, mutation) => {
                 if (records.some(r => r.addedNodes?.length)) {
                     if (container.isConnected) {
@@ -192,9 +192,9 @@ function containerAndSelectorsMounted(container, selectors) {
                         resolve();
                     }
                 }
-                if (records.some(r => [...r.removedNodes].includes(container))) {
+                if (records.some(r => [...r.removedNodes].some(r => r === container || r.contains(container)))) {
                     mutation.disconnect();
-                    _reject(new Error("Removed from DOM"));
+                    reject(new Error("Removed from DOM"));
                 }
             }).observe(container.ownerDocument.body, {
                 subtree: true,

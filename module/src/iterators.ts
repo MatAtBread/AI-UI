@@ -671,9 +671,9 @@ type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: any) => any): MaybePromised<R> {
   if (isPromiseLike(v))
     return v.then(then, except);
-  try { 
-    return then(v) 
-  } catch (ex) { 
+  try {
+    return then(v)
+  } catch (ex) {
     return except(ex)
   }
 }
@@ -687,6 +687,7 @@ export function filterMap<U extends PartialIterable, R>(source: U,
   function done(v: IteratorResult<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator]>, any> | undefined){
     // @ts-ignore - remove references for GC
     ai = fai = null;
+    prev = Ignore;
     return { done: true, value: v?.value }
   }
   let fai: AsyncIterableIterator<R> = {

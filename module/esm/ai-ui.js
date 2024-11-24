@@ -9,7 +9,7 @@ export * as Iterators from './iterators.js';
 export const UniqueID = Symbol("Unique ID");
 const logNode = DEBUG
     ? ((n) => n instanceof Node
-        ? `"${'outerHTML' in n ? n.outerHTML : n.textContent}"`
+        ? 'outerHTML' in n ? n.outerHTML : `${n.textContent} ${n.nodeName}`
         : String(n))
     : (n) => undefined;
 let idCount = 0;
@@ -66,10 +66,10 @@ export const tag = function (_1, _2, _3) {
     const commonProperties = options?.commonProperties;
     const thisDoc = options?.document ?? globalThis.document;
     const removedNodes = mutationTracker(thisDoc, 'removedNodes', options?.enableOnRemovedFromDOM);
-    function DomPromiseContainer() {
-        return thisDoc.createComment(/*DEBUG
-          ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
-          :*/ "promise");
+    function DomPromiseContainer(label) {
+        return thisDoc.createComment(label ? label.toString() : DEBUG
+            ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
+            : "promise");
     }
     function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
@@ -197,18 +197,18 @@ export const tag = function (_1, _2, _3) {
                     return function (...args) {
                         const r = value.call(target, ...args);
                         if (prop === 'splice' || prop === 'push')
-                            console.log('ID:' + ID + ' ' + prop.toString() + '(', args.map(logNode), ')', target.map(logNode));
+                            console.info('ID:' + ID + ' ' + prop.toString() + '(', args.map(logNode), ')', target.map(logNode));
                         return r;
                     };
                 }
                 return value;
             }
-        }) : [];
+        }) : []; /****/
         const children = (c) => {
             if (c === undefined || c === null || c === Ignore)
                 return;
             if (isPromiseLike(c)) {
-                const g = DomPromiseContainer();
+                const g = DomPromiseContainer(ID);
                 const replaceNode = (replacement) => {
                     const idx = appended.indexOf(g);
                     if (idx < 0) {
@@ -247,27 +247,27 @@ export const tag = function (_1, _2, _3) {
                 // It's possible that this async iterator is a boxed object that also holds a value
                 const unboxed = c.valueOf();
                 const initialNodes = (unboxed === undefined || unboxed === c) ? [] : nodes(unboxed);
-                let replacementNodes = initialNodes.length ? initialNodes : [DomPromiseContainer()];
+                let replacementNodes = initialNodes.length ? initialNodes : [DomPromiseContainer(ID)];
                 appended.push(...replacementNodes);
                 const setReplacementNodes = (nodes) => {
-                    const indices = replacementNodes.map(n => appended.indexOf(n)).sort((a, b) => b - a);
-                    if (indices[indices.length - 1] < 0) {
-                        console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.');
-                        if (DEBUG) {
-                            debugger;
+                    appended.forEach((n, i) => { if (n.isConnected || removedNodes.has(n))
+                        delete appended[i]; });
+                    const indices = replacementNodes.map(n => appended.indexOf(n)).filter(n => n >= 0).sort();
+                    for (let i = indices.length - 1; i > 0; i--) {
+                        let j = indices[i];
+                        if (j >= 0) {
+                            removedNodes.add(appended[j]);
+                            appended.splice(j, 1);
                         }
                     }
-                    indices.forEach(i => {
-                        if (i >= 0) {
-                            removedNodes.add(appended[i]);
-                            appended.splice(i, 1);
-                        }
-                    });
                     if (nodes) {
-                        // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
+                        // If the iterated expression yielded no nodes, stuff in a DomPromiseContainer for the next iteration
                         if (nodes.length === 0)
-                            nodes = [DomPromiseContainer()];
-                        appended.splice(Math.min(...indices), 0, ...nodes);
+                            nodes = [DomPromiseContainer(ID)];
+                        appended.splice(indices[0], 1, ...nodes);
+                    }
+                    else {
+                        appended.splice(indices[0], 1);
                     }
                     replacementNodes = nodes || [];
                 };
@@ -796,6 +796,7 @@ function mutationTracker(root, track, enableOnRemovedFromDOM) {
             if (m.type === 'childList' && m[track].length) {
                 walk(m[track]);
             }
+            //console.log(tracked);
         });
     }).observe(root, { subtree: true, childList: true });
     return tracked;
