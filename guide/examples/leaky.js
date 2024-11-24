@@ -8,12 +8,11 @@ function sleep(ms, v) {
 
 async function* count() {
   try {
-    await sleep(2000);
     for (let n = 0; n < 15; n++) {
       //console.log("yield", n)
       yield n;
       //console.log("yielded", n-1)
-      await sleep(2000);
+      await sleep(200);
     }
   } catch (ex) {
     debugger;
@@ -30,6 +29,9 @@ const App = div.extended({
     let btn1 = button({ id: 'btn', async onclick() { await sleep(300); this.dispatchEvent(new Event("click2")) } }, 'click2 > click');
     let btn2 = button({ id: 'btn', async onclick() { await sleep(300); this.dispatchEvent(new Event("click2")) } }, 'click > click2');
     return [
+      div("A ",count()),
+      sleep(1000, div("B ",count())),
+      sleep(1000).then(() => div("C ",count())),
       btn1,
       btn1.when("click2").map(next).map(f => div("1T" + f,
         btn1.when("click").map(next).map(e => span(" 1N" + e))
@@ -43,6 +45,9 @@ const App = div.extended({
 });
 
 document.body.append(App());
+//document.body.append(await sleep(2000,App()));
+
+
 // const c = count().multi();
 // for await (const x of c) {
 //   console.log('outer',x);

@@ -276,49 +276,31 @@ export const tag = <TagLoader>function <Tags extends string,
   if (commonProperties)
     deepDefine(tagPrototypes, commonProperties);
 
-  let APPENDID = 1;
-  function nodes(...c: ChildTags[]) {
-    const ID = APPENDID++;
-    const appended: Node[] = DEBUG ? new Proxy([] as any[],{
-      get(target, prop, receiver) {
-        const value = Reflect.get(target, prop, receiver);
-        if (typeof value === 'function') {
-          return function(...args: any[]) {
-            const r = value.call(target,...args);
-            if (prop === 'splice' || prop === 'push')
-              console.info('ID:'+ID+' '+prop.toString()+'(',args.map(logNode),')',target.map(logNode));
-            return r;
-          }
-        }
-        return value;
-      }
-    }) : []; /****/
-    const children = (c: ChildTags) => {
-      if (c === undefined || c === null || c === Ignore)
-        return;
+  function *nodes(...childTags: ChildTags[]): IterableIterator<Node, void, unknown> {
+    function notViableTag(c: ChildTags) {
+      return (c === undefined || c === null || c === Ignore)
+    }
+
+    for (const c of childTags) {
+      if (notViableTag(c))
+        continue;
+
       if (isPromiseLike(c)) {
-        const g: ChildNode = DomPromiseContainer(ID);
-        const replaceNode = (replacement: Node[]) => {
-          const idx = appended.indexOf(g);
-          if (idx < 0) {
-            console.warn('Replacement node not in array of appended nodes! This shouldn\'t be possible.');
-            if (DEBUG) debugger;
-          }
+        let g = DomPromiseContainer();
+        c.then(replacement => {
+          g.replaceWith(...nodes(replacement));
+
           removedNodes.add(g);
-          appended.splice(idx, 1, ...replacement);
-          g.replaceWith(...replacement);
-        }
-        appended.push(g);
-        c.then(r => replaceNode(nodes(r)),
-        (x: any) => {
-          console.warn(x, logNode(g));
-          replaceNode([DyamicElementError({ error: x })]);
+          // @ts-ignore: release reference for GC
+          g = undefined;
         });
-        return;
+        yield g;
+        continue;
       }
+
       if (c instanceof Node) {
-        appended.push(c);
-        return;
+        yield c;
+        continue;
       }
 
       // We have an interesting case here where an iterable String is an object with both Symbol.iterator
@@ -327,8 +309,9 @@ export const tag = <TagLoader>function <Tags extends string,
       // It used to be after the isAsyncIter() test, but a non-AsyncIterator *may* also be a sync iterable
       // For now, we exclude (Symbol.asyncIterator in c) in this case.
       if (c && typeof c === 'object' && Symbol.iterator in c && !(Symbol.asyncIterator in c) && c[Symbol.iterator]) {
-        for (const d of c) children(d);
-        return;
+        for (const ch of c)
+          yield *nodes(ch);
+        continue;
       }
 
       if (isAsyncIter<ChildTags>(c)) {
@@ -336,78 +319,78 @@ export const tag = <TagLoader>function <Tags extends string,
         const ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
-        const initialNodes = (unboxed === undefined || unboxed === c) ? [] : nodes(unboxed as ChildTags)
-        let replacementNodes = initialNodes.length ? initialNodes : [DomPromiseContainer(ID)];
-        appended.push(...replacementNodes);
-
-        const setReplacementNodes = (nodes: Node[] | null) => {
-          appended.forEach((n,i) => { if (n.isConnected || removedNodes.has(n)) delete appended[i] });
-          const indices = replacementNodes.map(n => appended.indexOf(n)).filter(n => n >= 0).sort();
-          for (let i=indices.length-1; i>0; i--) {
-            let j = indices[i];
-            if (j>=0) {
-              removedNodes.add(appended[j]);
-              appended.splice(j,1);
-            }
+        const replacement = {
+          notYetMounted: true,
+          nodes: (unboxed === c || notViableTag(c)) ? [DomPromiseContainer()] : [...nodes(unboxed)],
+          [Symbol.iterator]() {
+            return this.nodes ? this.nodes[Symbol.iterator]()
+              : { next() { return { done: true as const, value: undefined } } } as Iterator<Node>
           }
+          // get [Symbol.iterator]() { return this.nodes[Symbol.iterator].bind(this.nodes) }
+          // get [Symbol.iterator]() {
+          //   return () => this.nodes[Symbol.iterator]()
+          // }
+        };
+        if (!replacement.nodes.length) debugger; // Shouldn't be possible
 
-          if (nodes) {
-            // If the iterated expression yielded no nodes, stuff in a DomPromiseContainer for the next iteration
-            if (nodes.length === 0) nodes = [DomPromiseContainer(ID)];
-            appended.splice(indices[0], 1, ...nodes);
-          } else {
-            appended.splice(indices[0], 1);
-          }
-          replacementNodes = nodes || [];
-        }
-
-        let notYetMounted = true;
         // DEBUG support
-        let createdAt = Date.now() + timeOutWarn;
-        const createdBy = DEBUG && new Error("Created by").stack;
+        const debugUnmounted = DEBUG
+          ? (() => {
+            const createdAt = Date.now() + timeOutWarn;
+            const createdBy = new Error("Created by").stack;
+            let f = () => {
+              if (replacement.notYetMounted && createdAt && createdAt < Date.now()) {
+                f = () => { };
+                console.warn(`Async element not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.`, createdBy, replacement.nodes.map(logNode));
+              }
+            }
+            return f;
+          })()
+          : null;
 
-        const step = () => ap.next().then(es => {
-          if (!es.done) {
+        (function step() {
+          ap.next().then(es => {
+            if (!es.done) {
               // ChildNode[], since we tested .parentNode
-              const mounted = replacementNodes.filter(e => e?.parentNode && e.isConnected);
-              const n = notYetMounted ? replacementNodes : mounted;
-              if (notYetMounted && mounted.length) notYetMounted = false;
+              const mounted = replacement.nodes.filter(e => /*e?.parentNode && */e.isConnected);
+              const n = replacement.notYetMounted ? replacement.nodes : mounted;
+              if (replacement.notYetMounted && mounted.length) replacement.notYetMounted = false;
 
-              if (!n.length || replacementNodes.every(e => removedNodes.has(e))) {
+              if (!n.length || replacement.nodes.every(e => removedNodes.has(e))) {
                 // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                const msg = "Element(s) have been removed from the document: " + replacementNodes.map(logNode).join('\n') + insertionStack;
-                setReplacementNodes(null);
+                const msg = "Element(s) have been removed from the document: "
+                  + replacement.nodes.map(logNode).join('\n')
+                  + insertionStack;
+                // @ts-ignore: release reference for GC
+                replacement.nodes = null;
                 ap.return?.(new Error(msg));
                 return;
               }
 
-              if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
-                createdAt = Number.MAX_SAFE_INTEGER;
-                console.warn(`Async element not mounted after ${timeOutWarn/1000} seconds. If it is never mounted, it will leak.`, createdBy, replacementNodes.map(logNode));
-              }
-              setReplacementNodes(nodes(unbox(es.value)));
-              (n[0] as ChildNode).replaceWith(...replacementNodes);
-              n.forEach(e => !replacementNodes.includes(e) && e.parentNode?.removeChild(e));
+              debugUnmounted?.();
+              replacement.nodes = [...nodes(unbox(es.value))];
+              (n[0] as ChildNode).replaceWith(...replacement.nodes);
+              n.forEach(e => !replacement.nodes.includes(e) && e.parentNode?.removeChild(e));
               step();
-          }
-        }).catch((errorValue: any) => {
-          const n = replacementNodes.filter(n => Boolean(n?.parentNode)) as ChildNode[];
-          if (n.length) {
-            setReplacementNodes([DyamicElementError({ error: errorValue })]);
-            n[0].replaceWith(...replacementNodes);
-            n.slice(1).forEach(e => e?.parentNode!.removeChild(e));
-          }
-          else console.warn("Can't report error", errorValue, createdBy, replacementNodes.map(logNode));
-          setReplacementNodes(null);
-          ap.return?.(errorValue);
-        });
-        step();
-        return;
+            }
+          }).catch((errorValue: any) => {
+            const n = replacement.nodes.filter(n => Boolean(n?.parentNode)) as ChildNode[];
+            if (n.length) {
+              n[0].replaceWith(DyamicElementError({ error: errorValue }));
+              n.slice(1).forEach(e => e?.remove());
+            }
+            else console.warn("Can't report error", errorValue, replacement.nodes.map(logNode));
+            // @ts-ignore: release reference for GC
+            replacement.nodes = null;
+            ap.return?.(errorValue);
+          });
+        })();
+        if (replacement.nodes) yield* replacement;
+        continue;
       }
-      appended.push(thisDoc.createTextNode(c.toString()));
-    };
-    children(c);
-    return appended;
+
+      yield thisDoc.createTextNode(c.toString());
+    }
   }
 
   if (!nameSpace) {
