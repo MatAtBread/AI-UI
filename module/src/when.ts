@@ -191,14 +191,7 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
 }
 
 async function* doneImmediately<Z>(): AsyncIterableIterator<Z> {
-  console.log("doneImmediately");
   return undefined as Z;
-}
-
-async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
-  console.log("neverGonnaHappen");
-  await new Promise(() => {});
-  yield undefined as Z; // Never should be executed
 }
 
 /* Syntactic sugar: chainAsync decorates the specified iterator so it can be mapped by

@@ -57,5 +57,5 @@
   },
   "type": "module",
   "types": "./esm/ai-ui.d.ts",
-  "version": "0.15.6"
+  "version": "0.17.0"
 }

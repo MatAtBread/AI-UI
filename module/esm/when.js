@@ -89,13 +89,7 @@ function whenEvent(container, what) {
     return queue.multi();
 }
 async function* doneImmediately() {
-    console.log("doneImmediately");
     return undefined;
-}
-async function* neverGonnaHappen() {
-    console.log("neverGonnaHappen");
-    await new Promise(() => { });
-    yield undefined; // Never should be executed
 }
 /* Syntactic sugar: chainAsync decorates the specified iterator so it can be mapped by
   a following function, or used directly as an iterable */

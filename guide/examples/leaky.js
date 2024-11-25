@@ -6,13 +6,14 @@ function sleep(ms, v) {
   return new Promise(resolve => setTimeout(() => resolve(v), ms));
 }
 
-async function* count() {
+async function* count(t = 1000) {
   try {
-    for (let n = 0; n < 15; n++) {
+    let n = 0;
+    while (1) { //for (let n = 0; n < 20; n++) {
       //console.log("yield", n)
-      yield n;
+      yield n++;
       //console.log("yielded", n-1)
-      await sleep(200);
+      await sleep(t);
     }
   } catch (ex) {
     debugger;
@@ -21,41 +22,30 @@ async function* count() {
   }
 }
 
-let n = 0;
-function next() { return n++ }
-const DblClickButton = button.extended({
-  override:{
-    async onclick() {
-      //await sleep(300);
-      this.dispatchEvent(new Event("click2"))
-    },
-    style: {
-      display: 'block'
-    }
+const dv = div.extended({
+  constructed() {
+    console.log("dv", this.id, this.textContent);
   }
 });
 
 const App = div.extended({
   constructed() {
-    let btn1 = DblClickButton('click2 > click');
-    let btn2 = DblClickButton('click > click2');
     return [
-      div("A ",count()),
-      sleep(1000, div("B ",count())),
-      sleep(1000).then(() => div("C ",count())),
-      btn1,
-      btn1.when("click2").map(next).map(f => div("1T" + f,
-        btn1.when("click").map(next).map(e => span(" 1N" + e))
-      )),
-      btn2,
-      btn2.when("click").map(next).map(f => div("2T" + f,
-        btn2.when("click2").map(next).map(e => span(" 2N" + e))
-      ))
+      count(1000).map(i =>
+        dv({
+          id: count(137).map(j => i + "-" + j),
+          style: {
+            fontSize: count(159).map(n => n + 18 + 'px')
+          }
+        }, "X"+i)
+      )
     ]
   }
 });
 
-document.body.append(App());
+const a = App();
+await sleep(1500);
+document.body.append(a);
 //document.body.append(await sleep(2000,App()));
 
 

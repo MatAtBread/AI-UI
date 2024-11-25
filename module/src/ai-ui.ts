@@ -147,7 +147,7 @@ export const tag = <TagLoader>function <Tags extends string,
   const commonProperties = options?.commonProperties;
   const thisDoc = options?.document ?? globalThis.document;
 
-  const removedNodes = mutationTracker(thisDoc, 'removedNodes', options?.enableOnRemovedFromDOM);
+  const removedNodes = mutationTracker(thisDoc, options?.enableOnRemovedFromDOM);
 
   function DomPromiseContainer(label?: any) {
     return thisDoc.createComment(label? label.toString() :DEBUG
@@ -322,6 +322,7 @@ export const tag = <TagLoader>function <Tags extends string,
             return true;
           if (force || replacement.nodes.every(e => removedNodes.has(e))) {
             // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+            replacement.nodes?.forEach(e => removedNodes.add(e));
             const msg = "Element(s) have been removed from the document: "
               + replacement.nodes.map(logNode).join('\n')
               + insertionStack;
@@ -343,7 +344,7 @@ export const tag = <TagLoader>function <Tags extends string,
             return this.nodes?.[Symbol.iterator]() ?? ({ next() { return { done: true as const, value: undefined } } } as Iterator<ChildNode>)
           }
         };
-        removedNodes.removed(replacement.nodes!,terminateSource);
+        removedNodes.onRemoval(replacement.nodes!,'nodes',terminateSource);
 
         // DEBUG support
         const debugUnmounted = DEBUG
@@ -373,27 +374,31 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (!terminateSource(!n.length)) {
                 debugUnmounted?.();
-                removedNodes.removed(replacement.nodes);
+                removedNodes.onRemoval(replacement.nodes, 'nodes');
 
                 replacement.nodes = [...nodes(unbox(es.value))];
-                removedNodes.removed(replacement.nodes,terminateSource);
+                removedNodes.onRemoval(replacement.nodes, 'nodes',terminateSource);
 
-                n[0].replaceWith(...replacement.nodes);
-                for (let i=1; i<n.length; i++)
-                  if (!replacement.nodes.includes(n[i]))
+                for (let i=0; i<n.length; i++) {
+                  if (i===0)
+                    n[0].replaceWith(...replacement.nodes);
+                  else if (!replacement.nodes.includes(n[i]))
                     n[i].remove();
+                  removedNodes.add(n[i]);
+                }
 
                 step();
               }
             }
           }).catch((errorValue: any) => {
             const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
+            replacement.nodes?.forEach(e => removedNodes.add(e));
             if (n?.length) {
               n[0].replaceWith(DyamicElementError({ error: errorValue }));
               n.slice(1).forEach(e => e?.remove());
             }
             else console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
-            removedNodes.removed(replacement.nodes ?? []);
+            if (replacement.nodes) removedNodes.onRemoval(replacement.nodes, 'nodes');
             // @ts-ignore: release reference for GC
             replacement.nodes = null;
             ap.return?.(errorValue);
@@ -606,16 +611,19 @@ export const tag = <TagLoader>function <Tags extends string,
               ap.next().then(update).catch(error);
             }
           }
-          const error = (errorValue: any) => {
-            console.warn("Dynamic attribute error", errorValue, k, d, createdBy, logNode(base));
+          const error = (errorValue?: any) => {
             ap.return?.(errorValue);
-            base.appendChild(DyamicElementError({ error: errorValue }));
+            if (errorValue) {
+              console.warn("Dynamic attribute terminartion", errorValue, k, d, createdBy, logNode(base));
+              base.appendChild(DyamicElementError({ error: errorValue }));
+            }
           }
           const unboxed = value.valueOf();
           if (unboxed !== undefined && unboxed !== value && !isAsyncIter(unboxed))
             update({ done: false, value: unboxed });
           else
             ap.next().then(update).catch(error);
+          removedNodes.onRemoval([base], 'assignIterable', error);
         }
 
         function assignObject(value: any, k: string) {
@@ -888,20 +896,20 @@ export const tag = <TagLoader>function <Tags extends string,
 type PickByType<T, Value> = {
   [P in keyof T as T[P] extends Value | undefined ? P : never]: T[P]
 }
-function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, NodeList>, enableOnRemovedFromDOM?: boolean) {
+function mutationTracker(root: Node, enableOnRemovedFromDOM?: boolean) {
   const tracked = new WeakSet<Node>();
-  const removals = new WeakMap<Node, ()=>void>;
+  const removals: WeakMap<Node, Map<string, ()=>void>> = new WeakMap();
   function walk(nodes: NodeList) {
     for (const node of nodes) {
       // In case it's be re-added/moved
-      if ((track === 'addedNodes') === node.isConnected) {
-        walk(node.childNodes);
+      if (!node.isConnected) {
         tracked.add(node);
+        walk(node.childNodes);
         // Modern onRemovedFromDOM support
-        const removalFn = removals.get(node);
-        if (removalFn) {
+        const removalSet = removals.get(node);
+        if (removalSet) {
           removals.delete(node);
-          removalFn();
+          for (const x of removalSet?.values()) x()
         }
         // Legacy onRemovedFromDOM support
         if (enableOnRemovedFromDOM && 'onRemovedFromDOM' in node && typeof node.onRemovedFromDOM === 'function') node.onRemovedFromDOM();
@@ -910,20 +918,32 @@ function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, Nod
   }
   new MutationObserver((mutations) => {
     mutations.forEach(function (m) {
-      if (m.type === 'childList' && m[track].length) {
-        walk(m[track])
-      }
-      //console.log(tracked);
+      if (m.type === 'childList' && m.removedNodes.length)
+        walk(m.removedNodes)
     });
   }).observe(root, { subtree: true, childList: true });
 
   return {
     has(e:Node) { return tracked.has(e) },
-    removed(e: Node[], handler?: ()=>void) {
-      if (handler)
-        e.forEach(e => removals.set(e, handler));
-      else
-        e.forEach(e => removals.delete(e));
+    add(e:Node) { return tracked.add(e) },
+    onRemoval(e: Node[], name: string, handler?: ()=>void) {
+      if (handler) {
+        e.forEach(e => {
+          const map = removals.get(e) ?? new Map<string, ()=>void>();
+          removals.set(e, map);
+          map.set(name, handler);
+        });
+      }
+      else {
+        e.forEach(e => {
+          const map = removals.get(e);
+          if (map) {
+            map.delete(name);
+            if (!map.size)
+              removals.delete(e)
+          }
+        });
+      }
     }
   }
 }

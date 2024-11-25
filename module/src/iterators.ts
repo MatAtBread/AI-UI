@@ -343,8 +343,7 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
               throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`, { cause: stack });
             }
             push(y?.valueOf() as V)
-          })
-            .catch(ex => console.info(ex))
+          }).catch(ex => console.info(ex))
             .finally(() => (v === piped) && (piped = undefined));
 
           // Early return as we're going to pipe values in later
