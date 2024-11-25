@@ -276,7 +276,7 @@ export const tag = <TagLoader>function <Tags extends string,
   if (commonProperties)
     deepDefine(tagPrototypes, commonProperties);
 
-  function *nodes(...childTags: ChildTags[]): IterableIterator<Node, void, unknown> {
+  function *nodes(...childTags: ChildTags[]): IterableIterator<ChildNode, void, unknown> {
     function notViableTag(c: ChildTags) {
       return (c === undefined || c === null || c === Ignore)
     }
@@ -289,8 +289,6 @@ export const tag = <TagLoader>function <Tags extends string,
         let g = DomPromiseContainer();
         c.then(replacement => {
           g.replaceWith(...nodes(replacement));
-
-          removedNodes.add(g);
           // @ts-ignore: release reference for GC
           g = undefined;
         });
@@ -299,7 +297,7 @@ export const tag = <TagLoader>function <Tags extends string,
       }
 
       if (c instanceof Node) {
-        yield c;
+        yield c as ChildNode;
         continue;
       }
 
@@ -316,22 +314,36 @@ export const tag = <TagLoader>function <Tags extends string,
 
       if (isAsyncIter<ChildTags>(c)) {
         const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
-        const ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
+        let ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
+        let notYetMounted = true;
+
+        const terminateSource = (force: boolean = false) => {
+          if (!ap || !replacement.nodes)
+            return true;
+          if (force || replacement.nodes.every(e => removedNodes.has(e))) {
+            // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+            const msg = "Element(s) have been removed from the document: "
+              + replacement.nodes.map(logNode).join('\n')
+              + insertionStack;
+            // @ts-ignore: release reference for GC
+            replacement.nodes = null;
+            ap.return?.(new Error(msg));
+            // @ts-ignore: release reference for GC
+            ap = null;
+            return true;
+          }
+          return false;
+        }
+
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
         const replacement = {
-          notYetMounted: true,
-          nodes: (unboxed === c || notViableTag(c)) ? [DomPromiseContainer()] : [...nodes(unboxed)],
+          nodes: ((unboxed === c || notViableTag(c)) ? [DomPromiseContainer()] : [...nodes(unboxed)]) as ChildNode[] | undefined,
           [Symbol.iterator]() {
-            return this.nodes ? this.nodes[Symbol.iterator]()
-              : { next() { return { done: true as const, value: undefined } } } as Iterator<Node>
+            return this.nodes?.[Symbol.iterator]() ?? ({ next() { return { done: true as const, value: undefined } } } as Iterator<ChildNode>)
           }
-          // get [Symbol.iterator]() { return this.nodes[Symbol.iterator].bind(this.nodes) }
-          // get [Symbol.iterator]() {
-          //   return () => this.nodes[Symbol.iterator]()
-          // }
         };
-        if (!replacement.nodes.length) debugger; // Shouldn't be possible
+        removedNodes.removed(replacement.nodes!,terminateSource);
 
         // DEBUG support
         const debugUnmounted = DEBUG
@@ -339,9 +351,9 @@ export const tag = <TagLoader>function <Tags extends string,
             const createdAt = Date.now() + timeOutWarn;
             const createdBy = new Error("Created by").stack;
             let f = () => {
-              if (replacement.notYetMounted && createdAt && createdAt < Date.now()) {
+              if (notYetMounted && createdAt && createdAt < Date.now()) {
                 f = () => { };
-                console.warn(`Async element not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.`, createdBy, replacement.nodes.map(logNode));
+                console.warn(`Async element not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.`, createdBy, replacement.nodes?.map(logNode));
               }
             }
             return f;
@@ -351,40 +363,45 @@ export const tag = <TagLoader>function <Tags extends string,
         (function step() {
           ap.next().then(es => {
             if (!es.done) {
-              // ChildNode[], since we tested .parentNode
-              const mounted = replacement.nodes.filter(e => /*e?.parentNode && */e.isConnected);
-              const n = replacement.notYetMounted ? replacement.nodes : mounted;
-              if (replacement.notYetMounted && mounted.length) replacement.notYetMounted = false;
-
-              if (!n.length || replacement.nodes.every(e => removedNodes.has(e))) {
-                // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                const msg = "Element(s) have been removed from the document: "
-                  + replacement.nodes.map(logNode).join('\n')
-                  + insertionStack;
-                // @ts-ignore: release reference for GC
-                replacement.nodes = null;
-                ap.return?.(new Error(msg));
+              if (!replacement.nodes) {
+                ap?.throw?.(new Error("Already ternimated"));
                 return;
               }
+              const mounted = replacement.nodes.filter(e => e.isConnected);
+              const n = notYetMounted ? replacement.nodes : mounted;
+              if (notYetMounted && mounted.length) notYetMounted = false;
 
-              debugUnmounted?.();
-              replacement.nodes = [...nodes(unbox(es.value))];
-              (n[0] as ChildNode).replaceWith(...replacement.nodes);
-              n.forEach(e => !replacement.nodes.includes(e) && e.parentNode?.removeChild(e));
-              step();
+              if (!terminateSource(!n.length)) {
+                debugUnmounted?.();
+                removedNodes.removed(replacement.nodes);
+
+                replacement.nodes = [...nodes(unbox(es.value))];
+                removedNodes.removed(replacement.nodes,terminateSource);
+
+                n[0].replaceWith(...replacement.nodes);
+                for (let i=1; i<n.length; i++)
+                  if (!replacement.nodes.includes(n[i]))
+                    n[i].remove();
+
+                step();
+              }
             }
           }).catch((errorValue: any) => {
-            const n = replacement.nodes.filter(n => Boolean(n?.parentNode)) as ChildNode[];
-            if (n.length) {
+            const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
+            if (n?.length) {
               n[0].replaceWith(DyamicElementError({ error: errorValue }));
               n.slice(1).forEach(e => e?.remove());
             }
-            else console.warn("Can't report error", errorValue, replacement.nodes.map(logNode));
+            else console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
+            removedNodes.removed(replacement.nodes ?? []);
             // @ts-ignore: release reference for GC
             replacement.nodes = null;
             ap.return?.(errorValue);
+            // @ts-ignore: release reference for GC
+            ap = null;
           });
         })();
+
         if (replacement.nodes) yield* replacement;
         continue;
       }
@@ -873,12 +890,19 @@ type PickByType<T, Value> = {
 }
 function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, NodeList>, enableOnRemovedFromDOM?: boolean) {
   const tracked = new WeakSet<Node>();
+  const removals = new WeakMap<Node, ()=>void>;
   function walk(nodes: NodeList) {
     for (const node of nodes) {
       // In case it's be re-added/moved
       if ((track === 'addedNodes') === node.isConnected) {
         walk(node.childNodes);
         tracked.add(node);
+        // Modern onRemovedFromDOM support
+        const removalFn = removals.get(node);
+        if (removalFn) {
+          removals.delete(node);
+          removalFn();
+        }
         // Legacy onRemovedFromDOM support
         if (enableOnRemovedFromDOM && 'onRemovedFromDOM' in node && typeof node.onRemovedFromDOM === 'function') node.onRemovedFromDOM();
       }
@@ -893,5 +917,13 @@ function mutationTracker(root: Node, track: keyof PickByType<MutationRecord, Nod
     });
   }).observe(root, { subtree: true, childList: true });
 
-  return tracked;
+  return {
+    has(e:Node) { return tracked.has(e) },
+    removed(e: Node[], handler?: ()=>void) {
+      if (handler)
+        e.forEach(e => removals.set(e, handler));
+      else
+        e.forEach(e => removals.delete(e));
+    }
+  }
 }

@@ -23,11 +23,22 @@ async function* count() {
 
 let n = 0;
 function next() { return n++ }
+const DblClickButton = button.extended({
+  override:{
+    async onclick() {
+      //await sleep(300);
+      this.dispatchEvent(new Event("click2"))
+    },
+    style: {
+      display: 'block'
+    }
+  }
+});
 
 const App = div.extended({
   constructed() {
-    let btn1 = button({ id: 'btn', async onclick() { await sleep(300); this.dispatchEvent(new Event("click2")) } }, 'click2 > click');
-    let btn2 = button({ id: 'btn', async onclick() { await sleep(300); this.dispatchEvent(new Event("click2")) } }, 'click > click2');
+    let btn1 = DblClickButton('click2 > click');
+    let btn2 = DblClickButton('click > click2');
     return [
       div("A ",count()),
       sleep(1000, div("B ",count())),
