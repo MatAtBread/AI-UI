@@ -339,11 +339,13 @@ export const tag = <TagLoader>function <Tags extends string,
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
         const replacement = {
-          nodes: ((unboxed === c || notViableTag(c)) ? [DomPromiseContainer()] : [...nodes(unboxed)]) as ChildNode[] | undefined,
+          nodes: ((unboxed === c) ? [] : [...nodes(unboxed)]) as ChildNode[] | undefined,
           [Symbol.iterator]() {
             return this.nodes?.[Symbol.iterator]() ?? ({ next() { return { done: true as const, value: undefined } } } as Iterator<ChildNode>)
           }
         };
+        if (!replacement.nodes!.length)
+          replacement.nodes = [DomPromiseContainer()];
         removedNodes.onRemoval(replacement.nodes!,'nodes',terminateSource);
 
         // DEBUG support
@@ -377,6 +379,8 @@ export const tag = <TagLoader>function <Tags extends string,
                 removedNodes.onRemoval(replacement.nodes, 'nodes');
 
                 replacement.nodes = [...nodes(unbox(es.value))];
+                if (!replacement.nodes.length)
+                  replacement.nodes = [DomPromiseContainer()];
                 removedNodes.onRemoval(replacement.nodes, 'nodes',terminateSource);
 
                 for (let i=0; i<n.length; i++) {

@@ -243,11 +243,13 @@ export const tag = function (_1, _2, _3) {
                 // It's possible that this async iterator is a boxed object that also holds a value
                 const unboxed = c.valueOf();
                 const replacement = {
-                    nodes: ((unboxed === c || notViableTag(c)) ? [DomPromiseContainer()] : [...nodes(unboxed)]),
+                    nodes: ((unboxed === c) ? [] : [...nodes(unboxed)]),
                     [Symbol.iterator]() {
                         return this.nodes?.[Symbol.iterator]() ?? { next() { return { done: true, value: undefined }; } };
                     }
                 };
+                if (!replacement.nodes.length)
+                    replacement.nodes = [DomPromiseContainer()];
                 removedNodes.onRemoval(replacement.nodes, 'nodes', terminateSource);
                 // DEBUG support
                 const debugUnmounted = DEBUG
@@ -278,6 +280,8 @@ export const tag = function (_1, _2, _3) {
                                 debugUnmounted?.();
                                 removedNodes.onRemoval(replacement.nodes, 'nodes');
                                 replacement.nodes = [...nodes(unbox(es.value))];
+                                if (!replacement.nodes.length)
+                                    replacement.nodes = [DomPromiseContainer()];
                                 removedNodes.onRemoval(replacement.nodes, 'nodes', terminateSource);
                                 for (let i = 0; i < n.length; i++) {
                                     if (i === 0)
