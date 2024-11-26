@@ -1,5 +1,5 @@
 // @ts-ignore
-export const DEBUG = globalThis.DEBUG == '*' || globalThis.DEBUG == true || globalThis.DEBUG?.match(/(^|\W)AI-UI(\W|$)/) || false;
+export const DEBUG = globalThis.DEBUG == '*' || globalThis.DEBUG == true || Boolean(globalThis.DEBUG?.match(/(^|\W)AI-UI(\W|$)/)) || false;
 export { _console as console };
 export const timeOutWarn = 5000;
 
@@ -11,7 +11,7 @@ const _console = {
     if (DEBUG) console.warn('(AI-UI) WARN:', ...args, new Error().stack?.replace(/Error\n\s*.*\n/,'\n'))
   },
   info(...args: any) {
-    if (DEBUG) console.trace('(AI-UI) INFO:', ...args)
+    if (DEBUG) console.info('(AI-UI) INFO:', ...args)
   }
 }
 

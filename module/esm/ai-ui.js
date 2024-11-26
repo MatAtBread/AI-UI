@@ -7,7 +7,15 @@ import { callStackSymbol } from './tags.js';
 export { when } from './when.js';
 export * as Iterators from './iterators.js';
 export const UniqueID = Symbol("Unique ID");
-const logNode = DEBUG ? ((n) => `"${'innerHTML' in n ? n.innerHTML : n.textContent}"`) : (n) => undefined;
+const trackNodes = Symbol("trackNodes");
+const trackAttributes = Symbol("tracAttributes");
+const trackLegacy = Symbol("onRemovalFromDOM");
+const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
+const logNode = DEBUG
+    ? ((n) => n instanceof Node
+        ? 'outerHTML' in n ? n.outerHTML : `${n.textContent} ${n.nodeName}`
+        : String(n))
+    : (n) => undefined;
 let idCount = 0;
 const standandTags = [
     "a", "abbr", "address", "area", "article", "aside", "audio", "b", "base", "bdi", "bdo", "blockquote", "body", "br", "button",
@@ -61,17 +69,18 @@ export const tag = function (_1, _2, _3) {
             : [null, standandTags, _1];
     const commonProperties = options?.commonProperties;
     const thisDoc = options?.document ?? globalThis.document;
-    const removedNodes = mutationTracker(thisDoc, 'removedNodes', options?.enableOnRemovedFromDOM);
-    function DomPromiseContainer() {
-        return thisDoc.createComment(DEBUG
+    const removedNodes = mutationTracker(thisDoc);
+    function DomPromiseContainer(label) {
+        return thisDoc.createComment(label ? label.toString() : DEBUG
             ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
             : "promise");
     }
     function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     }
-    const poStyleElt = thisDoc.createElement("STYLE");
-    poStyleElt.id = "--ai-ui-extended-tag-styles-";
+    if (!document.getElementById(aiuiExtendedTagStyles)) {
+        thisDoc.head.appendChild(Object.assign(thisDoc.createElement("STYLE"), { id: aiuiExtendedTagStyles }));
+    }
     /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
     const warned = new Set();
     const tagPrototypes = Object.create(null, {
@@ -179,101 +188,151 @@ export const tag = function (_1, _2, _3) {
             }
         }
     });
+    if (options?.enableOnRemovedFromDOM) {
+        Object.defineProperty(tagPrototypes, 'onRemovedFromDOM', {
+            configurable: true,
+            enumerable: false,
+            set: function (fn) {
+                removedNodes.onRemoval([this], trackLegacy, fn);
+            },
+            get: function () {
+                removedNodes.getRemovalHandler(this, trackLegacy);
+            }
+        });
+    }
     /* Add any user supplied prototypes */
     if (commonProperties)
         deepDefine(tagPrototypes, commonProperties);
-    function nodes(...c) {
-        const appended = [];
-        (function children(c) {
-            if (c === undefined || c === null || c === Ignore)
-                return;
+    function* nodes(...childTags) {
+        function notViableTag(c) {
+            return (c === undefined || c === null || c === Ignore);
+        }
+        for (const c of childTags) {
+            if (notViableTag(c))
+                continue;
             if (isPromiseLike(c)) {
-                const g = DomPromiseContainer();
-                appended.push(g);
-                c.then(r => g.replaceWith(...nodes(r)), (x) => {
-                    console.warn(x, logNode(g));
-                    g.replaceWith(DyamicElementError({ error: x }));
+                let g = DomPromiseContainer();
+                c.then(replacement => {
+                    g.replaceWith(...nodes(replacement));
+                    // @ts-ignore: release reference for GC
+                    g = undefined;
                 });
-                return;
+                yield g;
+                continue;
             }
             if (c instanceof Node) {
-                appended.push(c);
-                return;
+                yield c;
+                continue;
             }
             // We have an interesting case here where an iterable String is an object with both Symbol.iterator
             // (inherited from the String prototype) and Symbol.asyncIterator (as it's been augmented by boxed())
-            // but we're only interested in cases like HTMLCollection, NodeList, array, etc., not the fukny ones
+            // but we're only interested in cases like HTMLCollection, NodeList, array, etc., not the funky ones
             // It used to be after the isAsyncIter() test, but a non-AsyncIterator *may* also be a sync iterable
             // For now, we exclude (Symbol.asyncIterator in c) in this case.
             if (c && typeof c === 'object' && Symbol.iterator in c && !(Symbol.asyncIterator in c) && c[Symbol.iterator]) {
-                for (const d of c)
-                    children(d);
-                return;
+                for (const ch of c)
+                    yield* nodes(ch);
+                continue;
             }
             if (isAsyncIter(c)) {
                 const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
-                const ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
+                let ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
+                let notYetMounted = true;
+                const terminateSource = (force = false) => {
+                    if (!ap || !replacement.nodes)
+                        return true;
+                    if (force || replacement.nodes.every(e => removedNodes.has(e))) {
+                        // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
+                        replacement.nodes?.forEach(e => removedNodes.add(e));
+                        const msg = "Element(s) have been removed from the document: "
+                            + replacement.nodes.map(logNode).join('\n')
+                            + insertionStack;
+                        // @ts-ignore: release reference for GC
+                        replacement.nodes = null;
+                        ap.return?.(new Error(msg));
+                        // @ts-ignore: release reference for GC
+                        ap = null;
+                        return true;
+                    }
+                    return false;
+                };
                 // It's possible that this async iterator is a boxed object that also holds a value
                 const unboxed = c.valueOf();
-                const dpm = (unboxed === undefined || unboxed === c) ? [DomPromiseContainer()] : nodes(unboxed);
-                let t = dpm.length ? dpm : [DomPromiseContainer()];
-                appended.push(...t);
-                let notYetMounted = true;
-                // DEBUG support
-                let createdAt = Date.now() + timeOutWarn;
-                const createdBy = DEBUG && new Error("Created by").stack;
-                const error = (errorValue) => {
-                    const n = t.filter(n => Boolean(n?.parentNode));
-                    if (n.length) {
-                        t = [DyamicElementError({ error: errorValue })];
-                        n[0].replaceWith(...t);
-                        n.slice(1).forEach(e => e?.parentNode.removeChild(e));
+                const replacement = {
+                    nodes: ((unboxed === c) ? [] : [...nodes(unboxed)]),
+                    [Symbol.iterator]() {
+                        return this.nodes?.[Symbol.iterator]() ?? { next() { return { done: true, value: undefined }; } };
                     }
-                    else
-                        console.warn("Can't report error", errorValue, createdBy, t.map(logNode));
-                    t = [];
-                    ap.return?.(errorValue);
                 };
-                const update = (es) => {
-                    if (!es.done) {
-                        try {
-                            // ChildNode[], since we tested .parentNode
-                            const mounted = t.filter(e => e?.parentNode && e.isConnected);
-                            const n = notYetMounted ? t : mounted;
-                            if (mounted.length)
-                                notYetMounted = false;
-                            if (!n.length || t.every(e => removedNodes(e))) {
-                                // We're done - terminate the source quietly (ie this is not an exception as it's expected, but we're done)
-                                t = [];
-                                const msg = "Element(s) have been removed from the document: " + insertionStack;
-                                ap.return?.(new Error(msg));
+                if (!replacement.nodes.length)
+                    replacement.nodes = [DomPromiseContainer()];
+                removedNodes.onRemoval(replacement.nodes, trackNodes, terminateSource);
+                // DEBUG support
+                const debugUnmounted = DEBUG
+                    ? (() => {
+                        const createdAt = Date.now() + timeOutWarn;
+                        const createdBy = new Error("Created by").stack;
+                        let f = () => {
+                            if (notYetMounted && createdAt && createdAt < Date.now()) {
+                                f = () => { };
+                                console.warn(`Async element not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.`, createdBy, replacement.nodes?.map(logNode));
+                            }
+                        };
+                        return f;
+                    })()
+                    : null;
+                (function step() {
+                    ap.next().then(es => {
+                        if (!es.done) {
+                            if (!replacement.nodes) {
+                                ap?.throw?.(new Error("Already ternimated"));
                                 return;
                             }
-                            if (DEBUG && notYetMounted && createdAt && createdAt < Date.now()) {
-                                createdAt = Number.MAX_SAFE_INTEGER;
-                                console.warn(`Async element not mounted after 5 seconds. If it is never mounted, it will leak.`, createdBy, t.map(logNode));
+                            const mounted = replacement.nodes.filter(e => e.isConnected);
+                            const n = notYetMounted ? replacement.nodes : mounted;
+                            if (notYetMounted && mounted.length)
+                                notYetMounted = false;
+                            if (!terminateSource(!n.length)) {
+                                debugUnmounted?.();
+                                removedNodes.onRemoval(replacement.nodes, trackNodes);
+                                replacement.nodes = [...nodes(unbox(es.value))];
+                                if (!replacement.nodes.length)
+                                    replacement.nodes = [DomPromiseContainer()];
+                                removedNodes.onRemoval(replacement.nodes, trackNodes, terminateSource);
+                                for (let i = 0; i < n.length; i++) {
+                                    if (i === 0)
+                                        n[0].replaceWith(...replacement.nodes);
+                                    else if (!replacement.nodes.includes(n[i]))
+                                        n[i].remove();
+                                    removedNodes.add(n[i]);
+                                }
+                                step();
                             }
-                            t = nodes(unbox(es.value));
-                            // If the iterated expression yields no nodes, stuff in a DomPromiseContainer for the next iteration
-                            if (!t.length)
-                                t.push(DomPromiseContainer());
-                            n[0].replaceWith(...t);
-                            n.slice(1).forEach(e => !t.includes(e) && e.parentNode?.removeChild(e));
-                            ap.next().then(update).catch(error);
                         }
-                        catch (ex) {
-                            // Something went wrong. Terminate the iterator source
-                            t = [];
-                            ap.return?.(ex);
+                    }).catch((errorValue) => {
+                        const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
+                        replacement.nodes?.forEach(e => removedNodes.add(e));
+                        if (n?.length) {
+                            n[0].replaceWith(DyamicElementError({ error: errorValue }));
+                            n.slice(1).forEach(e => e?.remove());
                         }
-                    }
-                };
-                ap.next().then(update).catch(error);
-                return;
+                        else
+                            console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
+                        if (replacement.nodes)
+                            removedNodes.onRemoval(replacement.nodes, trackNodes);
+                        // @ts-ignore: release reference for GC
+                        replacement.nodes = null;
+                        ap.return?.(errorValue);
+                        // @ts-ignore: release reference for GC
+                        ap = null;
+                    });
+                })();
+                if (replacement.nodes)
+                    yield* replacement;
+                continue;
             }
-            appended.push(thisDoc.createTextNode(c.toString()));
-        })(c);
-        return appended;
+            yield thisDoc.createTextNode(c.toString());
+        }
     }
     if (!nameSpace) {
         Object.assign(tag, {
@@ -322,7 +381,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             else {
                                 if (value instanceof Node) {
-                                    console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or as a child", k, logNode(value));
+                                    console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${d instanceof Node ? logNode(d) : d}`);
                                     d[k] = value;
                                 }
                                 else {
@@ -367,7 +426,7 @@ export const tag = function (_1, _2, _3) {
     }
     function unbox(a) {
         const v = a?.valueOf();
-        return Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v;
+        return (Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v);
     }
     function assignProps(base, props) {
         // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
@@ -470,7 +529,7 @@ export const tag = function (_1, _2, _3) {
                             }
                             const mounted = base.isConnected;
                             // If we have been mounted before, bit aren't now, remove the consumer
-                            if (removedNodes(base) || (!notYetMounted && !mounted)) {
+                            if (removedNodes.has(base) || (!notYetMounted && !mounted)) {
                                 console.info(`Element does not exist in document when setting async attribute '${k}' to:\n${logNode(base)}`);
                                 ap.return?.();
                                 return;
@@ -479,25 +538,28 @@ export const tag = function (_1, _2, _3) {
                                 notYetMounted = false;
                             if (notYetMounted && createdAt && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
-                                console.warn(`Element with async attribute '${k}' not mounted after 5 seconds. If it is never mounted, it will leak.\nElement contains: ${logNode(base)}\n${createdBy}`);
+                                console.warn(`Element with async attribute '${k}' not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.\nElement contains: ${logNode(base)}\n${createdBy}`);
                             }
                             ap.next().then(update).catch(error);
                         }
                     };
                     const error = (errorValue) => {
-                        console.warn("Dynamic attribute error", errorValue, k, d, createdBy, logNode(base));
                         ap.return?.(errorValue);
-                        base.appendChild(DyamicElementError({ error: errorValue }));
+                        if (errorValue) {
+                            console.warn("Dynamic attribute terminartion", errorValue, k, d, createdBy, logNode(base));
+                            base.appendChild(DyamicElementError({ error: errorValue }));
+                        }
                     };
                     const unboxed = value.valueOf();
                     if (unboxed !== undefined && unboxed !== value && !isAsyncIter(unboxed))
                         update({ done: false, value: unboxed });
                     else
                         ap.next().then(update).catch(error);
+                    removedNodes.onRemoval([base], trackAttributes, error);
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {
-                        console.info("Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes", k, logNode(value));
+                        console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${base instanceof Node ? logNode(base) : base}`);
                         d[k] = value;
                     }
                     else {
@@ -547,13 +609,10 @@ export const tag = function (_1, _2, _3) {
             ? (instance) => Object.assign({}, _overrides, instance)
             : _overrides;
         const uniqueTagID = Date.now().toString(36) + (idCount++).toString(36) + Math.random().toString(36).slice(2);
-        let staticExtensions = instanceDefinition({ [UniqueID]: uniqueTagID });
+        const staticExtensions = instanceDefinition({ [UniqueID]: uniqueTagID });
         /* "Statically" create any styles required by this widget */
         if (staticExtensions.styles) {
-            poStyleElt.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
-            if (!thisDoc.head.contains(poStyleElt)) {
-                thisDoc.head.appendChild(poStyleElt);
-            }
+            document.getElementById(aiuiExtendedTagStyles)?.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
         }
         // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
         // Here's where we actually create the tag, by accumulating all the base attributes and
@@ -568,12 +627,12 @@ export const tag = function (_1, _2, _3) {
             combinedAttrs[callStackSymbol].push(tagDefinition);
             if (DEBUG) {
                 // Validate declare and override
-                function isAncestral(creator, d) {
+                const isAncestral = (creator, d) => {
                     for (let f = creator; f; f = f.super)
                         if (f.definition?.declare && d in f.definition.declare)
                             return true;
                     return false;
-                }
+                };
                 if (tagDefinition.declare) {
                     const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this, d));
                     if (clash.length) {
@@ -734,28 +793,60 @@ export const tag = function (_1, _2, _3) {
     // @ts-ignore
     return baseTagCreators;
 };
-function mutationTracker(root, track, enableOnRemovedFromDOM) {
+function mutationTracker(root) {
     const tracked = new WeakSet();
+    const removals = new WeakMap();
     function walk(nodes) {
         for (const node of nodes) {
             // In case it's be re-added/moved
-            if ((track === 'addedNodes') === node.isConnected) {
-                walk(node.childNodes);
+            if (!node.isConnected) {
                 tracked.add(node);
-                // Legacy onRemovedFromDOM support
-                if (enableOnRemovedFromDOM && 'onRemovedFromDOM' in node && typeof node.onRemovedFromDOM === 'function')
-                    node.onRemovedFromDOM();
+                walk(node.childNodes);
+                // Modern onRemovedFromDOM support
+                const removalSet = removals.get(node);
+                if (removalSet) {
+                    removals.delete(node);
+                    for (const [name, x] of removalSet?.entries())
+                        try {
+                            x.call(node);
+                        }
+                        catch (ex) {
+                            console.info("Ignored exception handling node removal", name, x, logNode(node));
+                        }
+                }
             }
         }
     }
     new MutationObserver((mutations) => {
         mutations.forEach(function (m) {
-            if (m.type === 'childList' && m[track].length) {
-                walk(m[track]);
-            }
+            if (m.type === 'childList' && m.removedNodes.length)
+                walk(m.removedNodes);
         });
     }).observe(root, { subtree: true, childList: true });
-    return function (node) {
-        return tracked.has(node);
+    return {
+        has(e) { return tracked.has(e); },
+        add(e) { return tracked.add(e); },
+        getRemovalHandler(e, name) {
+            return removals.get(e)?.get(name);
+        },
+        onRemoval(e, name, handler) {
+            if (handler) {
+                e.forEach(e => {
+                    const map = removals.get(e) ?? new Map();
+                    removals.set(e, map);
+                    map.set(name, handler);
+                });
+            }
+            else {
+                e.forEach(e => {
+                    const map = removals.get(e);
+                    if (map) {
+                        map.delete(name);
+                        if (!map.size)
+                            removals.delete(e);
+                    }
+                });
+            }
+        }
     };
 }

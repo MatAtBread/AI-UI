@@ -72,7 +72,8 @@ function whenEvent(container, what) {
         });
         eventObservations.get(container.ownerDocument).set(eventName, new Set());
     }
-    const queue = queueIteratableIterator(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
+    const observations = eventObservations.get(container.ownerDocument).get(eventName);
+    const queue = queueIteratableIterator(() => observations.delete(details));
     const details = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
@@ -81,12 +82,11 @@ function whenEvent(container, what) {
         selector
     };
     containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-        .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName).add(details));
+        .then(_ => observations.add(details));
     return queue.multi();
 }
-async function* neverGonnaHappen() {
-    await new Promise(() => { });
-    yield undefined; // Never should be executed
+async function* doneImmediately() {
+    return undefined;
 }
 /* Syntactic sugar: chainAsync decorates the specified iterator so it can be mapped by
   a following function, or used directly as an iterable */
@@ -129,9 +129,7 @@ export function when(container, ...sources) {
     }
     if (sources.includes('@ready')) {
         const watchSelectors = sources.filter(isValidWhenSelector).map(what => parseWhenSelector(what)?.[0]);
-        function isMissing(sel) {
-            return Boolean(typeof sel === 'string' && !container.querySelector(sel));
-        }
+        const isMissing = (sel) => Boolean(typeof sel === 'string' && !container.querySelector(sel));
         const missing = watchSelectors.map(w => w?.selector).filter(isMissing);
         let events = undefined;
         const ai = {
@@ -154,10 +152,10 @@ export function when(container, ...sources) {
                         ? merge(...iterators)
                         : iterators.length === 1
                             ? iterators[0]
-                            : (neverGonnaHappen());
+                            : undefined;
                     // Now everything is ready, we simply delegate all async ops to the underlying
                     // merged asyncIterator "events"
-                    events = merged[Symbol.asyncIterator]();
+                    events = merged?.[Symbol.asyncIterator]();
                     if (!events)
                         return { done: true, value: undefined };
                     return { done: false, value: {} };
@@ -170,55 +168,67 @@ export function when(container, ...sources) {
         ? merge(...iterators)
         : iterators.length === 1
             ? iterators[0]
-            : (neverGonnaHappen());
+            : (doneImmediately());
     return chainAsync(iterableHelpers(merged));
 }
-function elementIsInDOM(elt) {
-    if (elt.isConnected)
-        return Promise.resolve();
-    return new Promise(resolve => new MutationObserver((records, mutation) => {
-        if (records.some(r => r.addedNodes?.length)) {
-            if (elt.isConnected) {
-                mutation.disconnect();
-                resolve();
-            }
-        }
-    }).observe(elt.ownerDocument.body, {
-        subtree: true,
-        childList: true
-    }));
-}
 function containerAndSelectorsMounted(container, selectors) {
-    if (selectors?.length)
-        return Promise.all([
-            allSelectorsPresent(container, selectors),
-            elementIsInDOM(container)
-        ]);
-    return elementIsInDOM(container);
-}
-function allSelectorsPresent(container, missing) {
-    missing = missing.filter(sel => !container.querySelector(sel));
-    if (!missing.length) {
-        return Promise.resolve(); // Nothing is missing
-    }
-    const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
-        if (records.some(r => r.addedNodes?.length)) {
-            if (missing.every(sel => container.querySelector(sel))) {
-                mutation.disconnect();
-                resolve();
-            }
+    function containerIsInDOM() {
+        if (container.isConnected)
+            return Promise.resolve();
+        const promise = new Promise((resolve, reject) => {
+            return new MutationObserver((records, mutation) => {
+                if (records.some(r => r.addedNodes?.length)) {
+                    if (container.isConnected) {
+                        mutation.disconnect();
+                        resolve();
+                    }
+                }
+                if (records.some(r => [...r.removedNodes].some(r => r === container || r.contains(container)))) {
+                    mutation.disconnect();
+                    reject(new Error("Removed from DOM"));
+                }
+            }).observe(container.ownerDocument.body, {
+                subtree: true,
+                childList: true
+            });
+        });
+        if (DEBUG) {
+            const stack = new Error().stack?.replace(/^Error/, `Element not mounted after ${timeOutWarn / 1000} seconds:`);
+            const warnTimer = setTimeout(() => {
+                console.warn(stack + "\n" + container.outerHTML);
+                //reject(new Error("Element not mounted after 5 seconds"));
+            }, timeOutWarn);
+            promise.finally(() => clearTimeout(warnTimer));
         }
-    }).observe(container, {
-        subtree: true,
-        childList: true
-    }));
-    /* debugging help: warn if waiting a long time for a selectors to be ready */
-    if (DEBUG) {
-        const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
-        const warnTimer = setTimeout(() => {
-            console.warn(stack, missing);
-        }, timeOutWarn);
-        promise.finally(() => clearTimeout(warnTimer));
+        return promise;
     }
-    return promise;
+    function allSelectorsPresent(missing) {
+        missing = missing.filter(sel => !container.querySelector(sel));
+        if (!missing.length) {
+            return Promise.resolve(); // Nothing is missing
+        }
+        const promise = new Promise(resolve => new MutationObserver((records, mutation) => {
+            if (records.some(r => r.addedNodes?.length)) {
+                if (missing.every(sel => container.querySelector(sel))) {
+                    mutation.disconnect();
+                    resolve();
+                }
+            }
+        }).observe(container, {
+            subtree: true,
+            childList: true
+        }));
+        /* debugging help: warn if waiting a long time for a selectors to be ready */
+        if (DEBUG) {
+            const stack = new Error().stack?.replace(/^Error/, `Missing selectors after ${timeOutWarn / 1000} seconds: `) ?? '??';
+            const warnTimer = setTimeout(() => {
+                console.warn(stack + missing + "\n");
+            }, timeOutWarn);
+            promise.finally(() => clearTimeout(warnTimer));
+        }
+        return promise;
+    }
+    if (selectors?.length)
+        return containerIsInDOM().then(() => allSelectorsPresent(selectors));
+    return containerIsInDOM();
 }

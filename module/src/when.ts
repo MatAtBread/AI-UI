@@ -170,8 +170,8 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
     eventObservations.get(container.ownerDocument)!.set(eventName, new Set());
   }
 
-  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => eventObservations.get(container.ownerDocument)?.get(eventName)?.delete(details));
-
+  const observations = eventObservations.get(container.ownerDocument)!.get(eventName);
+  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => observations!.delete(details));
   const details: EventObservation<keyof GlobalEventHandlersEventMap> = {
     push: queue.push,
     terminate(ex: Error) { queue.return?.(ex)},
@@ -181,14 +181,13 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-    .then(_ => eventObservations.get(container.ownerDocument)?.get(eventName)!.add(details));
+    .then(_ => observations!.add(details));
 
   return queue.multi() ;
 }
 
-async function* neverGonnaHappen<Z>(): AsyncIterableIterator<Z> {
-  await new Promise(() => {});
-  yield undefined as Z; // Never should be executed
+async function* doneImmediately<Z>(): AsyncIterableIterator<Z> {
+  return undefined as Z;
 }
 
 /* Syntactic sugar: chainAsync decorates the specified iterator so it can be mapped by
@@ -240,9 +239,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
   if (sources.includes('@ready')) {
     const watchSelectors = sources.filter(isValidWhenSelector).map(what => parseWhenSelector(what)?.[0]);
 
-    function isMissing(sel: CSSIdentifier | string | null | undefined): sel is CSSIdentifier {
-      return Boolean(typeof sel === 'string' && !container.querySelector(sel));
-    }
+    const isMissing = (sel: CSSIdentifier | string | null | undefined): sel is CSSIdentifier => Boolean(typeof sel === 'string' && !container.querySelector(sel));
 
     const missing = watchSelectors.map(w => w?.selector).filter(isMissing);
 
@@ -265,11 +262,11 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
           ? merge(...iterators)
           : iterators.length === 1
             ? iterators[0]
-            : (neverGonnaHappen<WhenIteratedType<S>>());
+            : undefined;
 
           // Now everything is ready, we simply delegate all async ops to the underlying
           // merged asyncIterator "events"
-          events = merged[Symbol.asyncIterator]();
+          events = merged?.[Symbol.asyncIterator]();
           if (!events)
             return { done: true, value: undefined };
 
@@ -284,64 +281,78 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
     ? merge(...iterators)
     : iterators.length === 1
       ? iterators[0]
-      : (neverGonnaHappen<WhenIteratedType<S>>());
+      : (doneImmediately<WhenIteratedType<S>>());
 
   return chainAsync(iterableHelpers(merged));
 }
 
-function elementIsInDOM(elt: Element): Promise<void> {
-  if (elt.isConnected)
-    return Promise.resolve();
-
-  return new Promise<void>(resolve => new MutationObserver((records, mutation) => {
-    if (records.some(r => r.addedNodes?.length)) {
-      if (elt.isConnected) {
-        mutation.disconnect();
-        resolve();
-      }
-    }
-  }).observe(elt.ownerDocument.body, {
-    subtree: true,
-    childList: true
-  }));
-}
-
 function containerAndSelectorsMounted(container: Element, selectors?: string[]) {
-  if (selectors?.length)
-    return Promise.all([
-      allSelectorsPresent(container, selectors),
-      elementIsInDOM(container)
-    ]);
-  return elementIsInDOM(container);
-}
+  function containerIsInDOM(): Promise<void> {
+    if (container.isConnected)
+      return Promise.resolve();
 
-function allSelectorsPresent(container: Element, missing: string[]): Promise<void> {
-  missing = missing.filter(sel => !container.querySelector(sel))
-  if (!missing.length) {
-    return Promise.resolve(); // Nothing is missing
-  }
+    const promise = new Promise<void>((resolve, reject) => {
+      return new MutationObserver((records, mutation) => {
+        if (records.some(r => r.addedNodes?.length)) {
+          if (container.isConnected) {
+            mutation.disconnect();
+            resolve();
+          }
+        }
+        if (records.some(r => [...r.removedNodes].some(r => r === container || r.contains(container)))) {
+          mutation.disconnect();
+          reject(new Error("Removed from DOM"));
+        }
+      }).observe(container.ownerDocument.body, {
+        subtree: true,
+        childList: true
+      })
+    });
 
-  const promise = new Promise<void>(resolve => new MutationObserver((records, mutation) => {
-    if (records.some(r => r.addedNodes?.length)) {
-      if (missing.every(sel => container.querySelector(sel))) {
-        mutation.disconnect();
-        resolve();
-      }
+    if (DEBUG) {
+      const stack = new Error().stack?.replace(/^Error/, `Element not mounted after ${timeOutWarn / 1000} seconds:`);
+      const warnTimer = setTimeout(() => {
+        console.warn(stack + "\n" + container.outerHTML);
+        //reject(new Error("Element not mounted after 5 seconds"));
+      }, timeOutWarn);
+
+      promise.finally(() => clearTimeout(warnTimer))
     }
-  }).observe(container, {
-    subtree: true,
-    childList: true
-  }));
 
-  /* debugging help: warn if waiting a long time for a selectors to be ready */
-  if (DEBUG) {
-    const stack = new Error().stack?.replace(/^Error/, "Missing selectors after 5 seconds:");
-    const warnTimer = setTimeout(() => {
-      console.warn(stack, missing);
-    }, timeOutWarn);
-
-    promise.finally(() => clearTimeout(warnTimer))
+    return promise;
   }
 
-  return promise;
+  function allSelectorsPresent(missing: string[]): Promise<void> {
+    missing = missing.filter(sel => !container.querySelector(sel))
+    if (!missing.length) {
+      return Promise.resolve(); // Nothing is missing
+    }
+
+    const promise = new Promise<void>(resolve => new MutationObserver((records, mutation) => {
+      if (records.some(r => r.addedNodes?.length)) {
+        if (missing.every(sel => container.querySelector(sel))) {
+          mutation.disconnect();
+          resolve();
+        }
+      }
+    }).observe(container, {
+      subtree: true,
+      childList: true
+    }));
+
+    /* debugging help: warn if waiting a long time for a selectors to be ready */
+    if (DEBUG) {
+      const stack = new Error().stack?.replace(/^Error/, `Missing selectors after ${timeOutWarn / 1000} seconds: `) ?? '??';
+      const warnTimer = setTimeout(() => {
+        console.warn(stack + missing + "\n");
+      }, timeOutWarn);
+
+      promise.finally(() => clearTimeout(warnTimer))
+    }
+
+    return promise;
+  }
+  if (selectors?.length)
+    return containerIsInDOM().then(() => allSelectorsPresent(selectors))
+  return containerIsInDOM();
 }
