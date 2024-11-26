@@ -3,9 +3,6 @@ import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
 const eventObservations = new WeakMap();
 function docEventHandler(ev) {
-    setTimeout(() => _docEventHandler.call(this, ev), 1);
-}
-function _docEventHandler(ev) {
     if (!eventObservations.has(this))
         eventObservations.set(this, new Map());
     const observations = eventObservations.get(this).get(ev.type);
@@ -175,7 +172,7 @@ export function when(container, ...sources) {
     return chainAsync(iterableHelpers(merged));
 }
 function containerAndSelectorsMounted(container, selectors) {
-    function elementIsInDOM() {
+    function containerIsInDOM() {
         if (container.isConnected)
             return Promise.resolve();
         const promise = new Promise((resolve, reject) => {
@@ -232,6 +229,6 @@ function containerAndSelectorsMounted(container, selectors) {
         return promise;
     }
     if (selectors?.length)
-        return elementIsInDOM().then(() => allSelectorsPresent(selectors));
-    return elementIsInDOM();
+        return containerIsInDOM().then(() => allSelectorsPresent(selectors));
+    return containerIsInDOM();
 }

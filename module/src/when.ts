@@ -95,10 +95,6 @@ type EventObservation<EventName extends keyof GlobalEventHandlersEventMap> = {
 const eventObservations = new WeakMap<DocumentFragment | Document, Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>();
 
 function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: DocumentFragment | Document, ev: GlobalEventHandlersEventMap[EventName]) {
-  setTimeout(() => _docEventHandler.call(this, ev),1);
-}
-
-function _docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: DocumentFragment | Document, ev: GlobalEventHandlersEventMap[EventName]) {
   if (!eventObservations.has(this))
     eventObservations.set(this, new Map());
 
@@ -291,7 +287,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
 }
 
 function containerAndSelectorsMounted(container: Element, selectors?: string[]) {
-  function elementIsInDOM(): Promise<void> {
+  function containerIsInDOM(): Promise<void> {
     if (container.isConnected)
       return Promise.resolve();
 
@@ -357,6 +353,6 @@ function containerAndSelectorsMounted(container: Element, selectors?: string[]) 
     return promise;
   }
   if (selectors?.length)
-    return elementIsInDOM().then(() => allSelectorsPresent(selectors))
-  return elementIsInDOM();
+    return containerIsInDOM().then(() => allSelectorsPresent(selectors))
+  return containerIsInDOM();
 }

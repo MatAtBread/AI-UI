@@ -346,66 +346,57 @@ export function defineIterableProperty(obj, name, v) {
         }
     }
 }
-/*
-  Extensions to the AsyncIterable:
-*/
-const forever = new Promise(() => { });
 export const merge = (...ai) => {
-    const it = new Array(ai.length);
-    const promises = new Array(ai.length);
+    const it = new Map();
+    const promises = new Map();
     let init = () => {
         init = () => { };
         for (let n = 0; n < ai.length; n++) {
             const a = ai[n];
-            promises[n] = (it[n] = Symbol.asyncIterator in a
-                ? a[Symbol.asyncIterator]()
-                : a)
-                .next()
-                .then(result => ({ idx: n, result }));
+            const iter = Symbol.asyncIterator in a ? a[Symbol.asyncIterator]() : a;
+            it.set(n, iter);
+            promises.set(n, iter.next().then(result => ({ key: n, result })));
         }
     };
-    const results = [];
-    let count = promises.length;
+    const results = new Array(ai.length);
     const merged = {
         [Symbol.asyncIterator]() { return merged; },
         next() {
             init();
-            return count
-                ? Promise.race(promises).then(({ idx, result }) => {
+            return promises.size
+                ? Promise.race(promises.values()).then(({ key, result }) => {
                     if (result.done) {
-                        count--;
-                        promises[idx] = forever;
-                        results[idx] = result.value;
-                        // We don't yield intermediate return values, we just keep them in results
-                        // return { done: count === 0, value: result.value }
+                        promises.delete(key);
+                        it.delete(key);
+                        results[key] = result.value;
                         return merged.next();
                     }
                     else {
-                        // `ex` is the underlying async iteration exception
-                        promises[idx] = it[idx]
-                            ? it[idx].next().then(result => ({ idx, result })).catch(ex => ({ idx, result: { done: true, value: ex } }))
-                            : Promise.resolve({ idx, result: { done: true, value: undefined } });
+                        promises.set(key, it.has(key)
+                            ? it.get(key).next().then(result => ({ key, result })).catch(ex => ({ key, result: { done: true, value: ex } }))
+                            : Promise.resolve({ key, result: { done: true, value: undefined } }));
                         return result;
                     }
                 }).catch(ex => {
+                    // `ex` is the underlying async iteration exception
                     return merged.throw?.(ex) ?? Promise.reject({ done: true, value: new Error("Iterator merge exception") });
                 })
                 : Promise.resolve({ done: true, value: results });
         },
         async return(r) {
-            for (let i = 0; i < it.length; i++) {
-                if (promises[i] !== forever) {
-                    promises[i] = forever;
-                    results[i] = await it[i]?.return?.({ done: true, value: r }).then(v => v.value, ex => ex);
+            for (const key of it.keys()) {
+                if (promises.has(key)) {
+                    promises.delete(key);
+                    results[key] = await it.get(key)?.return?.({ done: true, value: r }).then(v => v.value, ex => ex);
                 }
             }
             return { done: true, value: results };
         },
         async throw(ex) {
-            for (let i = 0; i < it.length; i++) {
-                if (promises[i] !== forever) {
-                    promises[i] = forever;
-                    results[i] = await it[i]?.throw?.(ex).then(v => v.value, ex => ex);
+            for (const key of it.keys()) {
+                if (promises.has(key)) {
+                    promises.delete(key);
+                    results[key] = await it.get(key)?.throw?.(ex).then(v => v.value, ex => ex);
                 }
             }
             // Because we've passed the exception on to all the sources, we're now done
@@ -417,32 +408,30 @@ export const merge = (...ai) => {
 };
 export const combine = (src, opts = {}) => {
     const accumulated = {};
-    let pc;
-    let si = [];
-    let active = 0;
+    const si = new Map();
+    let pc; // Initialized lazily
     const ci = {
         [Symbol.asyncIterator]() { return ci; },
         next() {
             if (pc === undefined) {
-                pc = Object.entries(src).map(([k, sit], idx) => {
-                    active += 1;
-                    si[idx] = sit[Symbol.asyncIterator]();
-                    return si[idx].next().then(ir => ({ si, idx, k, ir }));
-                });
+                pc = new Map(Object.entries(src).map(([k, sit]) => {
+                    si.set(k, sit[Symbol.asyncIterator]());
+                    return [k, si.get(k).next().then(ir => ({ si, k, ir }))];
+                }));
             }
             return (function step() {
-                return Promise.race(pc).then(({ idx, k, ir }) => {
+                return Promise.race(pc.values()).then(({ k, ir }) => {
                     if (ir.done) {
-                        pc[idx] = forever;
-                        active -= 1;
-                        if (!active)
+                        pc.delete(k);
+                        si.delete(k);
+                        if (!pc.size)
                             return { done: true, value: undefined };
                         return step();
                     }
                     else {
                         // @ts-ignore
                         accumulated[k] = ir.value;
-                        pc[idx] = si[idx].next().then(ir => ({ idx, k, ir }));
+                        pc.set(k, si.get(k).next().then(ir => ({ k, ir })));
                     }
                     if (opts.ignorePartial) {
                         if (Object.keys(accumulated).length < Object.keys(src).length)
@@ -453,19 +442,17 @@ export const combine = (src, opts = {}) => {
             })();
         },
         return(v) {
-            pc.forEach((p, idx) => {
-                if (p !== forever) {
-                    si[idx].return?.(v);
-                }
-            });
+            for (const ai of si.values()) {
+                ai.return?.(v);
+            }
+            ;
             return Promise.resolve({ done: true, value: v });
         },
         throw(ex) {
-            pc.forEach((p, idx) => {
-                if (p !== forever) {
-                    si[idx].throw?.(ex);
-                }
-            });
+            for (const ai of si.values()) {
+                ai.throw?.(ex);
+            }
+            ;
             return Promise.reject({ done: true, value: ex });
         }
     };

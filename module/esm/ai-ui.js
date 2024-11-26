@@ -10,6 +10,7 @@ export const UniqueID = Symbol("Unique ID");
 const trackNodes = Symbol("trackNodes");
 const trackAttributes = Symbol("tracAttributes");
 const trackLegacy = Symbol("onRemovalFromDOM");
+const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
 const logNode = DEBUG
     ? ((n) => n instanceof Node
         ? 'outerHTML' in n ? n.outerHTML : `${n.textContent} ${n.nodeName}`
@@ -77,7 +78,6 @@ export const tag = function (_1, _2, _3) {
     function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     }
-    const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
     if (!document.getElementById(aiuiExtendedTagStyles)) {
         thisDoc.head.appendChild(Object.assign(thisDoc.createElement("STYLE"), { id: aiuiExtendedTagStyles }));
     }

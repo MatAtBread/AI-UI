@@ -14,6 +14,7 @@ export const UniqueID = Symbol("Unique ID");
 const trackNodes = Symbol("trackNodes");
 const trackAttributes = Symbol("tracAttributes");
 const trackLegacy = Symbol("onRemovalFromDOM");
+const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
 
 const logNode = DEBUG
 ? ((n: any) => n instanceof Node
@@ -162,7 +163,6 @@ export const tag = <TagLoader>function <Tags extends string,
     return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
   }
 
-  const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
   if (!document.getElementById(aiuiExtendedTagStyles)) {
     thisDoc.head.appendChild(Object.assign(thisDoc.createElement("STYLE"), {id: aiuiExtendedTagStyles} ));
   }
