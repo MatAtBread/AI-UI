@@ -11,6 +11,9 @@ export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags
 export * as Iterators from './iterators.js';
 
 export const UniqueID = Symbol("Unique ID");
+const trackNodes = Symbol("trackNodes");
+const trackAttributes = Symbol("tracAttributes");
+const trackLegacy = Symbol("onRemovalFromDOM");
 
 const logNode = DEBUG
 ? ((n: any) => n instanceof Node
@@ -139,15 +142,15 @@ export const tag = <TagLoader>function <Tags extends string,
     tag(namespace | null, tags[], commonProperties) [string | null, string[], object]
   */
   const [nameSpace, tags, options] = (typeof _1 === 'string') || _1 === null
-    ? [_1, _2 as Tags[], _3 as TagFunctionOptions<Q>]
+    ? [_1, _2 as Tags[], _3 as TagFunctionOptions<Q> | undefined]
     : Array.isArray(_1)
-      ? [null, _1 as Tags[], _2 as TagFunctionOptions<Q>]
-      : [null, standandTags, _1 as TagFunctionOptions<Q>];
+      ? [null, _1 as Tags[], _2 as TagFunctionOptions<Q> | undefined]
+      : [null, standandTags, _1 as TagFunctionOptions<Q> | undefined];
 
   const commonProperties = options?.commonProperties;
   const thisDoc = options?.document ?? globalThis.document;
 
-  const removedNodes = mutationTracker(thisDoc, options?.enableOnRemovedFromDOM);
+  const removedNodes = mutationTracker(thisDoc);
 
   function DomPromiseContainer(label?: any) {
     return thisDoc.createComment(label? label.toString() :DEBUG
@@ -158,9 +161,11 @@ export const tag = <TagLoader>function <Tags extends string,
   function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
     return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
   }
-  const aiuiExtendedTagStyles = thisDoc.createElement("STYLE");
-  aiuiExtendedTagStyles.id = "--ai-ui-extended-tag-styles-"+Date.now();
-  thisDoc.head.appendChild(aiuiExtendedTagStyles);
+
+  const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
+  if (!document.getElementById(aiuiExtendedTagStyles)) {
+    thisDoc.head.appendChild(Object.assign(thisDoc.createElement("STYLE"), {id: aiuiExtendedTagStyles} ));
+  }
 
   /* Properties applied to every tag which can be implemented by reference, similar to prototypes */
   const warned = new Set<string>();
@@ -272,6 +277,18 @@ export const tag = <TagLoader>function <Tags extends string,
     }
   );
 
+  if (options?.enableOnRemovedFromDOM) {
+    Object.defineProperty(tagPrototypes,'onRemovedFromDOM',{
+      configurable: true,
+      enumerable: false,
+      set: function(fn?: ()=>void){
+        removedNodes.onRemoval([this], trackLegacy, fn);
+      },
+      get: function(){
+        removedNodes.getRemovalHandler(this, trackLegacy);
+      }
+    });
+  }
   /* Add any user supplied prototypes */
   if (commonProperties)
     deepDefine(tagPrototypes, commonProperties);
@@ -346,7 +363,7 @@ export const tag = <TagLoader>function <Tags extends string,
         };
         if (!replacement.nodes!.length)
           replacement.nodes = [DomPromiseContainer()];
-        removedNodes.onRemoval(replacement.nodes!,'nodes',terminateSource);
+        removedNodes.onRemoval(replacement.nodes!,trackNodes,terminateSource);
 
         // DEBUG support
         const debugUnmounted = DEBUG
@@ -376,12 +393,12 @@ export const tag = <TagLoader>function <Tags extends string,
 
               if (!terminateSource(!n.length)) {
                 debugUnmounted?.();
-                removedNodes.onRemoval(replacement.nodes, 'nodes');
+                removedNodes.onRemoval(replacement.nodes, trackNodes);
 
                 replacement.nodes = [...nodes(unbox(es.value))];
                 if (!replacement.nodes.length)
                   replacement.nodes = [DomPromiseContainer()];
-                removedNodes.onRemoval(replacement.nodes, 'nodes',terminateSource);
+                removedNodes.onRemoval(replacement.nodes, trackNodes,terminateSource);
 
                 for (let i=0; i<n.length; i++) {
                   if (i===0)
@@ -402,7 +419,7 @@ export const tag = <TagLoader>function <Tags extends string,
               n.slice(1).forEach(e => e?.remove());
             }
             else console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
-            if (replacement.nodes) removedNodes.onRemoval(replacement.nodes, 'nodes');
+            if (replacement.nodes) removedNodes.onRemoval(replacement.nodes, trackNodes);
             // @ts-ignore: release reference for GC
             replacement.nodes = null;
             ap.return?.(errorValue);
@@ -627,7 +644,7 @@ export const tag = <TagLoader>function <Tags extends string,
             update({ done: false, value: unboxed });
           else
             ap.next().then(update).catch(error);
-          removedNodes.onRemoval([base], 'assignIterable', error);
+          removedNodes.onRemoval([base], trackAttributes, error);
         }
 
         function assignObject(value: any, k: string) {
@@ -683,13 +700,10 @@ export const tag = <TagLoader>function <Tags extends string,
       : _overrides
 
     const uniqueTagID = Date.now().toString(36) + (idCount++).toString(36) + Math.random().toString(36).slice(2);
-    let staticExtensions: Overrides = instanceDefinition({ [UniqueID]: uniqueTagID });
+    const staticExtensions: Overrides = instanceDefinition({ [UniqueID]: uniqueTagID });
     /* "Statically" create any styles required by this widget */
     if (staticExtensions.styles) {
-      aiuiExtendedTagStyles.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
-      // if (!thisDoc.head.contains(aiuiExtendedTagStyles)) {
-      //   thisDoc.head.appendChild(aiuiExtendedTagStyles);
-      // }
+      document.getElementById(aiuiExtendedTagStyles)?.appendChild(thisDoc.createTextNode(staticExtensions.styles + '\n'));
     }
 
     // "this" is the tag we're being extended from, as it's always called as: `(this).extended`
@@ -705,7 +719,7 @@ export const tag = <TagLoader>function <Tags extends string,
       combinedAttrs[callStackSymbol].push(tagDefinition);
       if (DEBUG) {
         // Validate declare and override
-        function isAncestral(creator: TagCreator<Element>, d: string) {
+        const isAncestral = (creator: TagCreator<Element>, d: string) => {
           for (let f = creator; f; f = f.super)
             if (f.definition?.declare && d in f.definition.declare) return true;
           return false;
@@ -900,9 +914,9 @@ export const tag = <TagLoader>function <Tags extends string,
 type PickByType<T, Value> = {
   [P in keyof T as T[P] extends Value | undefined ? P : never]: T[P]
 }
-function mutationTracker(root: Node, enableOnRemovedFromDOM?: boolean) {
+function mutationTracker(root: Node) {
   const tracked = new WeakSet<Node>();
-  const removals: WeakMap<Node, Map<string, ()=>void>> = new WeakMap();
+  const removals: WeakMap<Node, Map<Symbol, (this: Node)=>void>> = new WeakMap();
   function walk(nodes: NodeList) {
     for (const node of nodes) {
       // In case it's be re-added/moved
@@ -913,10 +927,10 @@ function mutationTracker(root: Node, enableOnRemovedFromDOM?: boolean) {
         const removalSet = removals.get(node);
         if (removalSet) {
           removals.delete(node);
-          for (const x of removalSet?.values()) x()
+          for (const [name, x] of removalSet?.entries()) try { x.call(node) } catch (ex) {
+            console.info("Ignored exception handling node removal", name, x, logNode(node));
+          }
         }
-        // Legacy onRemovedFromDOM support
-        if (enableOnRemovedFromDOM && 'onRemovedFromDOM' in node && typeof node.onRemovedFromDOM === 'function') node.onRemovedFromDOM();
       }
     }
   }
@@ -930,10 +944,13 @@ function mutationTracker(root: Node, enableOnRemovedFromDOM?: boolean) {
   return {
     has(e:Node) { return tracked.has(e) },
     add(e:Node) { return tracked.add(e) },
-    onRemoval(e: Node[], name: string, handler?: ()=>void) {
+    getRemovalHandler(e: Node, name: Symbol) {
+      return removals.get(e)?.get(name);
+    },
+    onRemoval(e: Node[], name: Symbol, handler?: (this: Node)=>void) {
       if (handler) {
         e.forEach(e => {
-          const map = removals.get(e) ?? new Map<string, ()=>void>();
+          const map = removals.get(e) ?? new Map<Symbol, ()=>void>();
           removals.set(e, map);
           map.set(name, handler);
         });
