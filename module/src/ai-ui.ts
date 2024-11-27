@@ -12,7 +12,6 @@ export * as Iterators from './iterators.js';
 
 export const UniqueID = Symbol("Unique ID");
 const trackNodes = Symbol("trackNodes");
-const trackAttributes = Symbol("tracAttributes");
 const trackLegacy = Symbol("onRemovalFromDOM");
 const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
 
@@ -303,13 +302,22 @@ export const tag = <TagLoader>function <Tags extends string,
         continue;
 
       if (isPromiseLike(c)) {
-        let g = DomPromiseContainer();
+        let g: ChildNode[] | undefined = [DomPromiseContainer()];
         c.then(replacement => {
-          g.replaceWith(...nodes(replacement));
-          // @ts-ignore: release reference for GC
-          g = undefined;
+          const old = g;
+          if (old) {
+            g = [...nodes(replacement)];
+            removedNodes.onRemoval(g, trackNodes, ()=> { g = undefined });
+            for (let i=0; i < old.length; i++) {
+              if (i === 0)
+                old[i].replaceWith(...g);
+              else
+              old[i].remove();
+            }
+          }
         });
-        yield g;
+
+        if (g) yield *g;
         continue;
       }
 
@@ -552,18 +560,20 @@ export const tag = <TagLoader>function <Tags extends string,
                 assignIterable(value, k);
               } else if (isPromiseLike(value)) {
                 value.then(v => {
-                  if (v && typeof v === 'object') {
-                    // Special case: this promise resolved to an async iterator
-                    if (isAsyncIter<unknown>(v)) {
-                      assignIterable(v, k);
+                  if (!removedNodes.has(base)) {
+                    if (v && typeof v === 'object') {
+                      // Special case: this promise resolved to an async iterator
+                      if (isAsyncIter<unknown>(v)) {
+                        assignIterable(v, k);
+                      } else {
+                        assignObject(v, k);
+                      }
                     } else {
-                      assignObject(v, k);
+                      if (s[k] !== undefined)
+                        d[k] = v;
                     }
-                  } else {
-                    if (s[k] !== undefined)
-                      d[k] = v;
                   }
-                }, error => console.log("Failed to set attribute", error));
+                }, error => console.log(`Exception in promised attribute '${k}'`, error, logNode(d)));
               } else if (!isAsyncIter<unknown>(value)) {
                 // This has a real value, which might be an object
                 if (value && typeof value === 'object' && !isPromiseLike(value))
@@ -583,15 +593,22 @@ export const tag = <TagLoader>function <Tags extends string,
           }
         }
 
-        function assignIterable(value: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
-          const ap = asyncIterator(value);
-          let notYetMounted = true;
+        function assignIterable(iter: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
+          const ap = asyncIterator(iter);
           // DEBUG support
           let createdAt = Date.now() + timeOutWarn;
           const createdBy = DEBUG && new Error("Created by").stack;
 
+          let mounted = false;
           const update = (es: IteratorResult<unknown>) => {
             if (!es.done) {
+              mounted = mounted || base.isConnected;
+              // If we have been mounted before, but aren't now, remove the consumer
+              if (removedNodes.has(base)) {
+                error();
+                return;
+              }
+
               const value = unbox(es.value);
               if (typeof value === 'object' && value !== null) {
                 /*
@@ -616,15 +633,8 @@ export const tag = <TagLoader>function <Tags extends string,
                 if (value !== undefined)
                   d[k] = value;
               }
-              const mounted = base.isConnected;
-              // If we have been mounted before, bit aren't now, remove the consumer
-              if (removedNodes.has(base) || (!notYetMounted && !mounted)) {
-                console.info(`Element does not exist in document when setting async attribute '${k}' to:\n${logNode(base)}`);
-                ap.return?.();
-                return;
-              }
-              if (mounted) notYetMounted = false;
-              if (notYetMounted && createdAt && createdAt < Date.now()) {
+
+              if (DEBUG && !mounted && createdAt < Date.now()) {
                 createdAt = Number.MAX_SAFE_INTEGER;
                 console.warn(`Element with async attribute '${k}' not mounted after ${timeOutWarn/1000} seconds. If it is never mounted, it will leak.\nElement contains: ${logNode(base)}\n${createdBy}`);
               }
@@ -639,12 +649,13 @@ export const tag = <TagLoader>function <Tags extends string,
               base.appendChild(DyamicElementError({ error: errorValue }));
             }
           }
-          const unboxed = value.valueOf();
-          if (unboxed !== undefined && unboxed !== value && !isAsyncIter(unboxed))
+
+          const unboxed = iter.valueOf();
+          if (unboxed !== undefined && unboxed !== iter && !isAsyncIter(unboxed))
             update({ done: false, value: unboxed });
           else
             ap.next().then(update).catch(error);
-          removedNodes.onRemoval([base], trackAttributes, error);
+          removedNodes.onRemoval([base], k, error);
         }
 
         function assignObject(value: any, k: string) {
@@ -719,19 +730,19 @@ export const tag = <TagLoader>function <Tags extends string,
       combinedAttrs[callStackSymbol].push(tagDefinition);
       if (DEBUG) {
         // Validate declare and override
-        const isAncestral = (creator: TagCreator<Element>, d: string) => {
+        const isAncestral = (creator: TagCreator<Element>, key: string) => {
           for (let f = creator; f; f = f.super)
-            if (f.definition?.declare && d in f.definition.declare) return true;
+            if (f.definition?.declare && key in f.definition.declare) return true;
           return false;
         }
         if (tagDefinition.declare) {
-          const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this, d));
+          const clash = Object.keys(tagDefinition.declare).filter(k => (k in e) || isAncestral(this, k));
           if (clash.length) {
             console.log(`Declared keys '${clash}' in ${extendTag.name} already exist in base '${this.valueOf()}'`);
           }
         }
         if (tagDefinition.override) {
-          const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this, d));
+          const clash = Object.keys(tagDefinition.override).filter(k => !(k in e) && !(commonProperties && k in commonProperties) && !isAncestral(this, k));
           if (clash.length) {
             console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
           }
@@ -916,7 +927,7 @@ type PickByType<T, Value> = {
 }
 function mutationTracker(root: Node) {
   const tracked = new WeakSet<Node>();
-  const removals: WeakMap<Node, Map<Symbol, (this: Node)=>void>> = new WeakMap();
+  const removals: WeakMap<Node, Map<Symbol | string, (this: Node)=>void>> = new WeakMap();
   function walk(nodes: NodeList) {
     for (const node of nodes) {
       // In case it's be re-added/moved
@@ -947,10 +958,10 @@ function mutationTracker(root: Node) {
     getRemovalHandler(e: Node, name: Symbol) {
       return removals.get(e)?.get(name);
     },
-    onRemoval(e: Node[], name: Symbol, handler?: (this: Node)=>void) {
+    onRemoval(e: Node[], name: Symbol | string, handler?: (this: Node)=>void) {
       if (handler) {
         e.forEach(e => {
-          const map = removals.get(e) ?? new Map<Symbol, ()=>void>();
+          const map = removals.get(e) ?? new Map<Symbol | string, ()=>void>();
           removals.set(e, map);
           map.set(name, handler);
         });
