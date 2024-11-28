@@ -1,6 +1,9 @@
 import { DEBUG, console } from "./debug.js";
+// Create a deferred Promise, which can be asynchronously/externally resolved or rejected.
+const debugId = Symbol("deferredPromiseID");
 // Used to suppress TS error about use before initialisation
 const nothing = (v) => { };
+let id = 1;
 export function deferred() {
     let resolve = nothing;
     let reject = nothing;
@@ -8,6 +11,7 @@ export function deferred() {
     promise.resolve = resolve;
     promise.reject = reject;
     if (DEBUG) {
+        promise[debugId] = id++;
         const initLocation = new Error().stack;
         promise.catch(ex => (ex instanceof Error || ex?.value instanceof Error) ? console.log("Deferred rejection", ex, "allocated at ", initLocation) : undefined);
     }

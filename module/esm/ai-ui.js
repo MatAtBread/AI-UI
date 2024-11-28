@@ -8,7 +8,6 @@ export { when } from './when.js';
 export * as Iterators from './iterators.js';
 export const UniqueID = Symbol("Unique ID");
 const trackNodes = Symbol("trackNodes");
-const trackAttributes = Symbol("tracAttributes");
 const trackLegacy = Symbol("onRemovalFromDOM");
 const aiuiExtendedTagStyles = "--ai-ui-extended-tag-styles";
 const logNode = DEBUG
@@ -69,14 +68,14 @@ export const tag = function (_1, _2, _3) {
             : [null, standandTags, _1];
     const commonProperties = options?.commonProperties;
     const thisDoc = options?.document ?? globalThis.document;
+    const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }) {
+        return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
+    };
     const removedNodes = mutationTracker(thisDoc);
     function DomPromiseContainer(label) {
         return thisDoc.createComment(label ? label.toString() : DEBUG
             ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
             : "promise");
-    }
-    function DyamicElementError({ error }) {
-        return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     }
     if (!document.getElementById(aiuiExtendedTagStyles)) {
         thisDoc.head.appendChild(Object.assign(thisDoc.createElement("STYLE"), { id: aiuiExtendedTagStyles }));
@@ -211,13 +210,22 @@ export const tag = function (_1, _2, _3) {
             if (notViableTag(c))
                 continue;
             if (isPromiseLike(c)) {
-                let g = DomPromiseContainer();
+                let g = [DomPromiseContainer()];
                 c.then(replacement => {
-                    g.replaceWith(...nodes(replacement));
-                    // @ts-ignore: release reference for GC
-                    g = undefined;
+                    const old = g;
+                    if (old) {
+                        g = [...nodes(replacement)];
+                        removedNodes.onRemoval(g, trackNodes, () => { g = undefined; });
+                        for (let i = 0; i < old.length; i++) {
+                            if (i === 0)
+                                old[i].replaceWith(...g);
+                            else
+                                old[i].remove();
+                        }
+                    }
                 });
-                yield g;
+                if (g)
+                    yield* g;
                 continue;
             }
             if (c instanceof Node) {
@@ -311,18 +319,14 @@ export const tag = function (_1, _2, _3) {
                         }
                     }).catch((errorValue) => {
                         const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
-                        replacement.nodes?.forEach(e => removedNodes.add(e));
                         if (n?.length) {
-                            n[0].replaceWith(DyamicElementError({ error: errorValue }));
+                            n[0].replaceWith(DyamicElementError({ error: errorValue?.value ?? errorValue }));
                             n.slice(1).forEach(e => e?.remove());
                         }
                         else
                             console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
-                        if (replacement.nodes)
-                            removedNodes.onRemoval(replacement.nodes, trackNodes);
                         // @ts-ignore: release reference for GC
                         replacement.nodes = null;
-                        ap.return?.(errorValue);
                         // @ts-ignore: release reference for GC
                         ap = null;
                     });
@@ -459,20 +463,22 @@ export const tag = function (_1, _2, _3) {
                             }
                             else if (isPromiseLike(value)) {
                                 value.then(v => {
-                                    if (v && typeof v === 'object') {
-                                        // Special case: this promise resolved to an async iterator
-                                        if (isAsyncIter(v)) {
-                                            assignIterable(v, k);
+                                    if (!removedNodes.has(base)) {
+                                        if (v && typeof v === 'object') {
+                                            // Special case: this promise resolved to an async iterator
+                                            if (isAsyncIter(v)) {
+                                                assignIterable(v, k);
+                                            }
+                                            else {
+                                                assignObject(v, k);
+                                            }
                                         }
                                         else {
-                                            assignObject(v, k);
+                                            if (s[k] !== undefined)
+                                                d[k] = v;
                                         }
                                     }
-                                    else {
-                                        if (s[k] !== undefined)
-                                            d[k] = v;
-                                    }
-                                }, error => console.log("Failed to set attribute", error));
+                                }, error => console.log(`Exception in promised attribute '${k}'`, error, logNode(d)));
                             }
                             else if (!isAsyncIter(value)) {
                                 // This has a real value, which might be an object
@@ -494,14 +500,21 @@ export const tag = function (_1, _2, _3) {
                         throw ex;
                     }
                 }
-                function assignIterable(value, k) {
-                    const ap = asyncIterator(value);
-                    let notYetMounted = true;
+                function assignIterable(iter, k) {
+                    const ap = asyncIterator(iter);
                     // DEBUG support
                     let createdAt = Date.now() + timeOutWarn;
                     const createdBy = DEBUG && new Error("Created by").stack;
+                    let mounted = false;
                     const update = (es) => {
                         if (!es.done) {
+                            mounted = mounted || base.isConnected;
+                            // If we have been mounted before, but aren't now, remove the consumer
+                            if (removedNodes.has(base)) {
+                                error("(node removed)");
+                                ap.return?.();
+                                return;
+                            }
                             const value = unbox(es.value);
                             if (typeof value === 'object' && value !== null) {
                                 /*
@@ -527,16 +540,7 @@ export const tag = function (_1, _2, _3) {
                                 if (value !== undefined)
                                     d[k] = value;
                             }
-                            const mounted = base.isConnected;
-                            // If we have been mounted before, bit aren't now, remove the consumer
-                            if (removedNodes.has(base) || (!notYetMounted && !mounted)) {
-                                console.info(`Element does not exist in document when setting async attribute '${k}' to:\n${logNode(base)}`);
-                                ap.return?.();
-                                return;
-                            }
-                            if (mounted)
-                                notYetMounted = false;
-                            if (notYetMounted && createdAt && createdAt < Date.now()) {
+                            if (DEBUG && !mounted && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
                                 console.warn(`Element with async attribute '${k}' not mounted after ${timeOutWarn / 1000} seconds. If it is never mounted, it will leak.\nElement contains: ${logNode(base)}\n${createdBy}`);
                             }
@@ -544,18 +548,17 @@ export const tag = function (_1, _2, _3) {
                         }
                     };
                     const error = (errorValue) => {
-                        ap.return?.(errorValue);
                         if (errorValue) {
-                            console.warn("Dynamic attribute terminartion", errorValue, k, d, createdBy, logNode(base));
+                            console.warn("Dynamic attribute termination", errorValue, k, d, createdBy, logNode(base));
                             base.appendChild(DyamicElementError({ error: errorValue }));
                         }
                     };
-                    const unboxed = value.valueOf();
-                    if (unboxed !== undefined && unboxed !== value && !isAsyncIter(unboxed))
+                    const unboxed = iter.valueOf();
+                    if (unboxed !== undefined && unboxed !== iter && !isAsyncIter(unboxed))
                         update({ done: false, value: unboxed });
                     else
                         ap.next().then(update).catch(error);
-                    removedNodes.onRemoval([base], trackAttributes, error);
+                    removedNodes.onRemoval([base], k, () => ap.return?.());
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {
@@ -627,20 +630,20 @@ export const tag = function (_1, _2, _3) {
             combinedAttrs[callStackSymbol].push(tagDefinition);
             if (DEBUG) {
                 // Validate declare and override
-                const isAncestral = (creator, d) => {
+                const isAncestral = (creator, key) => {
                     for (let f = creator; f; f = f.super)
-                        if (f.definition?.declare && d in f.definition.declare)
+                        if (f.definition?.declare && key in f.definition.declare)
                             return true;
                     return false;
                 };
                 if (tagDefinition.declare) {
-                    const clash = Object.keys(tagDefinition.declare).filter(d => (d in e) || isAncestral(this, d));
+                    const clash = Object.keys(tagDefinition.declare).filter(k => (k in e) || isAncestral(this, k));
                     if (clash.length) {
                         console.log(`Declared keys '${clash}' in ${extendTag.name} already exist in base '${this.valueOf()}'`);
                     }
                 }
                 if (tagDefinition.override) {
-                    const clash = Object.keys(tagDefinition.override).filter(d => !(d in e) && !(commonProperties && d in commonProperties) && !isAncestral(this, d));
+                    const clash = Object.keys(tagDefinition.override).filter(k => !(k in e) && !(commonProperties && k in commonProperties) && !isAncestral(this, k));
                     if (clash.length) {
                         console.log(`Overridden keys '${clash}' in ${extendTag.name} do not exist in base '${this.valueOf()}'`);
                     }
