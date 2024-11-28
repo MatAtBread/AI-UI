@@ -7,6 +7,9 @@ export declare const UniqueID: unique symbol;
 type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> = {
     commonProperties?: OtherMembers;
     document?: Document;
+    ErrorTag?: TagCreatorFunction<Element & {
+        error: any;
+    }>;
     /** @deprecated - legacy support */
     enableOnRemovedFromDOM?: boolean;
 };

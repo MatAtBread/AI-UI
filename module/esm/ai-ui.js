@@ -68,14 +68,14 @@ export const tag = function (_1, _2, _3) {
             : [null, standandTags, _1];
     const commonProperties = options?.commonProperties;
     const thisDoc = options?.document ?? globalThis.document;
+    const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }) {
+        return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
+    };
     const removedNodes = mutationTracker(thisDoc);
     function DomPromiseContainer(label) {
         return thisDoc.createComment(label ? label.toString() : DEBUG
             ? new Error("promise").stack?.replace(/^Error: /, '') || "promise"
             : "promise");
-    }
-    function DyamicElementError({ error }) {
-        return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     }
     if (!document.getElementById(aiuiExtendedTagStyles)) {
         thisDoc.head.appendChild(Object.assign(thisDoc.createElement("STYLE"), { id: aiuiExtendedTagStyles }));
@@ -320,15 +320,13 @@ export const tag = function (_1, _2, _3) {
                     }).catch((errorValue) => {
                         const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
                         if (n?.length) {
-                            n[0].replaceWith(DyamicElementError({ error: errorValue }));
+                            n[0].replaceWith(DyamicElementError({ error: errorValue?.value ?? errorValue }));
                             n.slice(1).forEach(e => e?.remove());
                         }
                         else
                             console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
-                        //if (replacement.nodes) removedNodes.onRemoval(replacement.nodes, trackNodes);
                         // @ts-ignore: release reference for GC
                         replacement.nodes = null;
-                        ap.return?.(errorValue);
                         // @ts-ignore: release reference for GC
                         ap = null;
                     });
