@@ -133,10 +133,14 @@ export const asyncExtras = {
 const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)] as (keyof typeof asyncExtras)[];
 
 // Like Object.assign, but the assigned properties are not enumerable
+const iteratorCallSite = Symbol("IteratorCallSite");
 function assignHidden<D extends {}, S extends {}>(d: D, s: S) {
   const keys = [...Object.getOwnPropertyNames(s), ...Object.getOwnPropertySymbols(s)];
   for (const k of keys) {
     Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false });
+  }
+  if (DEBUG) {
+    if (!(iteratorCallSite in d)) Object.defineProperty(d, iteratorCallSite, { value: new Error().stack })
   }
   return d as D & S;
 }
@@ -184,10 +188,10 @@ function internalQueueIteratableIterator<T>(stop = () => { }) {
       if (q[_pending]) {
         try { stop() } catch (ex) { }
         while (q[_pending].length)
-          q[_pending].pop()!.reject(value);
+          q[_pending].pop()!.reject(value.value);
         q[_items] = q[_pending] = null;
       }
-      return Promise.reject(value);
+      return Promise.resolve(value);
     },
 
     get length() {
@@ -519,7 +523,7 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
           }
         }).catch(ex => {
             // `ex` is the underlying async iteration exception
-            return merged.throw?.(ex) ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
+            return merged.throw!(ex) // ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
         })
         : Promise.resolve({ done: true as const, value: results });
     },
@@ -540,7 +544,6 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
         }
       }
       // Because we've passed the exception on to all the sources, we're now done
-      // previously: return Promise.reject(ex);
       return { done: true, value: results };
     }
   };
@@ -601,10 +604,9 @@ export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions
       return Promise.resolve({ done: true, value: v });
     },
     throw(ex: any) {
-      for (const ai of si.values()) {
+      for (const ai of si.values())
         ai.throw?.(ex)
-    };
-    return Promise.reject({ done: true, value: ex });
+      return Promise.resolve({ done: true, value: ex });
     }
   }
   return iterableHelpers(ci);
@@ -704,8 +706,10 @@ export function filterMap<U extends PartialIterable, R>(source: U,
               ex => {
                 prev = Ignore; // Remove reference for GC
                 // The filter function failed...
-                ai.throw ? ai.throw(ex) : ai.return?.(ex) // Terminate the source - for now we ignore the result of the termination
-                reject({ done: true, value: ex }); // Terminate the consumer
+                const sourceResponse = ai.throw?.(ex) ?? ai.return?.(ex);
+                // Terminate the source (ai) and consumer (reject)
+                if (isPromiseLike(sourceResponse)) sourceResponse.then(reject,reject);
+                else reject({ done: true, value: ex })
               }
             ),
           ex => {
@@ -716,20 +720,22 @@ export function filterMap<U extends PartialIterable, R>(source: U,
         ).catch(ex => {
           // The callback threw
           prev = Ignore; // Remove reference for GC
-          ai.throw ? ai.throw(ex) : ai.return?.(ex); // Terminate the source - for now we ignore the result of the termination
-          reject({ done: true, value: ex })
+          const sourceResponse = ai.throw?.(ex) ?? ai.return?.(ex);
+          // Terminate the source (ai) and consumer (reject)
+          if (isPromiseLike(sourceResponse)) sourceResponse.then(reject, reject);
+          else reject({ done: true, value: sourceResponse })
         })
       })
     },
 
     throw(ex: any) {
       // The consumer wants us to exit with an exception. Tell the source
-      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(done)
+      return Promise.resolve(ai?.throw?.(ex) ?? ai?.return?.(ex)).then(done, done)
     },
 
     return(v?: any) {
       // The consumer told us to return, so we need to terminate the source
-      return Promise.resolve(ai?.return?.(v)).then(done)
+      return Promise.resolve(ai?.return?.(v)).then(done, done)
     }
   };
   return iterableHelpers(fai)
@@ -775,7 +781,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
       ai!.next()
         .then(step)
         .catch(error => {
-          current.reject({ done: true, value: error });
+          current?.reject({ done: true, value: error });
           // @ts-ignore: release reference
           current = null;
         });
@@ -809,7 +815,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
       consumers -= 1;
       if (consumers)
         return Promise.resolve({ done: true, value: ex });
-      return Promise.resolve(ai?.throw ? ai.throw(ex) : ai?.return?.(ex)).then(done)
+      return Promise.resolve(ai?.throw?.(ex) ?? ai?.return?.(ex)).then(done, done)
     },
 
     return(v?: any) {
@@ -819,7 +825,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
       consumers -= 1;
       if (consumers)
         return Promise.resolve({ done: true, value: v });
-      return Promise.resolve(ai?.return?.(v)).then(done)
+      return Promise.resolve(ai?.return?.(v)).then(done, done)
     }
   };
   return iterableHelpers(mai);

@@ -319,15 +319,13 @@ export const tag = function (_1, _2, _3) {
                         }
                     }).catch((errorValue) => {
                         const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
-                        replacement.nodes?.forEach(e => removedNodes.add(e));
                         if (n?.length) {
                             n[0].replaceWith(DyamicElementError({ error: errorValue }));
                             n.slice(1).forEach(e => e?.remove());
                         }
                         else
                             console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
-                        if (replacement.nodes)
-                            removedNodes.onRemoval(replacement.nodes, trackNodes);
+                        //if (replacement.nodes) removedNodes.onRemoval(replacement.nodes, trackNodes);
                         // @ts-ignore: release reference for GC
                         replacement.nodes = null;
                         ap.return?.(errorValue);
@@ -515,7 +513,8 @@ export const tag = function (_1, _2, _3) {
                             mounted = mounted || base.isConnected;
                             // If we have been mounted before, but aren't now, remove the consumer
                             if (removedNodes.has(base)) {
-                                error();
+                                error("(node removed)");
+                                ap.return?.();
                                 return;
                             }
                             const value = unbox(es.value);
@@ -551,9 +550,8 @@ export const tag = function (_1, _2, _3) {
                         }
                     };
                     const error = (errorValue) => {
-                        ap.return?.(errorValue);
                         if (errorValue) {
-                            console.warn("Dynamic attribute terminartion", errorValue, k, d, createdBy, logNode(base));
+                            console.warn("Dynamic attribute termination", errorValue, k, d, createdBy, logNode(base));
                             base.appendChild(DyamicElementError({ error: errorValue }));
                         }
                     };
@@ -562,7 +560,7 @@ export const tag = function (_1, _2, _3) {
                         update({ done: false, value: unboxed });
                     else
                         ap.next().then(update).catch(error);
-                    removedNodes.onRemoval([base], k, error);
+                    removedNodes.onRemoval([base], k, () => ap.return?.());
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {

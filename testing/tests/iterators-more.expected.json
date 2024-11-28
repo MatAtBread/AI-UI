@@ -198,7 +198,7 @@
   [197,"mapperEx","yield",3],
   [198,"mapperEx","Exception","MapperEX"],
   [199,"mapperEx","finally"],
-  [200,"run ex",{"done":true,"value":"MapperEX"}],
+  [200,"run ex",{"value":"mapperEx done 3","done":true}],
   [201,"run finally"],
   [202,"mapperEx then:",null]
 ]
