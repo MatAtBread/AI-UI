@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>window.DEBUG = true</script>
+    <script src="../../module/dist/ai-ui.js"></script>
+</head>
+
+<body>
+</body>
+<script>
+
+  /* Specify what base tags you reference in your UI */
+  const { div } = AIUI.tag();
+
+  /* Define a _new_ tag type, called `App`, based on the standard "<div>" tag,
+    that is composed of an h2 and div elements. It will generate markup like:
+
+  <div>
+      <h2>Hello World</h2>
+      <div>Dunno</div>
+  </div>
+
+  */
+
+  /* A simple async "sleep" function */
+  function sleep(seconds) {
+    return new Promise(resolve => setTimeout(resolve, seconds * 1000))
+  }
+
+  /* The async generator that yields the time once a second */
+  async function *clock() {
+    while (true) {
+      yield "red";
+      await sleep(1);
+      yield "blue";
+      await sleep(1);
+      throw "end";
+    }
+  }
+
+  window.xx = new WeakSet();
+  window.xx.add(div({ id: "static"},1));
+  window.xx.add(div({ id: clock() },2));
+  //window.xx.add(div({ id: "style",  style: { color: clock() }},2));
+  //window.xx.add(div({ id: "text" },3,clock()));
+</script>
