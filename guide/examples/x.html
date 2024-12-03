@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+    <script>window.DEBUG = true;</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="../../module/dist/ai-ui.js"></script>
+</head>
+
+<body>
+</body>
+<script>
+  /* Specify what base tags you reference in your UI */
+  const { div } = AIUI.tag();
+
+  const App = div.extended({
+    constructed() {
+      return [
+        this.when('@ready')(x => JSON.stringify(x))
+      ]
+    }
+  });
+
+document.body.append(App());
+</script>
+
