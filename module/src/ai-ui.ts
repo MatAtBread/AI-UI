@@ -642,7 +642,7 @@ export const tag = <TagLoader>function <Tags extends string,
           }
           const error = (errorValue: any) => {
             if (errorValue) {
-              console.warn("Dynamic attribute termination", errorValue, k, d, createdBy, logNode(base));
+              console.warn("Dynamic attribute termination", errorValue, k, logNode(d), createdBy, logNode(base));
               base.appendChild(DyamicElementError({ error: errorValue }));
             }
           }
