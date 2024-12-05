@@ -738,6 +738,9 @@ export function filterMap<U extends PartialIterable, R>(source: U,
       return Promise.resolve(ai?.return?.(v)).then(done, done)
     }
   };
+  // if (DEBUG) Object.defineProperty(fai,'debug: source asyncIterator',{
+  //   value: new WeakRef(source)
+  // })
   return iterableHelpers(fai)
 }
 
