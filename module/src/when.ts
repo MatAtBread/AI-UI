@@ -76,10 +76,9 @@ type IsValidWhenSelector<S>
 
 type ExtractEventNames<S>
   = S extends keyof SpecialWhenEvents ? S
-  : S extends `${infer V}:${CSSIdentifier}`
-  ? EventNameUnion<V> extends never ? never : EventNameUnion<V>
-  : S extends CSSIdentifier
-  ? 'change'
+  : S extends `${infer V}:${CSSIdentifier}` ? EventNameUnion<V> extends never ? never : EventNameUnion<V>
+  : S extends keyof WhenEvents ? EventNameUnion<S> extends never ? never : EventNameUnion<S>
+  : S extends CSSIdentifier ? 'change'
   : never;
 
 type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];

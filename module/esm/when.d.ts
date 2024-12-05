@@ -14,7 +14,7 @@ type EventNameUnion<T extends string> = T extends keyof WhenEvents ? T : T exten
 type EventAttribute = `${keyof GlobalEventHandlersEventMap}`;
 type CSSIdentifier<IDS extends string = string> = `#${IDS}` | `#${IDS}>` | `.${string}` | `[${string}]`;
 export type ValidWhenSelector<IDS extends string = string> = `${keyof SpecialWhenEvents}` | `${EventAttribute}:${CSSIdentifier<IDS>}` | EventAttribute | CSSIdentifier<IDS>;
-type ExtractEventNames<S> = S extends keyof SpecialWhenEvents ? S : S extends `${infer V}:${CSSIdentifier}` ? EventNameUnion<V> extends never ? never : EventNameUnion<V> : S extends CSSIdentifier ? 'change' : never;
+type ExtractEventNames<S> = S extends keyof SpecialWhenEvents ? S : S extends `${infer V}:${CSSIdentifier}` ? EventNameUnion<V> extends never ? never : EventNameUnion<V> : S extends keyof WhenEvents ? EventNameUnion<S> extends never ? never : EventNameUnion<S> : S extends CSSIdentifier ? 'change' : never;
 type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>];
 export declare function when<S extends WhenParameters>(container: Element, ...sources: S): WhenReturn<S>;
 export {};
