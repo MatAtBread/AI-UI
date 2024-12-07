@@ -76,10 +76,10 @@ export interface TagLoader {
 
   <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
   <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
-  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
-  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(tags: Tags[], options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
-  <Tags extends string, Q extends {}>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): { [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement> } & CreateElement
-  <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement
+  <Tags extends keyof HTMLElementTagNameMap, Q extends object>(options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends keyof HTMLElementTagNameMap, Q extends object>(tags: Tags[], options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends string, Q extends object>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): { [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement> } & CreateElement
+  <Tags extends string, Q extends object>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement
 }
 
 let idCount = 0;
@@ -126,7 +126,7 @@ function isChildTag(x: any): x is ChildTags {
 export const tag = <TagLoader>function <Tags extends string,
   T1 extends (string | Tags[] | TagFunctionOptions<Q>),
   T2 extends (Tags[] | TagFunctionOptions<Q>),
-  Q extends {}
+  Q extends object
 >(
   _1: T1,
   _2: T2,
@@ -150,6 +150,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
   const commonProperties = options?.commonProperties;
   const thisDoc = options?.document ?? globalThis.document;
+  const isTestEnv = thisDoc.documentURI === 'about:testing';
   const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
     return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
   }
@@ -551,7 +552,10 @@ export const tag = <TagLoader>function <Tags extends string,
         }
 
         function set(k: string, v:any) {
-          if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (!(k in d) || typeof d[k as keyof typeof d] !== 'string')) 
+          if (!isTestEnv 
+            && d instanceof Element 
+            && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') 
+            && (!(k in d) || typeof d[k as keyof typeof d] !== 'string')) 
             d.setAttribute(k==='className' ? 'class' : k,String(v));
           else
             d[k] = v;

@@ -54,7 +54,8 @@
     "prepublishOnly": "npm run build && npm test",
     "test": "tsc -p ../type_tests/tsconfig.json && npm run tests --",
     "tests": "ts-node ../testing/index.ts",
-    "examples": "npx http-server .. -c0 -e js"
+    "examples": "npx http-server .. -c0 -e js",
+    "ts-trace": "tsc -p ./tsconfig.json --generateTrace ./trace --incremental false && npx @typescript/analyze-trace ./trace"
   },
   "type": "module",
   "types": "./esm/ai-ui.d.ts",

@@ -31,15 +31,15 @@ export interface TagLoader {
     <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): {
         [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]>;
     } & CreateElement;
-    <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(options: TagFunctionOptions<Q>): {
+    <Tags extends keyof HTMLElementTagNameMap, Q extends object>(options: TagFunctionOptions<Q>): {
         [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]>;
     } & CreateElement;
-    <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(tags: Tags[], options: TagFunctionOptions<Q>): {
+    <Tags extends keyof HTMLElementTagNameMap, Q extends object>(tags: Tags[], options: TagFunctionOptions<Q>): {
         [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]>;
     } & CreateElement;
-    <Tags extends string, Q extends {}>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): {
+    <Tags extends string, Q extends object>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): {
         [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement>;
     } & CreateElement;
-    <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement;
+    <Tags extends string, Q extends object>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement;
 }
 export declare const tag: TagLoader;

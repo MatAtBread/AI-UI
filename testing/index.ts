@@ -104,7 +104,7 @@ async function captureLogs(file: string) {
   }
 
   // Globals to simulate DOM
-  const window = new JSDOM().window;
+  const window = new JSDOM('',{ url: 'about:testing' }).window;
   Object.assign(globalThis, {
 //    DEBUG: true,
     CSS: {

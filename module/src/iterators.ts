@@ -134,7 +134,7 @@ const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(
 
 // Like Object.assign, but the assigned properties are not enumerable
 const iteratorCallSite = Symbol("IteratorCallSite");
-function assignHidden<D extends {}, S extends {}>(d: D, s: S) {
+function assignHidden<D extends object, S extends object>(d: D, s: S) {
   const keys = [...Object.getOwnPropertyNames(s), ...Object.getOwnPropertySymbols(s)];
   for (const k of keys) {
     Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false });
@@ -267,7 +267,7 @@ declare global {
 */
 
 const _proxiedAsyncIterator = Symbol('_proxiedAsyncIterator');
-export function defineIterableProperty<T extends {}, const N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<{ [k in N]: V }> {
+export function defineIterableProperty<T extends object, const N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<{ [k in N]: V }> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed

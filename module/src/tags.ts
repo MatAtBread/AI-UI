@@ -32,7 +32,7 @@ export type Instance<T = {}> = { [UniqueID]: string } & T;
 
 /* Types used to validate an extended tag declaration */
 
-type NeverEmpty<O extends {}> = {} extends O ? never : O;
+type NeverEmpty<O extends object> = {} extends O ? never : O;
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
 type PickType<T, V> = [{ [K in keyof T as T[K] extends V ? K : never]: T[K] }][number]
 
@@ -90,7 +90,7 @@ export type Overrides = {
   styles?: string;
 }
 
-type IDS<I> = I extends {} ? {
+type IDS<I> = I extends object ? {
   ids: {
     [J in keyof I]: I[J] extends ExTagCreator<any> ? ReturnType<I[J]> : never;
   }
@@ -109,7 +109,7 @@ export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagC
 type BaseIterables<Base> =
   Base extends ExTagCreator<infer _Base, infer Super, infer SuperDefs extends Overrides, infer _Statics>
   ? BaseIterables<Super> extends never
-    ? SuperDefs['iterable'] extends {}
+    ? SuperDefs['iterable'] extends object
       ? SuperDefs['iterable']
       : {}
     : BaseIterables<Super> & SuperDefs['iterable']
@@ -146,12 +146,12 @@ export interface ExtendTagFunctionInstance extends ExtendTagFunction {
   extended: (this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) => ExtendTagFunctionInstance;
 }
 
-interface TagConstuctor<Base extends {}> {
+interface TagConstuctor {
   constructor: ExtendTagFunctionInstance;
 }
 
 type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> =
-  TagConstuctor<Base> &
+  TagConstuctor &
   ReadWriteAttributes<
     IterableProperties<CombinedIterableProperties<Base,D>>
     & CombinedNonIterableProperties<Base,D>,
@@ -249,11 +249,11 @@ export type TagCreatorArgs<A> = [] | [A & TagCreationOptions] | [A & TagCreation
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */
-export type TagCreatorFunction<Base extends {}> = (...args: TagCreatorArgs<PossiblyAsync<Base> & ThisType<Base>>) => ReadWriteAttributes<Base>;
+export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<Base> & ThisType<Base>>) => ReadWriteAttributes<Base>;
 
 /* A TagCreator is TagCreatorFunction decorated with some extra methods. The Super & Statics args are only
 ever specified by ExtendedTag (internally), and so is not exported */
-type ExTagCreator<Base extends {},
+type ExTagCreator<Base extends object,
   Super extends (unknown | ExTagCreator<any>) = unknown,
   SuperDefs extends Overrides = {},
   Statics = {},
@@ -274,4 +274,4 @@ type ExTagCreator<Base extends {},
 // so we compute the Statics outside this type declaration as pass them as a result
 Statics;
 
-export type TagCreator<Base extends {}> = ExTagCreator<Base, never, never, {}>;
+export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {}>;

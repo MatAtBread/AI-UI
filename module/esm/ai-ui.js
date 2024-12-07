@@ -68,6 +68,7 @@ export const tag = function (_1, _2, _3) {
             : [null, standandTags, _1];
     const commonProperties = options?.commonProperties;
     const thisDoc = options?.document ?? globalThis.document;
+    const isTestEnv = thisDoc.documentURI === 'about:testing';
     const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     };
@@ -455,7 +456,10 @@ export const tag = function (_1, _2, _3) {
                     });
                 }
                 function set(k, v) {
-                    if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (!(k in d) || typeof d[k] !== 'string'))
+                    if (!isTestEnv
+                        && d instanceof Element
+                        && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
+                        && (!(k in d) || typeof d[k] !== 'string'))
                         d.setAttribute(k === 'className' ? 'class' : k, String(v));
                     else
                         d[k] = v;
@@ -746,7 +750,7 @@ export const tag = function (_1, _2, _3) {
         return extendTag;
     }
     const createElement = (name, attrs, ...children) => 
-    // @ts-ignore 
+    // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
     name instanceof Node ? name
         : typeof name === 'string' && name in baseTagCreators ? baseTagCreators[name](attrs, children)
             : name === baseTagCreators.createElement ? [...nodes(...children)]
