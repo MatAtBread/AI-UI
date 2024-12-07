@@ -1,5 +1,6 @@
 import { AsyncExtraIterable } from "./iterators.js";
-export type WhenParameters<IDS extends string = string> = ReadonlyArray<AsyncIterable<any> | ValidWhenSelector<IDS> | Element | Promise<any>>;
+type WhenParameter<IDS extends string = string> = ValidWhenSelector<IDS> | Element | Promise<any> | AsyncIterable<any>;
+export type WhenParameters<IDS extends string = string> = ReadonlyArray<WhenParameter<IDS>>;
 type WhenIteratedType<S extends WhenParameters> = (Extract<S[number], AsyncIterable<any>> extends AsyncIterable<infer I> ? unknown extends I ? never : I : never) | ExtractEvents<Extract<S[number], string>> | (Extract<S[number], Element> extends never ? never : Event);
 type MappableIterable<A extends AsyncIterable<any>> = A extends AsyncIterable<infer T> ? A & AsyncExtraIterable<T> & (<R>(mapper: (value: A extends AsyncIterable<infer T> ? T : never) => R) => (AsyncExtraIterable<Awaited<R>>)) : never;
 export type WhenReturn<S extends WhenParameters> = MappableIterable<AsyncExtraIterable<WhenIteratedType<S>>>;

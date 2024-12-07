@@ -20,7 +20,7 @@ interface PoElementMethods {
     get attributes(): NamedNodeMap;
 }
 export interface CreateElement {
-    createElement(name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap, attrs: any, ...children: ChildTags[]): Node;
+    createElement<N extends (TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap | CreateElement['createElement'])>(name: N, attrs: any, ...children: ChildTags[]): N extends CreateElement['createElement'] ? Node[] : Node;
 }
 export interface TagLoader {
     nodes(...c: ChildTags[]): (Node | ((Element & PoElementMethods)))[];

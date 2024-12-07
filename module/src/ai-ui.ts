@@ -45,14 +45,14 @@ interface PoElementMethods {
 // Note: same signature as React.createElement
 export interface CreateElement {
   // Support for htm, JSX, etc
-  createElement(
+  createElement<N extends (TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap | CreateElement['createElement'])>(
     // "name" can a HTML tag string, an existing node (just returns itself), or a tag function
-    name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap,
+    name: N,
     // The attributes used to initialise the node (if a string or function - ignore if it's already a node)
     attrs: any,
     // The children
-    ...children: ChildTags[]): Node;
-}
+    ...children: ChildTags[]): N extends CreateElement['createElement'] ? Node[] : Node;
+  }
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
 export interface TagLoader {
@@ -848,24 +848,21 @@ export const tag = <TagLoader>function <Tags extends string,
     return extendTag;
   }
 
+  const createElement: CreateElement['createElement'] = (name, attrs, ...children) =>
+    // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
+    name instanceof Node ? name
+    : typeof name === 'string' && name in baseTagCreators ? baseTagCreators[name](attrs, children)
+    : name === baseTagCreators.createElement ? [...nodes(...children)]
+    : typeof name === 'function' ? name(attrs, children)
+    : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) })
+
   // @ts-ignore
   const baseTagCreators: CreateElement & {
     [K in keyof HTMLElementTagNameMap]?: TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>
   } & {
     [n: string]: TagCreator<Q & Element & PoElementMethods>
   } = {
-    createElement(
-      name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap,
-      attrs: any,
-      ...children: ChildTags[]): Node {
-      return (name === baseTagCreators.createElement ? nodes(...children)
-        : typeof name === 'function' ? name(attrs, children)
-        : typeof name === 'string' && name in baseTagCreators ?
-        // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
-            baseTagCreators[name](attrs, children)
-        : name instanceof Node ? name
-        : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) })) as Node
-    }
+    createElement
   }
 
   function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>;

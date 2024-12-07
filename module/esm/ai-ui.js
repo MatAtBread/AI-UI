@@ -745,17 +745,16 @@ export const tag = function (_1, _2, _3) {
         }
         return extendTag;
     }
+    const createElement = (name, attrs, ...children) => 
+    // @ts-ignore 
+    name instanceof Node ? name
+        : typeof name === 'string' && name in baseTagCreators ? baseTagCreators[name](attrs, children)
+            : name === baseTagCreators.createElement ? [...nodes(...children)]
+                : typeof name === 'function' ? name(attrs, children)
+                    : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) });
     // @ts-ignore
     const baseTagCreators = {
-        createElement(name, attrs, ...children) {
-            return (name === baseTagCreators.createElement ? nodes(...children)
-                : typeof name === 'function' ? name(attrs, children)
-                    : typeof name === 'string' && name in baseTagCreators ?
-                        // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
-                        baseTagCreators[name](attrs, children)
-                        : name instanceof Node ? name
-                            : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) }));
-        }
+        createElement
     };
     function createTag(k) {
         if (baseTagCreators[k])
