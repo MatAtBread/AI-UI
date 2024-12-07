@@ -1,7 +1,6 @@
 import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyValue } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
 export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
-type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
 type DeepPartial<X> = [X] extends [{}] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;
@@ -96,11 +95,10 @@ export type TagCreationOptions = {
 type ReTypedEventHandlers<T> = {
     [K in keyof T]: K extends keyof GlobalEventHandlers ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E) => any ? (this: T, e: E) => any | null : T[K] : T[K];
 };
-export type PossiblyAsync<X> = [
-    X
-] extends [object] ? X extends AsyncAttr<infer U> ? PossiblyAsync<U> : X extends Function ? X | AsyncAttr<X> : AsyncAttr<Partial<X>> | {
+type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
+type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? X extends (AsyncProvider<U> & U) ? U | AsyncAttr<U> : X | PromiseLike<X> : X extends (any[] | Function) ? X | AsyncAttr<X> : {
     [K in keyof X]?: PossiblyAsync<X[K]>;
-} : X | AsyncAttr<X> | undefined;
+} | Partial<X> | AsyncAttr<Partial<X>> : X | AsyncAttr<X>;
 type ReadWriteAttributes<E, Base = E> = E extends {
     attributes: any;
 } ? (Omit<E, 'attributes'> & {

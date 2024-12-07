@@ -1,5 +1,5 @@
 import type { TagCreator } from '../module/src/ai-ui.js';
-import type { AsyncExtraIterable } from '../module/src/iterators.js';
+import type { AsyncExtraIterable, IterableType } from '../module/src/iterators.js';
 
 type AssertEqual<T, Expected> = [T] extends [Expected]
   ? [Expected] extends [T]
@@ -7,13 +7,13 @@ type AssertEqual<T, Expected> = [T] extends [Expected]
   : { false: false; }
   : { false: false; };
 
-declare const div: TagCreator<Element>;
+declare const elt: TagCreator<Element>;
 const uninitialised = undefined as unknown;
 async function* gen<T>(a: T) { yield a }
 
 /* Tests to ensure that `this` is correct inside members of extended tags */
 
-const Base = div.extended({
+const Base = elt.extended({
   declare: {
     nd: 0,
     ad: uninitialised as AsyncExtraIterable<number>,
@@ -83,3 +83,24 @@ type verifyN = AssertEqual<N, {
   ad: AsyncExtraIterable<number>;
   fn: () => void;
 }>['true'];
+
+const Ext = Base.extended({
+  iterable:{
+    ab: uninitialised as boolean
+  }
+});
+
+const x = [
+  Ext({ ni: 1 }),
+  Ext({ ni: Promise.resolve(1) }),
+  Ext({ ni: gen(1) }),
+  Ext({ ni: gen(Promise.resolve(1)) }),
+  Ext({ ni: Promise.resolve(gen(1)) }),
+];
+
+type verifyXAB = [
+  AssertEqual<(typeof x)[number]['ab'], IterableType<boolean>>['true'],
+  AssertEqual<(typeof x)[number]['nd'], number>['true'],
+  AssertEqual<(typeof x)[number]['ad'], AsyncExtraIterable<number>>['true'],
+  AssertEqual<(typeof x)[number]['ni'], IterableType<number>>['true'],
+];

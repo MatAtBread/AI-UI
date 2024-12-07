@@ -15,7 +15,6 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   | Array<ChildTags>
   | Iterable<ChildTags>; // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
 
-type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
 
 type DeepPartial<X> = [X] extends [{}] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
 
@@ -228,14 +227,16 @@ type ReTypedEventHandlers<T> = {
     : T[K]
 }
 
-export type PossiblyAsync<X> =
-  [X] extends [object] // Not "naked" to prevent union distribution
-  ? X extends AsyncAttr<infer U>
-  ? PossiblyAsync<U>
-  : X extends Function
-  ? X | AsyncAttr<X>
-  : AsyncAttr<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; }
-  : X | AsyncAttr<X> | undefined;
+type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
+type PossiblyAsync<X> = [X] extends [object] /* Not "naked" to prevent union distribution */
+  ? X extends AsyncProvider<infer U>
+    ? X extends (AsyncProvider<U> & U) 
+      ? U | AsyncAttr<U> // iterable property
+      : X | PromiseLike<X> // some other AsyncProvider
+    : X extends (any[] | Function) 
+      ? X | AsyncAttr<X>  // Array or Function, which can be provided async
+      : { [K in keyof X]?: PossiblyAsync<X[K]> } | Partial<X> | AsyncAttr<Partial<X>> // Other object - partially, possible async
+  : X | AsyncAttr<X> // Something else (number, etc), which can be provided async
 
 type ReadWriteAttributes<E, Base = E> = E extends { attributes: any }
   ? (Omit<E, 'attributes'> & {
