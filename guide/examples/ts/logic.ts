@@ -13,7 +13,47 @@ const Gate2In = div.extended(({
   declare: {
     out: undefined as unknown as Iterators.AsyncExtraIterable<boolean>,
     logic(): boolean { return false },
-    contents(): Iterable<ChildTags> { return []; }
+    contents(): Iterable<ChildTags> { return []; },
+    get canDrag(): ReturnType<typeof Gate2In> {
+      this.style.position = 'absolute';
+      this.when('click:#in1', 'click:#in2').consume(e => {
+        if (e.target && 'id' in e.target && typeof e.target.id === 'string' && e.target.id in this) {
+          // @ts-ignore
+          this[e.target.id] = !this[e.target.id].valueOf()
+        }
+      });
+    
+      let drag = false;
+      this.when('dblclick').consume(e => { this.remove() });
+      this.when('mousedown').consume((e) => {
+        if (!drag && e.target && 'id' in e.target && !e.target.id) {
+          drag = true;
+          this.classList.add('selected');
+          this.parentElement?.append(this);
+        }
+      });
+      this.when('mouseup', 'mouseout').consume((e) => {
+        if (drag && (e.type === 'mouseup' || (e.type === 'mouseout' && e.target === this))) {
+          drag = false;
+          this.classList.remove('selected');
+        }
+      });
+      this.when('mousemove').consume((e) => {
+        if (drag) {
+          let x = parseInt(this.style.left);
+          let y = parseInt(this.style.top);
+          if (!x || !y) {
+            const r = this.getBoundingClientRect();
+            x = x || r.left;
+            y = y || r.top;
+          }
+          this.style.left = Math.max(0, (x + e.movementX)) + 'px';
+          this.style.top = Math.max(0, (y + e.movementY)) + 'px';
+        }
+      });
+      return this;
+    }
+    
   },
   override: {
     className: 'gate2in'
@@ -106,90 +146,6 @@ const Nor = Gate2In.extended({
   }
 });
 
-function draggable(gt: ReturnType<typeof Gate2In>) {
-  gt.style.position = 'absolute';
-  gt.when('click:#in1', 'click:#in2').consume(e => {
-    if (e.target && 'id' in e.target && typeof e.target.id === 'string' && e.target.id in gt) {
-      // @ts-ignore
-      gt[e.target.id] = !gt[e.target.id].valueOf()
-    }
-  });
-
-  let drag = false;
-  gt.when('dblclick').consume(e => { gt.remove() });
-  gt.when('mousedown').consume((e) => {
-    if (!drag && e.target && 'id' in e.target && !e.target.id) {
-      drag = true;
-      gt.classList.add('selected');
-      gt.parentElement?.append(gt);
-    }
-  });
-  gt.when('mouseup', 'mouseout').consume((e) => {
-    if (drag && (e.type === 'mouseup' || (e.type === 'mouseout' && e.target === gt))) {
-      drag = false;
-      gt.classList.remove('selected');
-    }
-  });
-  gt.when('mousemove').consume((e) => {
-    if (drag) {
-      let x = parseInt(gt.style.left);
-      let y = parseInt(gt.style.top);
-      if (!x || !y) {
-        const r = gt.getBoundingClientRect();
-        x = x || r.left;
-        y = y || r.top;
-      }
-      gt.style.left = Math.max(0, (x + e.movementX)) + 'px';
-      gt.style.top = Math.max(0, (y + e.movementY)) + 'px';
-    }
-  });
-  return gt;
-}
-// const DragNand = Nand.extended({
-//   override: {
-//     style: {
-//       position: 'absolute'
-//     }
-//   },
-//   constructed() {
-//     this.when('click:#in1', 'click:#in2').consume(e => {
-//       if (e.target && 'id' in e.target && typeof e.target.id === 'string' && e.target.id in this) {
-//         // @ts-ignore
-//         this[e.target.id] = !this[e.target.id].valueOf()
-//       }
-//     });
-
-//     let drag = false;
-//     this.when('dblclick').consume(e => { this.remove() });
-//     this.when('mousedown').consume((e) => {
-//       if (!drag && e.target && 'id' in e.target && !e.target.id) {
-//         drag = true;
-//         this.classList.add('selected');
-//         this.parentElement?.append(this);
-//       }
-//     });
-//     this.when('mouseup', 'mouseout').consume((e) => {
-//       if (drag && (e.type === 'mouseup' || (e.type === 'mouseout' && e.target === this))) {
-//         drag = false;
-//         this.classList.remove('selected');
-//       }
-//     });
-//     this.when('mousemove').consume((e) => {
-//       if (drag) {
-//         let x = parseInt(this.style.left);
-//         let y = parseInt(this.style.top);
-//         if (!x || !y) {
-//           const r = this.getBoundingClientRect();
-//           x = x || r.left;
-//           y = y || r.top;
-//         }
-//         this.style.left = Math.max(0, (x + e.movementX)) + 'px';
-//         this.style.top = Math.max(0, (y + e.movementY)) + 'px';
-//       }
-//     });
-//   }
-// });
-
 const App = div.extended({
   styles: `
   body {
@@ -213,7 +169,7 @@ const App = div.extended({
       },
         button({
           style: { borderRadius: '1em' },
-          onclick: () => this.ids.circuit.append(draggable(Nand()))
+          onclick: () => this.ids.circuit.append(Nand().canDrag)
         }, 
           Nand({
             style: {
@@ -224,7 +180,7 @@ const App = div.extended({
         ),
         button({
           style: { borderRadius: '1em' },
-          onclick: () => this.ids.circuit.append(draggable(Nor()))
+          onclick: () => this.ids.circuit.append(Nor().canDrag)
         }, 
           Nor({
             style: {
