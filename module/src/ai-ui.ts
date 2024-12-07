@@ -35,7 +35,7 @@ type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> 
 interface PoElementMethods {
   get ids(): {}
   when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
-  // This is a very incomplete type. In practice, set(attrs) requires a deeply partial set of
+  // This is a very incomplete type. In practice, set(k, attrs) requires a deeply partial set of
   // attributes, in exactly the same way as a TagFunction's first object parameter
   set attributes(attrs: object);
   get attributes(): NamedNodeMap
@@ -533,7 +533,7 @@ export const tag = <TagLoader>function <Tags extends string,
   function assignProps(base: Node, props: Record<string, any>) {
     // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
     if (!(callStackSymbol in props)) {
-      (function assign(d: any, s: any): void {
+      (function assign(d: any, s: any): void {        
         if (s === null || s === undefined || typeof s !== 'object')
           return;
         // static props before getters/setters
@@ -549,6 +549,14 @@ export const tag = <TagLoader>function <Tags extends string,
             return 0;
           });
         }
+
+        function set(k: string, v:any) {
+          if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (k in d && typeof d[k as keyof typeof d] !== 'string')) 
+            d.setAttribute(k==='className' ? 'class' : k,String(v));
+          else
+            d[k] = v;
+        }
+
         for (const [k, srcDesc] of sourceEntries) {
           try {
             if ('value' in srcDesc) {
@@ -567,7 +575,7 @@ export const tag = <TagLoader>function <Tags extends string,
                       }
                     } else {
                       if (s[k] !== undefined)
-                        d[k] = v;
+                        set(k, v);
                     }
                   }
                 }, error => console.log(`Exception in promised attribute '${k}'`, error, logNode(d)));
@@ -577,7 +585,7 @@ export const tag = <TagLoader>function <Tags extends string,
                   assignObject(value, k);
                 else {
                   if (s[k] !== undefined)
-                    d[k] = s[k];
+                    set(k, s[k]);
                 }
               }
             } else {
@@ -625,11 +633,11 @@ export const tag = <TagLoader>function <Tags extends string,
                 if (k === 'style' || !destDesc?.set)
                   assign(d[k], value);
                 else
-                  d[k] = value;
+                  set(k, value);
               } else {
                 // Src is not an object (or is null) - just assign it, unless it's undefined
                 if (value !== undefined)
-                  d[k] = value;
+                  set(k, value);
               }
 
               if (DEBUG && !mounted && createdAt < Date.now()) {
@@ -658,7 +666,7 @@ export const tag = <TagLoader>function <Tags extends string,
         function assignObject(value: any, k: string) {
           if (value instanceof Node) {
             console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${base instanceof Node ? logNode(base) : base}`);
-            d[k] = value;
+            set(k, value);
           } else {
             // Note - if we're copying to ourself (or an array of different length),
             // we're decoupling common object references, so we need a clean object to
@@ -667,15 +675,15 @@ export const tag = <TagLoader>function <Tags extends string,
               if (value.constructor === Object || value.constructor === Array) {
                 const copy = new (value.constructor);
                 assign(copy, value);
-                d[k] = copy;
+                set(k, copy);
                 //assign(d[k], value);
               } else {
                 // This is some sort of constructed object, which we can't clone, so we have to copy by reference
-                d[k] = value;
+                set(k, value);
               }
             } else {
               if (Object.getOwnPropertyDescriptor(d, k)?.set)
-                d[k] = value;
+                set(k, value);
               else
                 assign(d[k], value);
             }

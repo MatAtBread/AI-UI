@@ -454,6 +454,12 @@ export const tag = function (_1, _2, _3) {
                         return 0;
                     });
                 }
+                function set(k, v) {
+                    if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (k in d && typeof d[k] !== 'string'))
+                        d.setAttribute(k === 'className' ? 'class' : k, String(v));
+                    else
+                        d[k] = v;
+                }
                 for (const [k, srcDesc] of sourceEntries) {
                     try {
                         if ('value' in srcDesc) {
@@ -475,7 +481,7 @@ export const tag = function (_1, _2, _3) {
                                         }
                                         else {
                                             if (s[k] !== undefined)
-                                                d[k] = v;
+                                                set(k, v);
                                         }
                                     }
                                 }, error => console.log(`Exception in promised attribute '${k}'`, error, logNode(d)));
@@ -486,7 +492,7 @@ export const tag = function (_1, _2, _3) {
                                     assignObject(value, k);
                                 else {
                                     if (s[k] !== undefined)
-                                        d[k] = s[k];
+                                        set(k, s[k]);
                                 }
                             }
                         }
@@ -533,12 +539,12 @@ export const tag = function (_1, _2, _3) {
                                 if (k === 'style' || !destDesc?.set)
                                     assign(d[k], value);
                                 else
-                                    d[k] = value;
+                                    set(k, value);
                             }
                             else {
                                 // Src is not an object (or is null) - just assign it, unless it's undefined
                                 if (value !== undefined)
-                                    d[k] = value;
+                                    set(k, value);
                             }
                             if (DEBUG && !mounted && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
@@ -563,7 +569,7 @@ export const tag = function (_1, _2, _3) {
                 function assignObject(value, k) {
                     if (value instanceof Node) {
                         console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${base instanceof Node ? logNode(base) : base}`);
-                        d[k] = value;
+                        set(k, value);
                     }
                     else {
                         // Note - if we're copying to ourself (or an array of different length),
@@ -573,17 +579,17 @@ export const tag = function (_1, _2, _3) {
                             if (value.constructor === Object || value.constructor === Array) {
                                 const copy = new (value.constructor);
                                 assign(copy, value);
-                                d[k] = copy;
+                                set(k, copy);
                                 //assign(d[k], value);
                             }
                             else {
                                 // This is some sort of constructed object, which we can't clone, so we have to copy by reference
-                                d[k] = value;
+                                set(k, value);
                             }
                         }
                         else {
                             if (Object.getOwnPropertyDescriptor(d, k)?.set)
-                                d[k] = value;
+                                set(k, value);
                             else
                                 assign(d[k], value);
                         }

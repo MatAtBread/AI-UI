@@ -34,6 +34,7 @@ const Nand = div.extended(({
         width: '100%',
         height: '100%'
       },
+      viewBox: '0 0 320 180',
       innerHTML: Iterators.combine({ in1: this.in1, in2: this.in2, out: this.out as any }).map(v => `
       <defs>
       <path id="terminal" d="M 0,0 L 12,12 M 12,0 L 0,12" style="fill:none;stroke-width:5;"/>
@@ -55,7 +56,6 @@ const Nand = div.extended(({
       <use id="out" xlink:href="#terminal" x="303" y="83" style="stroke:green"/>
      `)
     });
-    s.setAttribute('viewBox', '0 0 320 180');
     return s;
   }
 }));
