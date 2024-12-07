@@ -551,7 +551,7 @@ export const tag = <TagLoader>function <Tags extends string,
         }
 
         function set(k: string, v:any) {
-          if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (k in d && typeof d[k as keyof typeof d] !== 'string')) 
+          if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (!(k in d) || typeof d[k as keyof typeof d] !== 'string')) 
             d.setAttribute(k==='className' ? 'class' : k,String(v));
           else
             d[k] = v;

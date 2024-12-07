@@ -455,7 +455,7 @@ export const tag = function (_1, _2, _3) {
                     });
                 }
                 function set(k, v) {
-                    if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (k in d && typeof d[k] !== 'string'))
+                    if (d instanceof Element && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') && (!(k in d) || typeof d[k] !== 'string'))
                         d.setAttribute(k === 'className' ? 'class' : k, String(v));
                     else
                         d[k] = v;
