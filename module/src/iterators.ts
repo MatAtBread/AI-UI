@@ -30,13 +30,13 @@ import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferr
 */
 
 // Base types that can be made defined as iterable: basically anything, _except_ a function
-export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null)
 // We should exclude AsyncIterable from the types that can be assigned to iterables (and therefore passed to defineIterableProperty)
-export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue };
+export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue }
 
 export const Iterability = Symbol("Iterability");
-export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
-export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
+export interface Iterability<Depth extends 'shallow' = 'shallow'> { [Iterability]: Depth }
+export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>
 
 declare global {
   // This is patch to the std lib definition of Array<T>. I don't know why it's absent,
@@ -55,7 +55,8 @@ declare global {
   }
 }
 
-type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers;
+type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers
+
 export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
   [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>
 } : {
@@ -295,12 +296,6 @@ export function defineIterableProperty<T extends object, const N extends string 
       } as (typeof asyncExtras)[M]
     }[method];
   }
-
-  type HelperDescriptors<T> = {
-    [K in keyof AsyncExtraIterable<T>]: TypedPropertyDescriptor<AsyncExtraIterable<T>[K]>
-  } & {
-    [Iterability]?: TypedPropertyDescriptor<'shallow'>
-  };
 
   const extras = { [Symbol.asyncIterator]: initIterator } as AsyncExtraIterable<V> & { [Iterability]?: 'shallow' };
   extraKeys.forEach((k) => // @ts-ignore

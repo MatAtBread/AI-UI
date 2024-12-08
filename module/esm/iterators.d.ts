@@ -3,9 +3,9 @@ export type IterablePropertyValue = IterablePropertyPrimitive | IterableProperty
     [k: string | symbol | number]: IterablePropertyValue;
 };
 export declare const Iterability: unique symbol;
-export type Iterability<Depth extends 'shallow' = 'shallow'> = {
+export interface Iterability<Depth extends 'shallow' = 'shallow'> {
     [Iterability]: Depth;
-};
+}
 export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
 declare global {
     interface Array<T> {

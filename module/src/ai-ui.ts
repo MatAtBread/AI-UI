@@ -43,15 +43,17 @@ interface PoElementMethods {
 
 // Support for https://www.npmjs.com/package/htm (or import htm from 'https://cdn.jsdelivr.net/npm/htm/dist/htm.module.js')
 // Note: same signature as React.createElement
+type CreateElementNodeType = TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap
+type CreateElementFragment = CreateElement['createElement'];
 export interface CreateElement {
   // Support for htm, JSX, etc
-  createElement<N extends (TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap | CreateElement['createElement'])>(
+  createElement<N extends (CreateElementNodeType | CreateElementFragment)>(
     // "name" can a HTML tag string, an existing node (just returns itself), or a tag function
     name: N,
     // The attributes used to initialise the node (if a string or function - ignore if it's already a node)
     attrs: any,
     // The children
-    ...children: ChildTags[]): N extends CreateElement['createElement'] ? Node[] : Node;
+    ...children: ChildTags[]): N extends CreateElementFragment ? Node[] : Node;
   }
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
@@ -534,7 +536,7 @@ export const tag = <TagLoader>function <Tags extends string,
   function assignProps(base: Node, props: Record<string, any>) {
     // Copy prop hierarchy onto the element via the asssignment operator in order to run setters
     if (!(callStackSymbol in props)) {
-      (function assign(d: any, s: any): void {        
+      (function assign(d: any, s: any): void {
         if (s === null || s === undefined || typeof s !== 'object')
           return;
         // static props before getters/setters
@@ -551,15 +553,15 @@ export const tag = <TagLoader>function <Tags extends string,
           });
         }
 
-        function set(k: string, v:any) {
-          if (!isTestEnv 
-            && d instanceof Element 
-            && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') 
-            && (!(k in d) || typeof d[k as keyof typeof d] !== 'string')) 
-            d.setAttribute(k==='className' ? 'class' : k,String(v));
-          else
-            d[k] = v;
-        }
+        const set = isTestEnv || !(d instanceof Element)
+          ? (k: string, v: any) => { d[k] = v }
+          : (k: string, v: any) => {
+            if ((v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
+              && (!(k in d) || typeof d[k as keyof typeof d] !== 'string'))
+              d.setAttribute(k === 'className' ? 'class' : k, String(v));
+            else // @ts-ignore
+              d[k] = v;
+          }
 
         for (const [k, srcDesc] of sourceEntries) {
           try {
