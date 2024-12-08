@@ -17,7 +17,7 @@
   if (!tsFile) {
     document.body.textContent = 'No .ts file specified';
   } else {
-    document.body.textContent = 'Loading '+tsFile;
+    document.body.textContent = 'Loading '+tsFile.split(/=\?/)[0];
     fetch(tsFile)
     .then(resp => resp.status === 200
       ? resp.text()

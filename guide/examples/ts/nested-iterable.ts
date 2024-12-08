@@ -66,6 +66,8 @@ document.body.append(t,
   State({ f: 'n', d: 888 }),
   input({ type: 'range', oninput() { t.num = Number(this.value) } }),
   input({ type: 'checkbox', onchange() { t.foo.nest = { f: this.checked }} }),
-  );
+  div(t.foo.map!(v => JSON.stringify(v))),
+  div(t.foo.map!(() => JSON.stringify(t.foo.valueOf())))
+);
 (window as any).t = t;
 

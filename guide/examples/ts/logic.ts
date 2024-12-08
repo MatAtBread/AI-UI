@@ -1,4 +1,4 @@
-import { tag, Iterators, ChildTags } from '../../../module/esm/ai-ui.js'
+import { tag, Iterators, ChildTags, TagCreator } from '../../../module/esm/ai-ui.js'
 
 const { h2, div, button } = tag();
 const { svg, text, path, use, defs } = tag("http://www.w3.org/2000/svg", ["svg", "text", "path", "use", "defs"], { commonProperties: {} as SVGElement });
@@ -14,7 +14,7 @@ const Gate2In = div.extended(({
     out: undefined as unknown as Iterators.AsyncExtraIterable<boolean>,
     logic(): boolean { return false },
     contents(): Iterable<ChildTags> { return []; },
-    get canDrag(): ReturnType<typeof Gate2In> {
+    get canDrag(): HTMLElement {
       this.style.position = 'absolute';
       this.when('click:#in1', 'click:#in2').consume(e => {
         if (e.target && 'id' in e.target && typeof e.target.id === 'string' && e.target.id in this) {
@@ -22,7 +22,7 @@ const Gate2In = div.extended(({
           this[e.target.id] = !this[e.target.id].valueOf()
         }
       });
-    
+
       let drag = false;
       this.when('dblclick').consume(e => { this.remove() });
       this.when('mousedown').consume((e) => {
@@ -53,7 +53,7 @@ const Gate2In = div.extended(({
       });
       return this;
     }
-    
+
   },
   override: {
     className: 'gate2in'
@@ -146,6 +146,16 @@ const Nor = Gate2In.extended({
   }
 });
 
+const CreateComponent = button.extended({
+  styles:`.createComponent { border-radius: 1em; margin-right: 1em; }`,
+  override: {
+    className: 'createComponent'
+  },
+  constructed() {
+    this.firstElementChild.style.pointerEvents = 'none'
+  }
+});
+
 const App = div.extended({
   styles: `
   body {
@@ -163,33 +173,13 @@ const App = div.extended({
     circuit: div
   },
   constructed() {
+    this.when('click:.createComponent').consume(e => {
+      this.ids.circuit.append(e.target.firstElementChild.constructor().canDrag)
+    });
     return [
-      div({
-        className: 'menu'
-      },
-        button({
-          style: { borderRadius: '1em' },
-          onclick: () => this.ids.circuit.append(Nand().canDrag)
-        }, 
-          Nand({
-            style: {
-              position: 'static',
-              width: '160px'
-            }
-          })
-        ),
-        button({
-          style: { borderRadius: '1em' },
-          onclick: () => this.ids.circuit.append(Nor().canDrag)
-        }, 
-          Nor({
-            style: {
-              position: 'static',
-              width: '160px'
-            }
-          })
-        )
-
+      div({ className: 'menu' },
+        CreateComponent(Nand({ style: { width: '160px' } })),
+        CreateComponent(Nor({ style: { width: '160px' } })),
       ),
       div({ id: 'circuit' })
     ]

@@ -455,7 +455,7 @@ export const tag = function (_1, _2, _3) {
                         return 0;
                     });
                 }
-                const set = isTestEnv || !(d instanceof Element)
+                const set = isTestEnv || !(d instanceof Element) || (d instanceof HTMLElement)
                     ? (k, v) => { d[k] = v; }
                     : (k, v) => {
                         if ((v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
