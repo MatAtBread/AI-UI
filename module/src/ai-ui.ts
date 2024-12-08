@@ -553,7 +553,7 @@ export const tag = <TagLoader>function <Tags extends string,
           });
         }
 
-        const set = isTestEnv || !(d instanceof Element)
+        const set = isTestEnv || !(d instanceof Element) || (d instanceof HTMLElement)
           ? (k: string, v: any) => { d[k] = v }
           : (k: string, v: any) => {
             if ((v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
