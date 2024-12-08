@@ -1,12 +1,12 @@
-import { ChildTags } from "./ai-ui.js";
-declare const AIUIJSX: <N extends (import("./tags.js").TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap | import("./ai-ui.js").CreateElement["createElement"])>(name: N, attrs: any, ...children: ChildTags[]) => N extends import("./ai-ui.js").CreateElement["createElement"] ? Node[] : Node;
+import { ChildTags, TagCreatorFunction } from "./ai-ui.js";
+declare const AIUIJSX: <N extends ((Node | keyof HTMLElementTagNameMap | TagCreatorFunction<any>) | /*elided*/ any)>(name: N, attrs: any, ...children: ChildTags[]) => N extends /*elided*/ any ? Node[] : Node;
 export declare const jsx: <T extends {
     children?: ChildTags[];
 }>(tagName: Parameters<typeof AIUIJSX>[0], attrs: T) => Node | Node[];
 export declare const jsxs: <T extends {
     children?: ChildTags[];
 }>(tagName: Parameters<typeof AIUIJSX>[0], attrs: T) => Node | Node[];
-export declare const Fragment: <N extends (import("./tags.js").TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap | import("./ai-ui.js").CreateElement["createElement"])>(name: N, attrs: any, ...children: ChildTags[]) => N extends import("./ai-ui.js").CreateElement["createElement"] ? Node[] : Node;
+export declare const Fragment: <N extends ((Node | keyof HTMLElementTagNameMap | TagCreatorFunction<any>) | /*elided*/ any)>(name: N, attrs: any, ...children: ChildTags[]) => N extends /*elided*/ any ? Node[] : Node;
 declare global {
     var React: unknown;
     namespace JSX {
@@ -16,6 +16,6 @@ declare global {
     }
 }
 declare const _default: {
-    AIUIJSX: <N extends (import("./tags.js").TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap | import("./ai-ui.js").CreateElement["createElement"])>(name: N, attrs: any, ...children: ChildTags[]) => N extends import("./ai-ui.js").CreateElement["createElement"] ? Node[] : Node;
+    AIUIJSX: <N extends ((Node | keyof HTMLElementTagNameMap | TagCreatorFunction<any>) | /*elided*/ any)>(name: N, attrs: any, ...children: ChildTags[]) => N extends /*elided*/ any ? Node[] : Node;
 };
 export default _default;

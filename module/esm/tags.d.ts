@@ -4,9 +4,6 @@ export type ChildTags = Node | number | string | boolean | undefined | typeof Ig
 type DeepPartial<X> = [X] extends [{}] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;
-export type Instance<T = {}> = {
-    [UniqueID]: string;
-} & T;
 type NeverEmpty<O extends object> = {} extends O ? never : O;
 type OmitType<T, V> = [{
     [K in keyof T as T[K] extends V ? never : K]: T[K];
@@ -61,12 +58,17 @@ type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Ove
 } & D['declare'] & D['override'] & IDS<D['ids']> & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>;
 type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable'];
 export declare const callStackSymbol: unique symbol;
-export type ConstructorCallStack = {
+export interface ConstructorCallStack extends TagCreationOptions {
     [callStackSymbol]?: Overrides[];
-};
-export type ExtendTagFunction = (attrs: (TagCreationOptions & ConstructorCallStack & {
     [k: string]: unknown;
-}) | ChildTags, ...children: ChildTags[]) => Element;
+}
+export interface ExtendTagFunction {
+    (attrs: ConstructorCallStack | ChildTags, ...children: ChildTags[]): Element;
+}
+interface InstanceUniqueID {
+    [UniqueID]: string;
+}
+export type Instance<T = {}> = InstanceUniqueID & T;
 export interface ExtendTagFunctionInstance extends ExtendTagFunction {
     super: TagCreator<Element>;
     definition: Overrides;
@@ -89,9 +91,9 @@ type CheckConstructedReturn<SuppliedDefinitions, Result> = SuppliedDefinitions e
 } : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never ? Result : {
     "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed>;
 };
-export type TagCreationOptions = {
+export interface TagCreationOptions {
     debugger?: boolean;
-};
+}
 type ReTypedEventHandlers<T> = {
     [K in keyof T]: K extends keyof GlobalEventHandlers ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E) => any ? (this: T, e: E) => any | null : T[K] : T[K];
 };
@@ -103,7 +105,7 @@ type ReadWriteAttributes<E, Base = E> = E extends {
     attributes: any;
 } ? (Omit<E, 'attributes'> & {
     get attributes(): NamedNodeMap;
-    set attributes(v: DeepPartial<PossiblyAsync<Omit<Base, 'attributes'>>>);
+    set attributes(v: PossiblyAsync<Omit<Base, 'attributes'>>);
 }) : (Omit<E, 'attributes'>);
 export type TagCreatorArgs<A> = [] | [A & TagCreationOptions] | [A & TagCreationOptions, ...ChildTags[]] | ChildTags[];
 export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<Base> & ThisType<Base>>) => ReadWriteAttributes<Base>;

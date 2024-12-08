@@ -455,15 +455,15 @@ export const tag = function (_1, _2, _3) {
                         return 0;
                     });
                 }
-                function set(k, v) {
-                    if (!isTestEnv
-                        && d instanceof Element
-                        && (v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
-                        && (!(k in d) || typeof d[k] !== 'string'))
-                        d.setAttribute(k === 'className' ? 'class' : k, String(v));
-                    else
-                        d[k] = v;
-                }
+                const set = isTestEnv || !(d instanceof Element)
+                    ? (k, v) => { d[k] = v; }
+                    : (k, v) => {
+                        if ((v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
+                            && (!(k in d) || typeof d[k] !== 'string'))
+                            d.setAttribute(k === 'className' ? 'class' : k, String(v));
+                        else // @ts-ignore
+                            d[k] = v;
+                    };
                 for (const [k, srcDesc] of sourceEntries) {
                     try {
                         if ('value' in srcDesc) {
