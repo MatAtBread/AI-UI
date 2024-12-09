@@ -137,7 +137,7 @@ export interface ConstructorCallStack extends TagCreationOptions {
 export interface ExtendTagFunction { (attrs: ConstructorCallStack | ChildTags, ...children: ChildTags[]): Element }
 
 interface InstanceUniqueID { [UniqueID]: string }
-export type Instance<T = {}> = InstanceUniqueID & T
+export type Instance<T = InstanceUniqueID> = InstanceUniqueID & T
 
 export interface ExtendTagFunctionInstance extends ExtendTagFunction {
   super: TagCreator<Element>;
@@ -174,7 +174,7 @@ interface ExtendedTag {
     BaseCreator extends ExTagCreator<any>,
     SuppliedDefinitions,
     Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {},
-    TagInstance = any
+    TagInstance extends InstanceUniqueID = InstanceUniqueID
   >(this: BaseCreator, _: (inst:TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
   : CheckConstructedReturn<SuppliedDefinitions,
       CheckPropertyClashes<BaseCreator, Definitions,
@@ -263,13 +263,12 @@ type ExTagCreator<Base extends object,
   /* It is based on a "super" TagCreator */
   super: Super
   /* It has a function that exposes the differences between the tags it creates and its super */
-  definition?: Overrides & { [UniqueID]: string }; /* Contains the definitions & UniqueID for an extended tag. undefined for base tags */
+  definition?: Overrides & InstanceUniqueID; /* Contains the definitions & UniqueID for an extended tag. undefined for base tags */
   /* It has a name (set to a class or definition location), which is helpful when debugging */
   readonly name: string;
   /* Can test if an element was created by this function or a base tag function */
   [Symbol.hasInstance](elt: any): boolean;
-  [UniqueID]: string;
-} &
+} & InstanceUniqueID &
 // `Statics` here is that same as StaticReferences<Super, SuperDefs>, but the circular reference breaks TS
 // so we compute the Statics outside this type declaration as pass them as a result
 Statics

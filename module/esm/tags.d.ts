@@ -68,7 +68,7 @@ export interface ExtendTagFunction {
 interface InstanceUniqueID {
     [UniqueID]: string;
 }
-export type Instance<T = {}> = InstanceUniqueID & T;
+export type Instance<T = InstanceUniqueID> = InstanceUniqueID & T;
 export interface ExtendTagFunctionInstance extends ExtendTagFunction {
     super: TagCreator<Element>;
     definition: Overrides;
@@ -81,7 +81,7 @@ interface TagConstuctor {
 type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> = TagConstuctor & ReadWriteAttributes<IterableProperties<CombinedIterableProperties<Base, D>> & CombinedNonIterableProperties<Base, D>, D['declare'] & D['override'] & CombinedIterableProperties<Base, D> & Omit<TagCreatorAttributes<Base>, keyof CombinedIterableProperties<Base, D>>>;
 type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<Definitions['declare'] & Definitions['override'] & TagCreatorAttributes<Base>, any>;
 interface ExtendedTag {
-    <BaseCreator extends ExTagCreator<any>, SuppliedDefinitions, Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}, TagInstance = any>(this: BaseCreator, _: (inst: TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator, Definitions>>): CheckConstructedReturn<SuppliedDefinitions, CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>> & CombinedNonIterableProperties<BaseCreator, Definitions>, BaseCreator, Definitions, StaticReferences<BaseCreator, Definitions>>>>;
+    <BaseCreator extends ExTagCreator<any>, SuppliedDefinitions, Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}, TagInstance extends InstanceUniqueID = InstanceUniqueID>(this: BaseCreator, _: (inst: TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator, Definitions>>): CheckConstructedReturn<SuppliedDefinitions, CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>> & CombinedNonIterableProperties<BaseCreator, Definitions>, BaseCreator, Definitions, StaticReferences<BaseCreator, Definitions>>>>;
     <BaseCreator extends ExTagCreator<any>, SuppliedDefinitions, Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}>(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator, Definitions>>): CheckConstructedReturn<SuppliedDefinitions, CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<BaseCreator, Definitions>> & CombinedNonIterableProperties<BaseCreator, Definitions>, BaseCreator, Definitions, StaticReferences<BaseCreator, Definitions>>>>;
 }
 type CheckConstructedReturn<SuppliedDefinitions, Result> = SuppliedDefinitions extends {
@@ -112,12 +112,9 @@ export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<P
 type ExTagCreator<Base extends object, Super extends (unknown | ExTagCreator<any>) = unknown, SuperDefs extends Overrides = {}, Statics = {}> = TagCreatorFunction<ReTypedEventHandlers<Base>> & {
     extended: ExtendedTag;
     super: Super;
-    definition?: Overrides & {
-        [UniqueID]: string;
-    };
+    definition?: Overrides & InstanceUniqueID;
     readonly name: string;
     [Symbol.hasInstance](elt: any): boolean;
-    [UniqueID]: string;
-} & Statics;
+} & InstanceUniqueID & Statics;
 export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {}>;
 export {};
