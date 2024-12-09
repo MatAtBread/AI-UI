@@ -48,10 +48,10 @@ const State = div.extended({
   constructed() {
     return [
       button({
-        onclick: ()=> this.f ?
+        onclick: ()=> this.f
         // @ts-ignore
-        t.foo[this.f]
-        = this.d : t.foo = this.d,
+        ? t.foo[this.f] = this.d // Set a (primitive) field in f
+        : t.foo = this.d, // Set the whole object. We spread this as we don't want subsequent field updates to override it
       }, 'foo', '.', this.f, ' = ', JSON.stringify(this.d))
     ]
   }
