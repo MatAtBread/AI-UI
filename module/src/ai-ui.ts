@@ -67,7 +67,7 @@ export interface TagLoader {
       tag(
           ?nameSpace?: string,  // absent nameSpace implies HTML
           ?tags?: string[],     // absent tags defaults to all common HTML tags
-          ?commonProperties?: CommonPropertiesConstraint // absent implies none are defined
+          ?commonProperties?: TagFunctionOptions<Q> // absent implies none are defined
       )
 
       eg:
