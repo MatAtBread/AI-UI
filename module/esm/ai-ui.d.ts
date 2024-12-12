@@ -4,15 +4,15 @@ export { when } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js';
 export * as Iterators from './iterators.js';
 export declare const UniqueID: unique symbol;
-type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> = {
-    commonProperties?: OtherMembers;
+export interface TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> {
+    commonProperties?: OtherMembers | undefined;
     document?: Document;
     ErrorTag?: TagCreatorFunction<Element & {
         error: any;
     }>;
     /** @deprecated - legacy support */
     enableOnRemovedFromDOM?: boolean;
-};
+}
 interface PoElementMethods {
     get ids(): {};
     when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
