@@ -221,8 +221,8 @@ export interface TagCreationOptions {
 
 type ReTypedEventHandlers<T> = {
   [K in keyof T]: K extends keyof GlobalEventHandlers
-    ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E)=>any
-      ? (this: T, e: E)=>any | null
+    ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E)=>infer R
+      ? ((e: E)=>R) | null
       : T[K]
     : T[K]
 }

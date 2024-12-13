@@ -95,7 +95,7 @@ export interface TagCreationOptions {
     debugger?: boolean;
 }
 type ReTypedEventHandlers<T> = {
-    [K in keyof T]: K extends keyof GlobalEventHandlers ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E) => any ? (this: T, e: E) => any | null : T[K] : T[K];
+    [K in keyof T]: K extends keyof GlobalEventHandlers ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E) => infer R ? ((e: E) => R) | null : T[K] : T[K];
 };
 type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
 type PossiblyAsync<X> = [X] extends [object] ? X extends AsyncProvider<infer U> ? X extends (AsyncProvider<U> & U) ? U | AsyncAttr<U> : X | PromiseLike<X> : X extends (any[] | Function) ? X | AsyncAttr<X> : {

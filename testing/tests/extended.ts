@@ -49,3 +49,9 @@ const e4 = E4({
   i4: 10
 });
 console.log(e4.d3,e4.i4)
+
+// Check GlobalEventHandlers
+const q = e4.onclick!;
+e4.onclick = function() {
+  e4 === this;
+}
