@@ -17,5 +17,5 @@
     // "jsx": "react-jsx",
     // "jsxImportSource": "../../../module/esm"
   },
-  "include": [ "ts/*.ts" ]
+  "include": [ "ts/*.ts"]
 }

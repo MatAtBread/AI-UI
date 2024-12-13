@@ -23,8 +23,8 @@ const logNode = DEBUG
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
-type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> = {
-  commonProperties?: OtherMembers
+export interface TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> {
+  commonProperties?: OtherMembers | undefined
   document?: Document
   ErrorTag?: TagCreatorFunction<Element & { error: any }>
   /** @deprecated - legacy support */
@@ -67,7 +67,7 @@ export interface TagLoader {
       tag(
           ?nameSpace?: string,  // absent nameSpace implies HTML
           ?tags?: string[],     // absent tags defaults to all common HTML tags
-          ?commonProperties?: CommonPropertiesConstraint // absent implies none are defined
+          ?commonProperties?: TagFunctionOptions<Q> // absent implies none are defined
       )
 
       eg:
