@@ -68,11 +68,11 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
       dereferencing of non-clashinh array keys such as `join` or `sort` and AsyncIterator methods which also allows
       simple assignment of the form `this.iterableArrayMember = [...]`.
 
-      The CORRECT type for these fields would be (if TS phas syntax for it):
+      The CORRECT type for these fields would be (if TS had syntax for it):
       get [K] (): Omit<Array<E & AsyncExtraIterable<E>, NonAccessibleIterableArrayKeys> & AsyncExtraIterable<E[]>
       set [K] (): Array<E> | AsyncExtraIterable<E[]>
       */
-      Omit<Array<E & Partial<AsyncExtraIterable<E>>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
+      Omit<Array<IterableType<E>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
     : (
       IP[K] extends object
       ? IterableProperties<IP[K]>
