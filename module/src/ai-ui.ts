@@ -33,7 +33,7 @@ export interface TagFunctionOptions<OtherMembers extends Record<string | symbol,
 
 /* Members applied to EVERY tag created, even base tags */
 interface PoElementMethods {
-  get ids(): {}
+  get ids(): {} & (undefined | ((attrs: object, ...children: ChildTags[]) => ReturnType<TagCreatorFunction<any>>))
   when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
   // This is a very incomplete type. In practice, set(k, attrs) requires a deeply partial set of
   // attributes, in exactly the same way as a TagFunction's first object parameter

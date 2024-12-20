@@ -15,16 +15,6 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   | Array<ChildTags>
   | Iterable<ChildTags> // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
 
-// Debug use only
-// export type Flatten<O> = [{
-//   [K in keyof O]: O[K]
-// }][number];
-
-// export type DeepFlatten<O> = [{
-//   [K in keyof O]: Flatten<O[K]>
-// }][number];
-
-
 /* Types used to validate an extended tag declaration */
 
 type DeepPartial<X> = [X] extends [{}] ? { [K in keyof X]?: DeepPartial<X[K]> } : X
@@ -86,10 +76,17 @@ export type Overrides = {
   styles?: string;
 }
 
-type IDS<I> = I extends object ? {
+interface TagCreatorForIDS<I extends NonNullable<Overrides['ids']>> {
+  <const K extends keyof I>(
+    attrs:{ id: K } & Exclude<Parameters<I[K]>[0], ChildTags>,
+    ...children: ChildTags[]
+  ): ReturnType<I[K]>
+}
+
+type IDS<I extends Overrides['ids']> = I extends NonNullable<Overrides['ids']> ? {
   ids: {
-    [J in keyof I]: I[J] extends ExTagCreator<any> ? ReturnType<I[J]> : never;
-  }
+    [J in keyof I]: ReturnType<I[J]>;
+  } & TagCreatorForIDS<I>
 } : { ids: {} }
 
 export type Constructed = {
@@ -112,21 +109,13 @@ type BaseIterables<Base> =
   : never
 
 // Work out the types of all the non-iterable properties of an ExTagCreator
-type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = {
-    ids: <
-      const K extends keyof Exclude<D['ids'], undefined>,
-      const TCF extends TagCreatorFunction<any> = Exclude<D['ids'], undefined>[K]
-    >(
-      attrs:{ id: K } & Exclude<Parameters<TCF>[0], ChildTags>,
-      ...children: ChildTags[]
-    ) => ReturnType<TCF>
-  }
-  & D['declare']
+type CombinedNonIterableProperties<D extends Overrides, Base extends ExTagCreator<any>> =
+  D['declare']
   & D['override']
   & IDS<D['ids']>
   & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>
 
-type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable']
+type CombinedIterableProperties<D extends Overrides, Base extends ExTagCreator<any>> = BaseIterables<Base> & D['iterable']
 
 export const callStackSymbol = Symbol('callStack');
 export interface ConstructorCallStack extends TagCreationOptions {
@@ -150,18 +139,18 @@ interface TagConstuctor {
   constructor: ExtendTagFunctionInstance;
 }
 
-type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> =
+type CombinedThisType<D extends Overrides, Base extends ExTagCreator<any>> =
   TagConstuctor &
   ReadWriteAttributes<
-    IterableProperties<CombinedIterableProperties<Base,D>>
-    & CombinedNonIterableProperties<Base,D>,
+    IterableProperties<CombinedIterableProperties<D, Base>>
+    & CombinedNonIterableProperties<D, Base>,
     D['declare']
     & D['override']
-    & CombinedIterableProperties<Base,D>
-    & Omit<TagCreatorAttributes<Base>, keyof CombinedIterableProperties<Base,D>>
+    & CombinedIterableProperties<D, Base>
+    & Omit<TagCreatorAttributes<Base>, keyof CombinedIterableProperties<D, Base>>
   >
 
-type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<
+type StaticReferences<Definitions extends Overrides, Base extends ExTagCreator<any>> = PickType<
   Definitions['declare']
   & Definitions['override']
   & TagCreatorAttributes<Base>,
@@ -175,15 +164,15 @@ interface ExtendedTag {
     SuppliedDefinitions,
     Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {},
     TagInstance extends InstanceUniqueID = InstanceUniqueID
-  >(this: BaseCreator, _: (inst:TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
+  >(this: BaseCreator, _: (inst:TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<Definitions, BaseCreator>>)
   : CheckConstructedReturn<SuppliedDefinitions,
       CheckPropertyClashes<BaseCreator, Definitions,
       ExTagCreator<
-        IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
-        & CombinedNonIterableProperties<BaseCreator,Definitions>,
+        IterableProperties<CombinedIterableProperties<Definitions, BaseCreator>>
+        & CombinedNonIterableProperties<Definitions, BaseCreator>,
         BaseCreator,
         Definitions,
-        StaticReferences<BaseCreator, Definitions>
+        StaticReferences<Definitions, BaseCreator>
       >
     >
   >
@@ -192,15 +181,15 @@ interface ExtendedTag {
     BaseCreator extends ExTagCreator<any>,
     SuppliedDefinitions,
     Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}
-  >(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
+  >(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<Definitions, BaseCreator>>)
   : CheckConstructedReturn<SuppliedDefinitions,
       CheckPropertyClashes<BaseCreator, Definitions,
       ExTagCreator<
-        IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
-        & CombinedNonIterableProperties<BaseCreator,Definitions>,
+        IterableProperties<CombinedIterableProperties<Definitions, BaseCreator>>
+        & CombinedNonIterableProperties<Definitions, BaseCreator>,
         BaseCreator,
         Definitions,
-        StaticReferences<BaseCreator, Definitions>
+        StaticReferences<Definitions, BaseCreator>
       >
     >
   >
