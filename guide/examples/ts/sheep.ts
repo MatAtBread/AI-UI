@@ -215,7 +215,8 @@ const SheepGame = div.extended({
       // ...a sheep pen
       SheepPen({ id: 'pen' }),
       // ...a dog
-      Dog({ id: 'dog' }),
+      //Dog({ id: 'dog' }),
+      this.ids({ id: 'dog'}),
       // ...we need to wait until the dog & pen are mounted into the DOM, as we
       // use the positions when playing the game
       this.when('#pen', '#dog', '@ready').map(() => this.flockSize.map!(() => {

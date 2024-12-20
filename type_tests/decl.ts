@@ -44,7 +44,7 @@ const e1 = Ext1({
 (<AssertEqual<typeof e1, {
   x: boolean;
   // This test is too loose - fix
-  ids: {} & ((attrs: any, ...ch: any) => any);
+  ids: {};
   Attr: "base";
   N: 0 | 1 | 2;
   fn: () => void;
@@ -78,7 +78,7 @@ type Q = typeof e2.ids;
   x: boolean;
   y: boolean;
   // This test is too loose - fix
-  ids: {} & ((attrs: any, ...ch: any) => any);
+  ids: {};
   Attr: "base";
   N: 0 | 1 | 2;
   fn: () => void;

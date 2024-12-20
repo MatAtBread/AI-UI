@@ -43,8 +43,8 @@ declare global {
   // as this is the implementation in all JavaScript engines. It is probably a result
   // of its absence in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/values,
   // which inherits from the Object.prototype, which makes no claim for the return type
-  // since it could be overriddem. However, in that case, a TS defn should also override
-  // it, like Number, String, Boolean etc do.
+  // since it could be overriddem. However, in that case, a TS defn should also override it
+  // like Number, String, Boolean etc do.
   interface Array<T> {
     valueOf(): Array<T>;
   }

@@ -14,7 +14,7 @@ export interface TagFunctionOptions<OtherMembers extends Record<string | symbol,
     enableOnRemovedFromDOM?: boolean;
 }
 interface PoElementMethods {
-    get ids(): {};
+    get ids(): {} & (undefined | ((attrs: object, ...children: ChildTags[]) => ReturnType<TagCreatorFunction<any>>));
     when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
     set attributes(attrs: object);
     get attributes(): NamedNodeMap;
