@@ -36,7 +36,7 @@ export type IterablePropertyValue = IterablePropertyPrimitive | IterableProperty
 
 export const Iterability = Symbol("Iterability");
 export interface Iterability<Depth extends 'shallow' = 'shallow'> { [Iterability]: Depth }
-export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>
+//export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>
 
 declare global {
   // This is patch to the std lib definition of Array<T>. I don't know why it's absent,
@@ -51,18 +51,11 @@ declare global {
   // As above, the return type could be T rather than Object, since this is the default impl,
   // but it's not, for some reason.
   interface Object {
-    valueOf<T>(this: T): T extends IterableType<infer Z> ? Z : Object;
+    valueOf<T>(this: T): IsIterableProperty<T, Object>;
   }
 }
 
-type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers
-
-export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
-  [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>
-} : {
-  [K in keyof IP]: (
-    IP[K] extends Array<infer E>
-    ? /*
+/*
       Because TS doesn't implement separate types for read/write, or computed getter/setter names (which DO allow
       different types for assignment and evaluation), it is not possible to define type for array members that permit
       dereferencing of non-clashinh array keys such as `join` or `sort` and AsyncIterator methods which also allows
@@ -71,15 +64,22 @@ export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
       The CORRECT type for these fields would be (if TS had syntax for it):
       get [K] (): Omit<Array<E & AsyncExtraIterable<E>, NonAccessibleIterableArrayKeys> & AsyncExtraIterable<E[]>
       set [K] (): Array<E> | AsyncExtraIterable<E[]>
-      */
-      Omit<Array<IterableType<E>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
-    : (
-      IP[K] extends object
-      ? IterableProperties<IP[K]>
-      : IP[K]
-    ) & IterableType<IP[K]>
-  )
-}
+*/
+type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers
+
+export type IsIterableProperty<Q, R = never> = [Q] extends [Partial<AsyncIterable<infer V>>] ? V & Partial<AsyncIterable<V>> extends Q
+    ? V
+    : V extends ArrayLike<any> ? V : R : R
+
+export type IterableType<T> = [T] extends [infer U] ? U & Partial<AsyncExtraIterable<U>> : never;
+export type IterableProperties<T> = [T] extends [infer IP] ?
+  [IP] extends [object] ? IP extends ArrayLike<infer E> ?
+    Omit<Array<IterableProperties<E>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
+  : {
+    [K in keyof IP]: IterableProperties<IP[K]>
+  } & IterableType<IP>
+  : IterableType<IP>
+  : never;
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {

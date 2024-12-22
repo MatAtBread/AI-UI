@@ -1,7 +1,18 @@
-import { tag, Iterators, ChildTags, TagCreator } from '../../../module/esm/ai-ui.js'
+import { tag, Iterators, ChildTags } from '../../../module/esm/ai-ui.js'
 
-const { h2, div, button } = tag();
-const { svg, text, path, use, defs } = tag("http://www.w3.org/2000/svg", ["svg", "text", "path", "use", "defs"], { commonProperties: {} as SVGElement });
+const { div, button } = tag();
+const { svg, text, path, use, defs } = tag("http://www.w3.org/2000/svg", ["svg", "text", "path", "use", "defs"], {
+  commonProperties: {} as SVGElement & {
+    x?: string,
+    y?: string,
+    d?: string,
+    href?: string,
+    transform?: string,
+    viewBox?: string,
+    get style(): any
+    set style(v: string | CSSStyleDeclaration);
+  }
+});
 
 let ID = 1;
 const Gate2In = div.extended(({
@@ -9,6 +20,7 @@ const Gate2In = div.extended(({
       width: fit-content;
       height: fit-content;
       border: 2px dotted transparent;
+      width: 200px;
   }`,
   declare: {
     out: undefined as unknown as Iterators.AsyncExtraIterable<boolean>,
@@ -16,14 +28,17 @@ const Gate2In = div.extended(({
     contents(): Iterable<ChildTags> { return []; },
     get canDrag(): HTMLElement {
       this.style.position = 'absolute';
-      this.when('click:#in1', 'click:#in2').consume(e => {
-        if (e.target && 'id' in e.target && typeof e.target.id === 'string' && e.target.id in this) {
-          // @ts-ignore
-          this[e.target.id] = !this[e.target.id].valueOf()
-        }
-      });
+      // this.when('click:#in1', 'click:#in2').consume(e => {
+      //   if (e.target && 'id' in e.target && typeof e.target.id === 'string' && e.target.id in this) {
+      //     // @ts-ignore
+      //     this[e.target.id] = !this[e.target.id].valueOf();
+      //   }
+      // });
 
       let drag = false;
+      this.when('click:#in1','click:#in2','click:#out').consume(e => {
+        this.dispatchEvent(new MouseEvent('click', { relatedTarget: e.target }));
+      });
       this.when('dblclick').consume(e => { this.remove() });
       this.when('mousedown').consume((e) => {
         if (!drag && e.target && 'id' in e.target && !e.target.id) {
@@ -64,12 +79,12 @@ const Gate2In = div.extended(({
   },
   ids: {
     in1: text,
-    in2: text
+    in2: text,
+    out: text
   },
   constructed() {
     this.id = "gate" + String(ID++);
-    this.out = Iterators.merge(this.in1, this.in2).map(() => this.logic.call(this));
-    //this.out.consume(e => console.log(this.id,this.in1,this.in2,e))
+    this.out = Iterators.merge(this.in1, this.in2).map(() => this.logic());
     return svg({
       style: {
         width: '100%',
@@ -152,7 +167,7 @@ const CreateComponent = button.extended({
     className: 'createComponent'
   },
   constructed() {
-    this.firstElementChild.style.pointerEvents = 'none'
+    (this.firstChild as HTMLElement).style.pointerEvents = 'none'
   }
 });
 
@@ -170,16 +185,31 @@ const App = div.extended({
     padding: 1em;
   }`,
   ids: {
-    circuit: div
+    circuit: div,
+    in1: use,
+    in2: use,
+    out: use
   },
   constructed() {
     this.when('click:.createComponent').consume(e => {
-      this.ids.circuit.append(e.target.firstElementChild.constructor().canDrag)
+      this.ids.circuit.append((e.target as HTMLElement).firstChild!.constructor().canDrag)
+    });
+    let clickedGate: ReturnType<typeof Gate2In> | undefined = undefined;
+    let clickedIn: 'in1' | 'in2' | 'out';
+    this.when('click:.gate2in>').consume(e => {
+      if (clickedGate) {
+        clickedGate.ids[clickedIn].style = clickedIn === 'out' ? 'stroke:green' : 'stroke:blue';
+        clickedGate = undefined;
+      } else if (e.target && e.relatedTarget) {
+        clickedGate = e.target as ReturnType<typeof Gate2In>;
+        clickedIn = (e.relatedTarget as Element).id as typeof clickedIn;
+        clickedGate.ids[clickedIn].style = 'stroke:red';
+      }
     });
     return [
       div({ className: 'menu' },
-        CreateComponent(Nand({ style: { width: '160px' } })),
-        CreateComponent(Nor({ style: { width: '160px' } })),
+        CreateComponent(Nand({ style: { width: '100px' } })),
+        CreateComponent(Nor({ style: { width: '100px' } }))
       ),
       div({ id: 'circuit' })
     ]

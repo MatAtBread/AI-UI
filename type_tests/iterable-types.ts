@@ -21,6 +21,8 @@ type IP = {
 
 declare var ip: IterableProperties<IP>;
 
+type V = IterableProperties<IP>['valueOf']
+
 const st = ip.a[0].valueOf()
 const vb = ip.b.valueOf();
 const va = ip.a.valueOf();

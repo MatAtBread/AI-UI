@@ -268,7 +268,7 @@ export const tag = function (_1, _2, _3) {
                 // It's possible that this async iterator is a boxed object that also holds a value
                 const unboxed = c.valueOf();
                 const replacement = {
-                    nodes: ((unboxed === c) ? [] : [...nodes(unboxed)]),
+                    nodes: ((unboxed === c) ? [] : [...nodes(unboxed /* we need this cast as IsIterableProperty doesn't (yet) work with arrays */)]),
                     [Symbol.iterator]() {
                         return this.nodes?.[Symbol.iterator]() ?? { next() { return { done: true, value: undefined }; } };
                     }

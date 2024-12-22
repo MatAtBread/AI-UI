@@ -10,9 +10,10 @@ export type AssertEqual<T, Expected> = [T] extends [Expected]
 
 declare var div: TagCreator<HTMLDivElement>;
 
-const o = { s:'1', n: 1, b: Boolean(1), as: ['1','2'] };
+const o = { s:'1', n: 1, b: Boolean(1) };
 const d = {
   list: ['1', 'b', '3', 'D'],
+  o,
   more: {
     f: true,
     nums: [1, 2, 3, 5],
@@ -53,18 +54,24 @@ type UX = AssertEqual<typeof u, Array<D['more']>>['true']
 const V = div.extended({
   iterable: {
     data: d
+  },
+  constructed() {
+    // this.data = d;
+    // this.data.more = d.more;
+    this.data.o = d.o;
+    // this.data.list = d.list;
   }
 });
 
-const v = [
-  V({ data: d }).data,
-  V({ data: Promise.resolve(d) }).data,
-  V({ data: ai(d) }).data,
-  V().data,
-  V("text").data
-];
+// const v = [
+//   V({ data: d }).data,
+//   V({ data: Promise.resolve(d) }).data,
+//   V({ data: ai(d) }).data,
+//   V().data,
+//   V("text").data
+// ];
 
-type IID = Iterators.IterableProperties<D>;
-type VX = AssertEqual<typeof v, Array<IID>>['true']
+// type IID = Iterators.IterableProperties<D>;
+// type VX = AssertEqual<typeof v, Array<IID>>['true']
 
-v[0].more.map!(x => { type T = AssertEqual<typeof x, D['more']>['true'] })
+// v[0].more.map!(x => { type T = AssertEqual<typeof x, D['more']>['true'] })

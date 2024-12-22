@@ -30,7 +30,8 @@ const Base = elt.extended({
     }
   },
   iterable: {
-    ni: 0
+    ni: 0,
+    f: false
   },
   constructed() {
     const t = this;
