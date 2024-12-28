@@ -67,19 +67,17 @@ declare global {
 */
 type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers
 
-export type IsIterableProperty<Q, R = never> = [Q] extends [Partial<AsyncIterable<infer V>>] ? V & Partial<AsyncIterable<V>> extends Q
-    ? V
-    : V extends ArrayLike<any> ? V : R : R
-
 export type IterableType<T> = [T] extends [infer U] ? U & Partial<AsyncExtraIterable<U>> : never;
+
 export type IterableProperties<T> = [T] extends [infer IP] ?
-  [IP] extends [object] ? IP extends ArrayLike<infer E> ?
-    Omit<Array<IterableProperties<E>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
-  : {
+  [IP] extends [Partial<AsyncExtraIterable<unknown>>] ? IP
+  : [IP] extends [object] ? IP extends Array<infer E> ? Omit<Array<IterableProperties<E>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<IP>> : {
     [K in keyof IP]: IterableProperties<IP[K]>
   } & IterableType<IP>
   : IterableType<IP>
   : never;
+
+export type IsIterableProperty<Q, R = never> = [Q] extends [Partial<AsyncExtraIterable<infer V>>] ? V : R
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
