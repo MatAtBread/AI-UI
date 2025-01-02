@@ -11,9 +11,9 @@ import { iterableHelpers, merge, AsyncExtraIterable, queueIteratableIterator } f
 */
 // Varargs type passed to "when"
 type WhenParameter<IDS extends string = string> = ValidWhenSelector<IDS>
-| Element /* Implies "change" event */
-| Promise<any> /* Just gets wrapped in a single `yield` */
-| AsyncIterable<any>
+  | Element /* Implies "change" event */
+  | Promise<any> /* Just gets wrapped in a single `yield` */
+  | AsyncIterable<any>
 
 export type WhenParameters<IDS extends string = string> = ReadonlyArray<WhenParameter<IDS>>
 

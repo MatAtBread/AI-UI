@@ -18,7 +18,7 @@ type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelp
 export type IterableType<T> = [T] extends [infer U] ? U & Partial<AsyncExtraIterable<U>> : never;
 export type IterableProperties<T> = [T] extends [infer IP] ? [
     IP
-] extends [Partial<AsyncExtraIterable<unknown>>] ? IP : [IP] extends [object] ? IP extends Array<infer E> ? Omit<Array<IterableProperties<E>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<IP>> : {
+] extends [Partial<AsyncExtraIterable<unknown>>] | [Iterability<'shallow'>] ? IP : [IP] extends [object] ? IP extends Array<infer E> ? Omit<IterableProperties<E>[], NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>> : {
     [K in keyof IP]: IterableProperties<IP[K]>;
 } & IterableType<IP> : IterableType<IP> : never;
 export type IsIterableProperty<Q, R = never> = [Q] extends [Partial<AsyncExtraIterable<infer V>>] ? V : R;

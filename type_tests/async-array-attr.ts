@@ -59,19 +59,21 @@ const V = div.extended({
     // this.data = d;
     // this.data.more = d.more;
     this.data.o = d.o;
-    // this.data.list = d.list;
+    // @ts-expect-error: TS cannot represent assignment of an array to an array iterable
+    this.data.list = d.list;
+    this.data.list = <typeof this.data.list>d.list;
   }
 });
 
-// const v = [
-//   V({ data: d }).data,
-//   V({ data: Promise.resolve(d) }).data,
-//   V({ data: ai(d) }).data,
-//   V().data,
-//   V("text").data
-// ];
+const v = [
+  // V({ data: d }).data,
+  // V({ data: Promise.resolve(d) }).data,
+  V({ data: ai(d) }).data,
+  V().data,
+  V("text").data
+];
 
-// type IID = Iterators.IterableProperties<D>;
-// type VX = AssertEqual<typeof v, Array<IID>>['true']
+type IID = Iterators.IterableProperties<D>;
+type VX = AssertEqual<typeof v, Array<IID>>['true']
 
-// v[0].more.map!(x => { type T = AssertEqual<typeof x, D['more']>['true'] })
+v[0].more.map!(x => { type T = AssertEqual<typeof x, D['more']>['true'] })

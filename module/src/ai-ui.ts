@@ -367,7 +367,7 @@ export const tag = <TagLoader>function <Tags extends string,
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
         const replacement = {
-          nodes: ((unboxed === c) ? [] : [...nodes(unboxed /* we need this cast as IsIterableProperty doesn't (yet) work with arrays */ as ChildTags)]) as ChildNode[] | undefined,
+          nodes: ((unboxed === c) ? [] : [...nodes(unboxed as ChildTags)]) as ChildNode[] | undefined,
           [Symbol.iterator]() {
             return this.nodes?.[Symbol.iterator]() ?? ({ next() { return { done: true as const, value: undefined } } } as Iterator<ChildNode>)
           }

@@ -36,7 +36,6 @@ export type IterablePropertyValue = IterablePropertyPrimitive | IterableProperty
 
 export const Iterability = Symbol("Iterability");
 export interface Iterability<Depth extends 'shallow' = 'shallow'> { [Iterability]: Depth }
-//export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>
 
 declare global {
   // This is patch to the std lib definition of Array<T>. I don't know why it's absent,
@@ -51,7 +50,7 @@ declare global {
   // As above, the return type could be T rather than Object, since this is the default impl,
   // but it's not, for some reason.
   interface Object {
-    valueOf<T>(this: T): IsIterableProperty<T, Object>;
+    valueOf<T>(this: T): IsIterableProperty<T, Object>
   }
 }
 
@@ -70,10 +69,10 @@ type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelp
 export type IterableType<T> = [T] extends [infer U] ? U & Partial<AsyncExtraIterable<U>> : never;
 
 export type IterableProperties<T> = [T] extends [infer IP] ?
-  [IP] extends [Partial<AsyncExtraIterable<unknown>>] ? IP
-  : [IP] extends [object] ? IP extends Array<infer E> ? Omit<Array<IterableProperties<E>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<IP>> : {
-    [K in keyof IP]: IterableProperties<IP[K]>
-  } & IterableType<IP>
+  [IP] extends [Partial<AsyncExtraIterable<unknown>>] | [Iterability<'shallow'>] ? IP
+  : [IP] extends [object] ?
+    IP extends Array<infer E> ? Omit<IterableProperties<E>[], NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
+  : { [K in keyof IP]: IterableProperties<IP[K]> }  & IterableType<IP>
   : IterableType<IP>
   : never;
 
@@ -731,9 +730,6 @@ export function filterMap<U extends PartialIterable, R>(source: U,
       return Promise.resolve(ai?.return?.(v)).then(done, done)
     }
   };
-  // if (DEBUG) Object.defineProperty(fai,'debug: source asyncIterator',{
-  //   value: new WeakRef(source)
-  // })
   return iterableHelpers(fai)
 }
 
