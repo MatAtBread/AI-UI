@@ -23,8 +23,8 @@ const logNode = DEBUG
 
 /* A holder for commonProperties specified when `tag(...p)` is invoked, which are always
   applied (mixed in) when an element is created */
-type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> = {
-  commonProperties?: OtherMembers
+export interface TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> {
+  commonProperties?: OtherMembers | undefined
   document?: Document
   ErrorTag?: TagCreatorFunction<Element & { error: any }>
   /** @deprecated - legacy support */
@@ -33,9 +33,9 @@ type TagFunctionOptions<OtherMembers extends Record<string | symbol, any> = {}> 
 
 /* Members applied to EVERY tag created, even base tags */
 interface PoElementMethods {
-  get ids(): {}
+  get ids(): {} & (undefined | ((attrs: object, ...children: ChildTags[]) => ReturnType<TagCreatorFunction<any>>))
   when<T extends Element & PoElementMethods, S extends WhenParameters<Exclude<keyof T['ids'], number | symbol>>>(this: T, ...what: S): WhenReturn<S>;
-  // This is a very incomplete type. In practice, set(attrs) requires a deeply partial set of
+  // This is a very incomplete type. In practice, set(k, attrs) requires a deeply partial set of
   // attributes, in exactly the same way as a TagFunction's first object parameter
   set attributes(attrs: object);
   get attributes(): NamedNodeMap
@@ -43,16 +43,18 @@ interface PoElementMethods {
 
 // Support for https://www.npmjs.com/package/htm (or import htm from 'https://cdn.jsdelivr.net/npm/htm/dist/htm.module.js')
 // Note: same signature as React.createElement
+type CreateElementNodeType = TagCreatorFunction<any> | Node | keyof HTMLElementTagNameMap
+type CreateElementFragment = CreateElement['createElement'];
 export interface CreateElement {
   // Support for htm, JSX, etc
-  createElement(
+  createElement<N extends (CreateElementNodeType | CreateElementFragment)>(
     // "name" can a HTML tag string, an existing node (just returns itself), or a tag function
-    name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap,
+    name: N,
     // The attributes used to initialise the node (if a string or function - ignore if it's already a node)
     attrs: any,
     // The children
-    ...children: ChildTags[]): Node;
-}
+    ...children: ChildTags[]): N extends CreateElementFragment ? Node[] : Node;
+  }
 
 /* The interface that creates a set of TagCreators for the specified DOM tags */
 export interface TagLoader {
@@ -65,7 +67,7 @@ export interface TagLoader {
       tag(
           ?nameSpace?: string,  // absent nameSpace implies HTML
           ?tags?: string[],     // absent tags defaults to all common HTML tags
-          ?commonProperties?: CommonPropertiesConstraint // absent implies none are defined
+          ?commonProperties?: TagFunctionOptions<Q> // absent implies none are defined
       )
 
       eg:
@@ -76,10 +78,10 @@ export interface TagLoader {
 
   <Tags extends keyof HTMLElementTagNameMap>(): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
   <Tags extends keyof HTMLElementTagNameMap>(tags: Tags[]): { [k in Lowercase<Tags>]: TagCreator<PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
-  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
-  <Tags extends keyof HTMLElementTagNameMap, Q extends {}>(tags: Tags[], options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
-  <Tags extends string, Q extends {}>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): { [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement> } & CreateElement
-  <Tags extends string, Q extends {}>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement
+  <Tags extends keyof HTMLElementTagNameMap, Q extends object>(options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends keyof HTMLElementTagNameMap, Q extends object>(tags: Tags[], options: TagFunctionOptions<Q>): { [k in Lowercase<Tags>]: TagCreator<Q & PoElementMethods & HTMLElementTagNameMap[k]> } & CreateElement
+  <Tags extends string, Q extends object>(nameSpace: null | undefined | '', tags: Tags[], options?: TagFunctionOptions<Q>): { [k in Tags]: TagCreator<Q & PoElementMethods & HTMLElement> } & CreateElement
+  <Tags extends string, Q extends object>(nameSpace: string, tags: Tags[], options?: TagFunctionOptions<Q>): Record<string, TagCreator<Q & PoElementMethods & Element>> & CreateElement
 }
 
 let idCount = 0;
@@ -126,7 +128,7 @@ function isChildTag(x: any): x is ChildTags {
 export const tag = <TagLoader>function <Tags extends string,
   T1 extends (string | Tags[] | TagFunctionOptions<Q>),
   T2 extends (Tags[] | TagFunctionOptions<Q>),
-  Q extends {}
+  Q extends object
 >(
   _1: T1,
   _2: T2,
@@ -150,6 +152,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
   const commonProperties = options?.commonProperties;
   const thisDoc = options?.document ?? globalThis.document;
+  const isTestEnv = thisDoc.documentURI === 'about:testing';
   const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
     return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
   }
@@ -364,7 +367,7 @@ export const tag = <TagLoader>function <Tags extends string,
         // It's possible that this async iterator is a boxed object that also holds a value
         const unboxed = c.valueOf();
         const replacement = {
-          nodes: ((unboxed === c) ? [] : [...nodes(unboxed)]) as ChildNode[] | undefined,
+          nodes: ((unboxed === c) ? [] : [...nodes(unboxed as ChildTags)]) as ChildNode[] | undefined,
           [Symbol.iterator]() {
             return this.nodes?.[Symbol.iterator]() ?? ({ next() { return { done: true as const, value: undefined } } } as Iterator<ChildNode>)
           }
@@ -549,6 +552,17 @@ export const tag = <TagLoader>function <Tags extends string,
             return 0;
           });
         }
+
+        const set = isTestEnv || !(d instanceof Element) || (d instanceof HTMLElement)
+          ? (k: string, v: any) => { d[k] = v }
+          : (k: string, v: any) => {
+            if ((v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
+              && (!(k in d) || typeof d[k as keyof typeof d] !== 'string'))
+              d.setAttribute(k === 'className' ? 'class' : k, String(v));
+            else // @ts-ignore
+              d[k] = v;
+          }
+
         for (const [k, srcDesc] of sourceEntries) {
           try {
             if ('value' in srcDesc) {
@@ -567,7 +581,7 @@ export const tag = <TagLoader>function <Tags extends string,
                       }
                     } else {
                       if (s[k] !== undefined)
-                        d[k] = v;
+                        set(k, v);
                     }
                   }
                 }, error => console.log(`Exception in promised attribute '${k}'`, error, logNode(d)));
@@ -577,7 +591,7 @@ export const tag = <TagLoader>function <Tags extends string,
                   assignObject(value, k);
                 else {
                   if (s[k] !== undefined)
-                    d[k] = s[k];
+                    set(k, s[k]);
                 }
               }
             } else {
@@ -625,11 +639,11 @@ export const tag = <TagLoader>function <Tags extends string,
                 if (k === 'style' || !destDesc?.set)
                   assign(d[k], value);
                 else
-                  d[k] = value;
+                  set(k, value);
               } else {
                 // Src is not an object (or is null) - just assign it, unless it's undefined
                 if (value !== undefined)
-                  d[k] = value;
+                  set(k, value);
               }
 
               if (DEBUG && !mounted && createdAt < Date.now()) {
@@ -658,7 +672,7 @@ export const tag = <TagLoader>function <Tags extends string,
         function assignObject(value: any, k: string) {
           if (value instanceof Node) {
             console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${base instanceof Node ? logNode(base) : base}`);
-            d[k] = value;
+            set(k, value);
           } else {
             // Note - if we're copying to ourself (or an array of different length),
             // we're decoupling common object references, so we need a clean object to
@@ -667,15 +681,15 @@ export const tag = <TagLoader>function <Tags extends string,
               if (value.constructor === Object || value.constructor === Array) {
                 const copy = new (value.constructor);
                 assign(copy, value);
-                d[k] = copy;
+                set(k, copy);
                 //assign(d[k], value);
               } else {
                 // This is some sort of constructed object, which we can't clone, so we have to copy by reference
-                d[k] = value;
+                set(k, value);
               }
             } else {
               if (Object.getOwnPropertyDescriptor(d, k)?.set)
-                d[k] = value;
+                set(k, value);
               else
                 assign(d[k], value);
             }
@@ -840,24 +854,21 @@ export const tag = <TagLoader>function <Tags extends string,
     return extendTag;
   }
 
+  const createElement: CreateElement['createElement'] = (name, attrs, ...children) =>
+    // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
+    name instanceof Node ? name
+    : typeof name === 'string' && name in baseTagCreators ? baseTagCreators[name](attrs, children)
+    : name === baseTagCreators.createElement ? [...nodes(...children)]
+    : typeof name === 'function' ? name(attrs, children)
+    : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) })
+
   // @ts-ignore
   const baseTagCreators: CreateElement & {
     [K in keyof HTMLElementTagNameMap]?: TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>
   } & {
     [n: string]: TagCreator<Q & Element & PoElementMethods>
   } = {
-    createElement(
-      name: TagCreatorFunction<Element> | Node | keyof HTMLElementTagNameMap,
-      attrs: any,
-      ...children: ChildTags[]): Node {
-      return (name === baseTagCreators.createElement ? nodes(...children)
-        : typeof name === 'function' ? name(attrs, children)
-        : typeof name === 'string' && name in baseTagCreators ?
-        // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
-            baseTagCreators[name](attrs, children)
-        : name instanceof Node ? name
-        : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) })) as Node
-    }
+    createElement
   }
 
   function createTag<K extends keyof HTMLElementTagNameMap>(k: K): TagCreator<Q & HTMLElementTagNameMap[K] & PoElementMethods>;

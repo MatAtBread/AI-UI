@@ -30,55 +30,53 @@ import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferr
 */
 
 // Base types that can be made defined as iterable: basically anything, _except_ a function
-export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null)
 // We should exclude AsyncIterable from the types that can be assigned to iterables (and therefore passed to defineIterableProperty)
-export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue };
+export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue }
 
 export const Iterability = Symbol("Iterability");
-export type Iterability<Depth extends 'shallow' = 'shallow'> = { [Iterability]: Depth };
-export type IterableType<T> = T & Partial<AsyncExtraIterable<T>>;
+export interface Iterability<Depth extends 'shallow' = 'shallow'> { [Iterability]: Depth }
 
 declare global {
   // This is patch to the std lib definition of Array<T>. I don't know why it's absent,
   // as this is the implementation in all JavaScript engines. It is probably a result
   // of its absence in https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/values,
   // which inherits from the Object.prototype, which makes no claim for the return type
-  // since it could be overriddem. However, in that case, a TS defn should also override
-  // it, like Number, String, Boolean etc do.
+  // since it could be overriddem. However, in that case, a TS defn should also override it
+  // like Number, String, Boolean etc do.
   interface Array<T> {
     valueOf(): Array<T>;
   }
   // As above, the return type could be T rather than Object, since this is the default impl,
   // but it's not, for some reason.
   interface Object {
-    valueOf<T>(this: T): T extends IterableType<infer Z> ? Z : Object;
+    valueOf<T>(this: T): IsIterableProperty<T, Object>
   }
 }
 
-type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers;
-export type IterableProperties<IP> = IP extends Iterability<'shallow'> ? {
-  [K in keyof Omit<IP, typeof Iterability>]: IterableType<IP[K]>
-} : {
-  [K in keyof IP]: (
-    IP[K] extends Array<infer E>
-    ? /*
+/*
       Because TS doesn't implement separate types for read/write, or computed getter/setter names (which DO allow
       different types for assignment and evaluation), it is not possible to define type for array members that permit
       dereferencing of non-clashinh array keys such as `join` or `sort` and AsyncIterator methods which also allows
       simple assignment of the form `this.iterableArrayMember = [...]`.
 
-      The CORRECT type for these fields would be (if TS phas syntax for it):
+      The CORRECT type for these fields would be (if TS had syntax for it):
       get [K] (): Omit<Array<E & AsyncExtraIterable<E>, NonAccessibleIterableArrayKeys> & AsyncExtraIterable<E[]>
       set [K] (): Array<E> | AsyncExtraIterable<E[]>
-      */
-      Omit<Array<E & Partial<AsyncExtraIterable<E>>>, NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
-    : (
-      IP[K] extends object
-      ? IterableProperties<IP[K]>
-      : IP[K]
-    ) & IterableType<IP[K]>
-  )
-}
+*/
+type NonAccessibleIterableArrayKeys = keyof Array<any> & keyof AsyncIterableHelpers
+
+export type IterableType<T> = [T] extends [infer U] ? U & Partial<AsyncExtraIterable<U>> : never;
+
+export type IterableProperties<T> = [T] extends [infer IP] ?
+  [IP] extends [Partial<AsyncExtraIterable<unknown>>] | [Iterability<'shallow'>] ? IP
+  : [IP] extends [object] ?
+    IP extends Array<infer E> ? Omit<IterableProperties<E>[], NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
+  : { [K in keyof IP]: IterableProperties<IP[K]> }  & IterableType<IP>
+  : IterableType<IP>
+  : never;
+
+export type IsIterableProperty<Q, R = never> = [Q] extends [Partial<AsyncExtraIterable<infer V>>] ? V : R
 
 /* Things to suppliement the JS base AsyncIterable */
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
@@ -134,7 +132,7 @@ const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(
 
 // Like Object.assign, but the assigned properties are not enumerable
 const iteratorCallSite = Symbol("IteratorCallSite");
-function assignHidden<D extends {}, S extends {}>(d: D, s: S) {
+function assignHidden<D extends object, S extends object>(d: D, s: S) {
   const keys = [...Object.getOwnPropertyNames(s), ...Object.getOwnPropertySymbols(s)];
   for (const k of keys) {
     Object.defineProperty(d, k, { ...Object.getOwnPropertyDescriptor(s, k), enumerable: false });
@@ -267,7 +265,7 @@ declare global {
 */
 
 const _proxiedAsyncIterator = Symbol('_proxiedAsyncIterator');
-export function defineIterableProperty<T extends {}, const N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<{ [k in N]: V }> {
+export function defineIterableProperty<T extends object, const N extends string | symbol, V extends IterablePropertyValue>(obj: T, name: N, v: V): T & IterableProperties<{ [k in N]: V }> {
   // Make `a` an AsyncExtraIterable. We don't do this until a consumer actually tries to
   // access the iterator methods to prevent leaks where an iterable is created, but
   // never referenced, and therefore cannot be consumed and ultimately closed
@@ -295,12 +293,6 @@ export function defineIterableProperty<T extends {}, const N extends string | sy
       } as (typeof asyncExtras)[M]
     }[method];
   }
-
-  type HelperDescriptors<T> = {
-    [K in keyof AsyncExtraIterable<T>]: TypedPropertyDescriptor<AsyncExtraIterable<T>[K]>
-  } & {
-    [Iterability]?: TypedPropertyDescriptor<'shallow'>
-  };
 
   const extras = { [Symbol.asyncIterator]: initIterator } as AsyncExtraIterable<V> & { [Iterability]?: 'shallow' };
   extraKeys.forEach((k) => // @ts-ignore

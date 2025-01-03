@@ -68,6 +68,7 @@ export const tag = function (_1, _2, _3) {
             : [null, standandTags, _1];
     const commonProperties = options?.commonProperties;
     const thisDoc = options?.document ?? globalThis.document;
+    const isTestEnv = thisDoc.documentURI === 'about:testing';
     const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     };
@@ -454,6 +455,15 @@ export const tag = function (_1, _2, _3) {
                         return 0;
                     });
                 }
+                const set = isTestEnv || !(d instanceof Element) || (d instanceof HTMLElement)
+                    ? (k, v) => { d[k] = v; }
+                    : (k, v) => {
+                        if ((v === null || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string')
+                            && (!(k in d) || typeof d[k] !== 'string'))
+                            d.setAttribute(k === 'className' ? 'class' : k, String(v));
+                        else // @ts-ignore
+                            d[k] = v;
+                    };
                 for (const [k, srcDesc] of sourceEntries) {
                     try {
                         if ('value' in srcDesc) {
@@ -475,7 +485,7 @@ export const tag = function (_1, _2, _3) {
                                         }
                                         else {
                                             if (s[k] !== undefined)
-                                                d[k] = v;
+                                                set(k, v);
                                         }
                                     }
                                 }, error => console.log(`Exception in promised attribute '${k}'`, error, logNode(d)));
@@ -486,7 +496,7 @@ export const tag = function (_1, _2, _3) {
                                     assignObject(value, k);
                                 else {
                                     if (s[k] !== undefined)
-                                        d[k] = s[k];
+                                        set(k, s[k]);
                                 }
                             }
                         }
@@ -533,12 +543,12 @@ export const tag = function (_1, _2, _3) {
                                 if (k === 'style' || !destDesc?.set)
                                     assign(d[k], value);
                                 else
-                                    d[k] = value;
+                                    set(k, value);
                             }
                             else {
                                 // Src is not an object (or is null) - just assign it, unless it's undefined
                                 if (value !== undefined)
-                                    d[k] = value;
+                                    set(k, value);
                             }
                             if (DEBUG && !mounted && createdAt < Date.now()) {
                                 createdAt = Number.MAX_SAFE_INTEGER;
@@ -563,7 +573,7 @@ export const tag = function (_1, _2, _3) {
                 function assignObject(value, k) {
                     if (value instanceof Node) {
                         console.info(`Having DOM Nodes as properties of other DOM Nodes is a bad idea as it makes the DOM tree into a cyclic graph. You should reference nodes by ID or via a collection such as .childNodes. Propety: '${k}' value: ${logNode(value)} destination: ${base instanceof Node ? logNode(base) : base}`);
-                        d[k] = value;
+                        set(k, value);
                     }
                     else {
                         // Note - if we're copying to ourself (or an array of different length),
@@ -573,17 +583,17 @@ export const tag = function (_1, _2, _3) {
                             if (value.constructor === Object || value.constructor === Array) {
                                 const copy = new (value.constructor);
                                 assign(copy, value);
-                                d[k] = copy;
+                                set(k, copy);
                                 //assign(d[k], value);
                             }
                             else {
                                 // This is some sort of constructed object, which we can't clone, so we have to copy by reference
-                                d[k] = value;
+                                set(k, value);
                             }
                         }
                         else {
                             if (Object.getOwnPropertyDescriptor(d, k)?.set)
-                                d[k] = value;
+                                set(k, value);
                             else
                                 assign(d[k], value);
                         }
@@ -739,17 +749,16 @@ export const tag = function (_1, _2, _3) {
         }
         return extendTag;
     }
+    const createElement = (name, attrs, ...children) => 
+    // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
+    name instanceof Node ? name
+        : typeof name === 'string' && name in baseTagCreators ? baseTagCreators[name](attrs, children)
+            : name === baseTagCreators.createElement ? [...nodes(...children)]
+                : typeof name === 'function' ? name(attrs, children)
+                    : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) });
     // @ts-ignore
     const baseTagCreators = {
-        createElement(name, attrs, ...children) {
-            return (name === baseTagCreators.createElement ? nodes(...children)
-                : typeof name === 'function' ? name(attrs, children)
-                    : typeof name === 'string' && name in baseTagCreators ?
-                        // @ts-ignore: Expression produces a union type that is too complex to represent.ts(2590)
-                        baseTagCreators[name](attrs, children)
-                        : name instanceof Node ? name
-                            : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) }));
-        }
+        createElement
     };
     function createTag(k) {
         if (baseTagCreators[k])

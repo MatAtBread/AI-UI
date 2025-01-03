@@ -41,21 +41,23 @@
   },
   "scripts": {
     "clean": "rm -rf dist/* esm/*",
-    "build": "npm run clean && (npm run build-esm & npm run build-dev-mjs & npm run build-min-mjs & npm run build-dev-cjs & npm run build-min-cjs & npm run build-dev-script & npm run build-min-script & npm run build-jsx)",
+    "build": "npm run clean && (npm run build-esm & npm run bundle)",
+    "bundle": "npm run bundle-dev-mjs & npm run bundle-min-mjs & npm run bundle-dev-cjs & npm run bundle-min-cjs & npm run bundle-dev-script & npm run bundle-min-script & npm run bundle-jsx",
     "build-esm": "tsc -p tsconfig.json && printf '\\nFinished building .d.ts files\\n'",
-    "build-dev-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.mjs --bundle --platform=neutral --target=es2020 --sourcemap=inline",
-    "build-min-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.min.mjs --bundle --platform=neutral --target=es2020 --minify",
-    "build-dev-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.js --bundle --target=es2020 --sourcemap=inline",
-    "build-min-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.min.js --bundle --target=es2020 --minify",
-    "build-dev-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.cjs --bundle --target=es2020 --sourcemap=inline",
-    "build-min-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.min.cjs --bundle --target=es2020 --minify",
-    "build-jsx": "esbuild src/jsx-runtime.ts --outfile=esm/jsx-runtime --platform=neutral --target=es2020 && cp esm/jsx-runtime dist/jsx-runtime",
+    "bundle-dev-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.mjs --bundle --platform=neutral --target=es2020 --sourcemap=inline",
+    "bundle-min-mjs": "esbuild src/ai-ui.ts --outfile=dist/ai-ui.min.mjs --bundle --platform=neutral --target=es2020 --minify",
+    "bundle-dev-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.js --bundle --target=es2020 --sourcemap=inline",
+    "bundle-min-script": "esbuild src/ai-ui.ts --global-name=AIUI --format=iife --outfile=dist/ai-ui.min.js --bundle --target=es2020 --minify",
+    "bundle-dev-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.cjs --bundle --target=es2020 --sourcemap=inline",
+    "bundle-min-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.min.cjs --bundle --target=es2020 --minify",
+    "bundle-jsx": "esbuild src/jsx-runtime.ts --outfile=esm/jsx-runtime --platform=neutral --target=es2020 && cp esm/jsx-runtime dist/jsx-runtime",
     "prepublishOnly": "npm run build && npm test",
     "test": "tsc -p ../type_tests/tsconfig.json && npm run tests --",
     "tests": "ts-node ../testing/index.ts",
-    "examples": "npx http-server .. -c0 -e js"
+    "examples": "npx http-server .. -c0 -e js",
+    "ts-trace": "tsc -p ./tsconfig.json --generateTrace ./trace --incremental false && npx @typescript/analyze-trace ./trace"
   },
   "type": "module",
   "types": "./esm/ai-ui.d.ts",
-  "version": "0.17.3"
+  "version": "0.17.4"
 }

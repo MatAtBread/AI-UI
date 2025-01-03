@@ -13,58 +13,12 @@ export type ChildTags = Node // Things that are DOM nodes (including elements)
   // and wait for the de-containment to fail if it turns out to not be a `ChildTags`
   | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> // Things that will resolve to any of the above
   | Array<ChildTags>
-  | Iterable<ChildTags>; // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
+  | Iterable<ChildTags> // Iterable things that hold the above, like Arrays, HTMLCollection, NodeList
 
-type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>;
+/* Types used to validate an extended tag declaration */
 
-export type PossiblyAsync<X> =
-  [X] extends [object] // Not "naked" to prevent union distribution
-  ? X extends AsyncAttr<infer U>
-  ? PossiblyAsync<U>
-  : X extends Function
-  ? X | AsyncAttr<X>
-  : AsyncAttr<Partial<X>> | { [K in keyof X]?: PossiblyAsync<X[K]>; }
-  : X | AsyncAttr<X> | undefined;
-
-type DeepPartial<X> = [X] extends [object] ? { [K in keyof X]?: DeepPartial<X[K]> } : X;
-
-export type Instance<T = {}> = { [UniqueID]: string } & T;
-
-// Internal types supporting TagCreator
-type AsyncGeneratedObject<X extends object> = {
-  [K in keyof X]: X[K] extends AsyncAttr<infer Value> ? Value : X[K]
-}
-
-type IDS<I> = I extends {} ? {
-  ids: {
-    [J in keyof I]: I[J] extends ExTagCreator<any> ? ReturnType<I[J]> : never;
-  }
-} : { ids: {} }
-
-type ReTypedEventHandlers<T> = {
-  [K in keyof T]: K extends keyof GlobalEventHandlers
-    ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E)=>any
-      ? (this: T, e: E)=>any | null
-      : T[K]
-    : T[K]
-}
-
-type ReadWriteAttributes<E, Base = E> = E extends { attributes: any }
-  ? (Omit<E, 'attributes'> & {
-    get attributes(): NamedNodeMap;
-    set attributes(v: DeepPartial<PossiblyAsync<Omit<Base,'attributes'>>>);
-  })
-  : (Omit<E, 'attributes'>)
-
-export type Flatten<O> = [{
-  [K in keyof O]: O[K]
-}][number];
-
-export type DeepFlatten<O> = [{
-  [K in keyof O]: Flatten<O[K]>
-}][number];
-
-type NeverEmpty<O extends object> = {} extends O ? never : O;
+type DeepPartial<X> = [X] extends [{}] ? { [K in keyof X]?: DeepPartial<X[K]> } : X
+type NeverEmpty<O extends object> = {} extends O ? never : O
 type OmitType<T, V> = [{ [K in keyof T as T[K] extends V ? never : K]: T[K] }][number]
 type PickType<T, V> = [{ [K in keyof T as T[K] extends V ? K : never]: T[K] }][number]
 
@@ -87,7 +41,7 @@ type ExcessKeys<A, B> =
 
 type OverlappingKeys<A,B> = B extends never ? never
   : A extends never ? never
-  : keyof A & keyof B;
+  : keyof A & keyof B
 
 type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overrides, Result = never>
   = (OverlappingKeys<D['override'],D['declare']>
@@ -107,55 +61,72 @@ type CheckPropertyClashes<BaseCreator extends ExTagCreator<any>, D extends Overr
     '`override` clashes with `declare`': OverlappingKeys<D['override'],D['declare']>
   }, never>
 
+/* Types that form the description of an extended tag */
+
 export type Overrides = {
+  /* Values for properties that already exist in any base a tag is extended from */
   override?: object;
+  /* Declaration and default values for new properties in this tag definition. */
   declare?: object;
+  /* Declaration and default valuees for now properties that are boxed by defineIterableProperties */
   iterable?: { [k: string]: IterablePropertyValue };
+  /* Specification of the types of elements by ID that are contained by this tag */
   ids?: { [id: string]: TagCreatorFunction<any>; };
+  /* Static CSS referenced by this tag */
   styles?: string;
 }
+
+interface TagCreatorForIDS<I extends NonNullable<Overrides['ids']>> {
+  <const K extends keyof I>(
+    attrs:{ id: K } & Exclude<Parameters<I[K]>[0], ChildTags>,
+    ...children: ChildTags[]
+  ): ReturnType<I[K]>
+}
+
+type IDS<I extends Overrides['ids']> = I extends NonNullable<Overrides['ids']> ? {
+  ids: {
+    [J in keyof I]: ReturnType<I[J]>;
+  } & TagCreatorForIDS<I>
+} : { ids: {} }
 
 export type Constructed = {
   constructed: () => (ChildTags | void | PromiseLike<void | ChildTags>);
 }
+
 // Infer the effective set of attributes from an ExTagCreator
 export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer BaseAttrs>
   ? BaseAttrs
-  : never;
+  : never
 
 // Infer the effective set of iterable attributes from the _ancestors_ of an ExTagCreator
 type BaseIterables<Base> =
-  Base extends ExTagCreator<infer _A, infer B, infer D extends Overrides, infer _D>
-  ? BaseIterables<B> extends never
-    ? D['iterable'] extends unknown
-      ? {}
-      : D['iterable']
-    : BaseIterables<B> & D['iterable']
-  : never;
+  Base extends ExTagCreator<infer _Base, infer Super, infer SuperDefs extends Overrides, infer _Statics>
+  ? BaseIterables<Super> extends never
+    ? SuperDefs['iterable'] extends object
+      ? SuperDefs['iterable']
+      : {}
+    : BaseIterables<Super> & SuperDefs['iterable']
+  : never
 
-type CombinedNonIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> =
-  {
-    ids: <
-      const K extends keyof Exclude<D['ids'], undefined>, 
-      const TCF extends TagCreatorFunction<any> = Exclude<D['ids'], undefined>[K]
-    >(
-      attrs:{ id: K } & Exclude<Parameters<TCF>[0], ChildTags>,
-      ...children: ChildTags[]
-    ) => ReturnType<TCF>
-  }
-  & D['declare']
+// Work out the types of all the non-iterable properties of an ExTagCreator
+type CombinedNonIterableProperties<D extends Overrides, Base extends ExTagCreator<any>> =
+  D['declare']
   & D['override']
   & IDS<D['ids']>
-  & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>;
+  & Omit<TagCreatorAttributes<Base>, keyof D['iterable']>
 
-type CombinedIterableProperties<Base extends ExTagCreator<any>, D extends Overrides> = BaseIterables<Base> & D['iterable'];
+type CombinedIterableProperties<D extends Overrides, Base extends ExTagCreator<any>> = BaseIterables<Base> & D['iterable']
 
 export const callStackSymbol = Symbol('callStack');
-export type ConstructorCallStack = { [callStackSymbol]?: Overrides[] };
+export interface ConstructorCallStack extends TagCreationOptions {
+  [callStackSymbol]?: Overrides[];
+  [k: string]: unknown
+}
 
-export type ExtendTagFunction = (attrs: TagCreationOptions & ConstructorCallStack & {
-  [k: string]: unknown;
-} | ChildTags, ...children: ChildTags[]) => Element
+export interface ExtendTagFunction { (attrs: ConstructorCallStack | ChildTags, ...children: ChildTags[]): Element }
+
+interface InstanceUniqueID { [UniqueID]: string }
+export type Instance<T = InstanceUniqueID> = InstanceUniqueID & T
 
 export interface ExtendTagFunctionInstance extends ExtendTagFunction {
   super: TagCreator<Element>;
@@ -164,27 +135,27 @@ export interface ExtendTagFunctionInstance extends ExtendTagFunction {
   extended: (this: TagCreator<Element>, _overrides: Overrides | ((instance?: Instance) => Overrides)) => ExtendTagFunctionInstance;
 }
 
-interface TagConstuctor<Base extends object> {
+interface TagConstuctor {
   constructor: ExtendTagFunctionInstance;
 }
 
-type CombinedThisType<Base extends ExTagCreator<any>, D extends Overrides> =
-  TagConstuctor<Base> &
+type CombinedThisType<D extends Overrides, Base extends ExTagCreator<any>> =
+  TagConstuctor &
   ReadWriteAttributes<
-    IterableProperties<CombinedIterableProperties<Base,D>>
-    & AsyncGeneratedObject<CombinedNonIterableProperties<Base,D>>,
+    IterableProperties<CombinedIterableProperties<D, Base>>
+    & CombinedNonIterableProperties<D, Base>,
     D['declare']
     & D['override']
-    & CombinedIterableProperties<Base,D>
-    & Omit<TagCreatorAttributes<Base>, keyof CombinedIterableProperties<Base,D>>
-  >;
+    & CombinedIterableProperties<D, Base>
+    & Omit<TagCreatorAttributes<Base>, keyof CombinedIterableProperties<D, Base>>
+  >
 
-type StaticReferences<Base extends ExTagCreator<any>, Definitions extends Overrides> = PickType<
+type StaticReferences<Definitions extends Overrides, Base extends ExTagCreator<any>> = PickType<
   Definitions['declare']
   & Definitions['override']
   & TagCreatorAttributes<Base>,
   any
-  >;
+>
 
 // `this` in this.extended(...) is BaseCreator
 interface ExtendedTag {
@@ -192,16 +163,16 @@ interface ExtendedTag {
     BaseCreator extends ExTagCreator<any>,
     SuppliedDefinitions,
     Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {},
-    TagInstance = any
-  >(this: BaseCreator, _: (inst:TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
+    TagInstance extends InstanceUniqueID = InstanceUniqueID
+  >(this: BaseCreator, _: (inst:TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<Definitions, BaseCreator>>)
   : CheckConstructedReturn<SuppliedDefinitions,
       CheckPropertyClashes<BaseCreator, Definitions,
       ExTagCreator<
-        IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
-        & CombinedNonIterableProperties<BaseCreator,Definitions>,
+        IterableProperties<CombinedIterableProperties<Definitions, BaseCreator>>
+        & CombinedNonIterableProperties<Definitions, BaseCreator>,
         BaseCreator,
         Definitions,
-        StaticReferences<BaseCreator, Definitions>
+        StaticReferences<Definitions, BaseCreator>
       >
     >
   >
@@ -210,22 +181,22 @@ interface ExtendedTag {
     BaseCreator extends ExTagCreator<any>,
     SuppliedDefinitions,
     Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}
-  >(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<BaseCreator,Definitions>>)
+  >(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<Definitions, BaseCreator>>)
   : CheckConstructedReturn<SuppliedDefinitions,
       CheckPropertyClashes<BaseCreator, Definitions,
       ExTagCreator<
-        IterableProperties<CombinedIterableProperties<BaseCreator,Definitions>>
-        & CombinedNonIterableProperties<BaseCreator,Definitions>,
+        IterableProperties<CombinedIterableProperties<Definitions, BaseCreator>>
+        & CombinedNonIterableProperties<Definitions, BaseCreator>,
         BaseCreator,
         Definitions,
-        StaticReferences<BaseCreator, Definitions>
+        StaticReferences<Definitions, BaseCreator>
       >
     >
   >
 }
 
 type CheckConstructedReturn<SuppliedDefinitions, Result> =
-SuppliedDefinitions extends { constructed: any }
+  SuppliedDefinitions extends { constructed: any }
   ? SuppliedDefinitions extends Constructed
     ? Result
     : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
@@ -233,15 +204,41 @@ SuppliedDefinitions extends { constructed: any }
     ? Result
     : { "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed> }
 
-export type TagCreationOptions = {
+export interface TagCreationOptions {
   debugger?: boolean
-};
+}
 
-export type TagCreatorArgs<A> = [] | [A & TagCreationOptions] | [A & TagCreationOptions, ...ChildTags[]] | ChildTags[];
+type ReTypedEventHandlers<T> = {
+  [K in keyof T]: K extends keyof GlobalEventHandlers
+    ? Exclude<GlobalEventHandlers[K], null> extends (e: infer E)=>infer R
+      ? ((e: E)=>R) | null
+      : T[K]
+    : T[K]
+}
+
+type AsyncAttr<X> = AsyncProvider<X> | PromiseLike<AsyncProvider<X> | X>
+type PossiblyAsync<X> = [X] extends [object] /* Not "naked" to prevent union distribution */
+  ? X extends AsyncProvider<infer U>
+    ? X extends (AsyncProvider<U> & U)
+      ? U | AsyncAttr<U> // iterable property
+      : X | PromiseLike<X> // some other AsyncProvider
+    : X extends (any[] | Function)
+      ? X | AsyncAttr<X>  // Array or Function, which can be provided async
+      : { [K in keyof X]?: PossiblyAsync<X[K]> } | Partial<X> | AsyncAttr<Partial<X>> // Other object - partially, possible async
+  : X | AsyncAttr<X> // Something else (number, etc), which can be provided async
+
+type ReadWriteAttributes<E, Base = E> = E extends { attributes: any }
+  ? (Omit<E, 'attributes'> & {
+    get attributes(): NamedNodeMap;
+    set attributes(v: PossiblyAsync<Omit<Base,'attributes'>>);
+  })
+  : (Omit<E, 'attributes'>)
+
+export type TagCreatorArgs<A> = [] | [A & TagCreationOptions] | [A & TagCreationOptions, ...ChildTags[]] | ChildTags[]
 /* A TagCreator is a function that optionally takes attributes & children, and creates the tags.
   The attributes are PossiblyAsync. The return has `constructor` set to this function (since it instantiated it)
 */
-export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<ReTypedEventHandlers<Base>> & ThisType<ReTypedEventHandlers<Base>>>) => ReadWriteAttributes<ReTypedEventHandlers<Base>>;
+export type TagCreatorFunction<Base extends object> = (...args: TagCreatorArgs<PossiblyAsync<Base> & ThisType<Base>>) => ReadWriteAttributes<Base>
 
 /* A TagCreator is TagCreatorFunction decorated with some extra methods. The Super & Statics args are only
 ever specified by ExtendedTag (internally), and so is not exported */
@@ -249,21 +246,20 @@ type ExTagCreator<Base extends object,
   Super extends (unknown | ExTagCreator<any>) = unknown,
   SuperDefs extends Overrides = {},
   Statics = {},
-> = TagCreatorFunction<Base> & {
+> = TagCreatorFunction<ReTypedEventHandlers<Base>> & {
   /* It can also be extended */
   extended: ExtendedTag
   /* It is based on a "super" TagCreator */
   super: Super
   /* It has a function that exposes the differences between the tags it creates and its super */
-  definition?: Overrides & { [UniqueID]: string }; /* Contains the definitions & UniqueID for an extended tag. undefined for base tags */
+  definition?: Overrides & InstanceUniqueID; /* Contains the definitions & UniqueID for an extended tag. undefined for base tags */
   /* It has a name (set to a class or definition location), which is helpful when debugging */
   readonly name: string;
   /* Can test if an element was created by this function or a base tag function */
   [Symbol.hasInstance](elt: any): boolean;
-  [UniqueID]: string;
-} &
+} & InstanceUniqueID &
 // `Statics` here is that same as StaticReferences<Super, SuperDefs>, but the circular reference breaks TS
 // so we compute the Statics outside this type declaration as pass them as a result
-Statics;
+Statics
 
-export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {}>;
+export type TagCreator<Base extends object> = ExTagCreator<Base, never, never, {}>

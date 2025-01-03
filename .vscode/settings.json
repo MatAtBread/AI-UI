@@ -10,5 +10,6 @@
             "runningStatusMessage": "Building...",
             "finishStatusMessage": "Build complete"
         }
-    ]
+    ],
+    "svg.preview.background": "transparent"
 }
