@@ -1,6 +1,7 @@
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import { isPromiseLike } from './deferred.js';
 import { iterableHelpers, merge, queueIteratableIterator } from "./iterators.js";
+export const Ready = Object.freeze({});
 const eventObservations = new WeakMap();
 function docEventHandler(ev) {
     if (!eventObservations.has(this))
@@ -156,7 +157,7 @@ export function when(container, ...sources) {
                     // Now everything is ready, we simply delegate all async ops to the underlying
                     // merged asyncIterator "events"
                     events = merged[Symbol.asyncIterator]();
-                    return { done: false, value: {} };
+                    return { done: false, value: Ready };
                 });
             }
         };

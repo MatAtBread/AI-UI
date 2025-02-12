@@ -19,8 +19,8 @@ export type IterableType<T> = [T] extends [infer U] ? U & Partial<AsyncExtraIter
 export type IterableProperties<T> = [T] extends [infer IP] ? [
     IP
 ] extends [Partial<AsyncExtraIterable<unknown>>] | [Iterability<'shallow'>] ? IP : [IP] extends [object] ? IP extends Array<infer E> ? Omit<IterableProperties<E>[], NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>> : {
-    [K in keyof IP]: IterableProperties<IP[K]>;
-} & IterableType<IP> : IterableType<IP> : never;
+    [K in keyof IP]: IterableProperties<IP[K]> & IterableType<IP[K]>;
+} : IterableType<IP> : never;
 export type IsIterableProperty<Q, R = never> = [Q] extends [Partial<AsyncExtraIterable<infer V>>] ? V : R;
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
     push(value: T): boolean;

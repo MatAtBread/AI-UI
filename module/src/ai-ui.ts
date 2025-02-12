@@ -6,7 +6,7 @@ import type { ChildTags, Constructed, Instance, Overrides, TagCreationOptions, T
 import { callStackSymbol } from './tags.js';
 
 /* Export useful stuff for users of the bundled code */
-export { when } from './when.js';
+export { when, Ready } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js'
 export * as Iterators from './iterators.js';
 

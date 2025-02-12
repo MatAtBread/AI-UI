@@ -42,6 +42,8 @@ interface SpecialWhenEvents {
   "@ready": EmptyObject   // Fires when all Element specified sources are mounted in the DOM
 }
 
+export const Ready = Object.freeze({});
+
 interface WhenEvents extends GlobalEventHandlersEventMap, SpecialWhenEvents {}
 type EventNameList<T extends string> = T extends keyof WhenEvents
   ? T
@@ -269,7 +271,7 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
           // merged asyncIterator "events"
           events = merged[Symbol.asyncIterator]();
 
-          return { done: false, value: {} };
+          return { done: false, value: Ready };
         });
       }
     };

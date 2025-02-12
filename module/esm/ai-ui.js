@@ -4,7 +4,7 @@ import { when } from './when.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import { callStackSymbol } from './tags.js';
 /* Export useful stuff for users of the bundled code */
-export { when } from './when.js';
+export { when, Ready } from './when.js';
 export * as Iterators from './iterators.js';
 export const UniqueID = Symbol("Unique ID");
 const trackNodes = Symbol("trackNodes");
