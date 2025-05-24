@@ -322,7 +322,7 @@ export function defineIterableProperty(obj, name, v) {
                         }
                     }
                     // If the key is a target property, create the proxy to handle it
-                    if (key === 'valueOf')
+                    if (key === 'valueOf' || (key === 'toJSON' && !('toJSON' in target)))
                         return () => destructure(a, path);
                     if (key === Symbol.toPrimitive) {
                         // Special case, since Symbol.toPrimitive is in ha(), we need to implement it
