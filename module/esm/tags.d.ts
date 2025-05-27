@@ -1,4 +1,4 @@
-import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyValue } from "./iterators.js";
+import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
 export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 type DeepPartial<X> = [X] extends [{}] ? {
@@ -85,11 +85,26 @@ interface ExtendedTag {
     <BaseCreator extends ExTagCreator<any>, SuppliedDefinitions, Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}, TagInstance extends InstanceUniqueID = InstanceUniqueID>(this: BaseCreator, _: (inst: TagInstance) => SuppliedDefinitions & ThisType<CombinedThisType<Definitions, BaseCreator>>): CheckConstructedReturn<SuppliedDefinitions, CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<Definitions, BaseCreator>> & CombinedNonIterableProperties<Definitions, BaseCreator>, BaseCreator, Definitions, StaticReferences<Definitions, BaseCreator>>>>;
     <BaseCreator extends ExTagCreator<any>, SuppliedDefinitions, Definitions extends Overrides = SuppliedDefinitions extends Overrides ? SuppliedDefinitions : {}>(this: BaseCreator, _: SuppliedDefinitions & ThisType<CombinedThisType<Definitions, BaseCreator>>): CheckConstructedReturn<SuppliedDefinitions, CheckPropertyClashes<BaseCreator, Definitions, ExTagCreator<IterableProperties<CombinedIterableProperties<Definitions, BaseCreator>> & CombinedNonIterableProperties<Definitions, BaseCreator>, BaseCreator, Definitions, StaticReferences<Definitions, BaseCreator>>>>;
 }
+type CheckIsIterablePropertyValue<T, Prefix extends string = ''> = {
+    [K in keyof T]: Exclude<T[K], undefined> extends IterablePropertyPrimitive ? never : Exclude<T[K], undefined> extends Function ? {
+        [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined>;
+    } : Exclude<T[K], undefined> extends object ? Exclude<T[K], undefined> extends Array<infer Z> ? Z extends IterablePropertyPrimitive ? never : {
+        [P in `${Prefix}${K & string}`]: Exclude<Z[], undefined>;
+    } : CheckIsIterablePropertyValue<Exclude<T[K], undefined>, `${Prefix}${K & string}.`> : {
+        [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined>;
+    };
+}[keyof T] extends infer O ? {
+    [K in keyof O]: O[K];
+} : never;
 type CheckConstructedReturn<SuppliedDefinitions, Result> = SuppliedDefinitions extends {
     constructed: any;
 } ? SuppliedDefinitions extends Constructed ? Result : {
     "constructed` does not return ChildTags": SuppliedDefinitions['constructed'];
-} : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never ? Result : {
+} : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never ? Result : SuppliedDefinitions extends {
+    iterable: any;
+} ? {
+    "The extended tag defintion contains non-iterable types": Exclude<CheckIsIterablePropertyValue<SuppliedDefinitions['iterable']>, undefined>;
+} : {
     "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed>;
 };
 export interface TagCreationOptions {

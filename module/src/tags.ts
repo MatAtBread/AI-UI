@@ -2,7 +2,7 @@
   No code/data is declared in this file (except the re-exported symbols from iterators.ts).
 */
 
-import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyValue } from "./iterators.js";
+import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
@@ -195,26 +195,19 @@ interface ExtendedTag {
   >
 }
 
-type Flatten<T, Prefix extends string = ''> = {
-  [K in keyof T]: T[K] extends object
-    ? T[K] extends Array<any> // Prevent flattening arrays
-      ? { [P in `${Prefix}${K & string}`]: T[K] }
-      : Flatten<T[K], `${Prefix}${K & string}.`>
-    : { [P in `${Prefix}${K & string}`]: T[K] }
+type CheckIsIterablePropertyValue<T, Prefix extends string = ''> = {
+  [K in keyof T]: Exclude<T[K], undefined> extends IterablePropertyPrimitive
+  ? never // This isn't a problem as it's an IterablePropertyPrimitive
+  : Exclude<T[K], undefined> extends Function
+    ? { [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined> } // IterablePropertyPrimitive doesn't allow Functions
+    : Exclude<T[K], undefined> extends object // IterablePropertyPrimitive allows objects if they are are maps of IterablePropertyPrimitives
+      ? Exclude<T[K], undefined> extends Array<infer Z> // ....or arrays of IterablePropertyPrimitives
+        ? Z extends IterablePropertyPrimitive ? never : { [P in `${Prefix}${K & string}`]: Exclude<Z[], undefined> }// If it's an arraym check the array member union is also assignable to IterablePropertyPrimitive
+        : CheckIsIterablePropertyValue<Exclude<T[K], undefined>, `${Prefix}${K & string}.`>
+      : { [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined> }
 }[keyof T] extends infer O
   ? { [K in keyof O]: O[K] }
   : never;
-
-type Materialize<T, Z = RemoveNever<T>> = { [K in keyof Z]: Z[K] };
-type RemoveNever<T> = {
-  [K in keyof T as T[K] extends never ? never : K]: T[K]
-};
-
-type CheckIterableProperies<O, F = Flatten<O>> = {
-  [K in keyof F]: F[K] extends IterablePropertyValue
-  ? never
-  : F[K]
-}
 
 type CheckConstructedReturn<SuppliedDefinitions, Result> =
   SuppliedDefinitions extends { constructed: any }
@@ -223,7 +216,9 @@ type CheckConstructedReturn<SuppliedDefinitions, Result> =
     : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
   : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never
     ? Result
-    : { "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed> }
+    : SuppliedDefinitions extends { iterable: any }
+      ? { "The extended tag defintion contains non-iterable types": Exclude<CheckIsIterablePropertyValue<SuppliedDefinitions['iterable']>, undefined> }
+      : { "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed> }
 
 export interface TagCreationOptions {
   debugger?: boolean
