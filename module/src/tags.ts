@@ -195,6 +195,27 @@ interface ExtendedTag {
   >
 }
 
+type Flatten<T, Prefix extends string = ''> = {
+  [K in keyof T]: T[K] extends object
+    ? T[K] extends Array<any> // Prevent flattening arrays
+      ? { [P in `${Prefix}${K & string}`]: T[K] }
+      : Flatten<T[K], `${Prefix}${K & string}.`>
+    : { [P in `${Prefix}${K & string}`]: T[K] }
+}[keyof T] extends infer O
+  ? { [K in keyof O]: O[K] }
+  : never;
+
+type Materialize<T, Z = RemoveNever<T>> = { [K in keyof Z]: Z[K] };
+type RemoveNever<T> = {
+  [K in keyof T as T[K] extends never ? never : K]: T[K]
+};
+
+type CheckIterableProperies<O, F = Flatten<O>> = {
+  [K in keyof F]: F[K] extends IterablePropertyValue
+  ? never
+  : F[K]
+}
+
 type CheckConstructedReturn<SuppliedDefinitions, Result> =
   SuppliedDefinitions extends { constructed: any }
   ? SuppliedDefinitions extends Constructed
