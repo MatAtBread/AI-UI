@@ -1,7 +1,5 @@
-export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
-export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | {
-    [k: string | symbol | number]: IterablePropertyValue;
-};
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null | object | Function | symbol);
+export type IterablePropertyValue = IterablePropertyPrimitive;
 export declare const Iterability: unique symbol;
 export interface Iterability<Depth extends 'shallow' = 'shallow'> {
     [Iterability]: Depth;

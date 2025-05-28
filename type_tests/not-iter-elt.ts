@@ -68,8 +68,7 @@ const J4 = div.extended({
   }
 });
 
-// @ts-expect-error - members cannot be functions
-J4();
+J4().err;
 
 const J5 = div.extended({
   iterable: {
@@ -77,8 +76,8 @@ const J5 = div.extended({
   }
 });
 
-// @ts-expect-error - members cannot be functions
-J5();
+J5().f.consume!(()=>{});
+J5().f();
 
 const J6 = div.extended({
   iterable: {
@@ -86,8 +85,8 @@ const J6 = div.extended({
   }
 });
 
-// @ts-expect-error - members cannot be functions
-J6();
+J6().err.u.consume!(()=>{});
+J6().err.u();
 
 const J7 = div.extended({
   iterable: {
@@ -100,6 +99,13 @@ const J7 = div.extended({
   }
 });
 
-// @ts-expect-error - members cannot be functions
 J7();
 
+const K1 = div.extended({
+  iterable:{
+    n: {} as { s: string, n: number}
+  }
+});
+
+const k1 = K1().n.map!(n => [n]);
+k1.consume(x => console.log(x));

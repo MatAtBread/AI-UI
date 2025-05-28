@@ -259,6 +259,7 @@ export function defineIterableProperty(obj, name, v) {
                 return assignHidden(Object(a), Object.assign(pds, {
                     toJSON() { return a.valueOf(); }
                 }));
+            case 'function':
             case 'object':
                 // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
                 // The proxies are recursive, so that if an object contains objects, they too are proxied. Objects containing primitives remain proxied to

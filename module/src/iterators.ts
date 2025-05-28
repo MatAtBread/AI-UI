@@ -29,10 +29,10 @@ import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferr
   iterable, but it's membetrs are just POJS values.
 */
 
-// Base types that can be made defined as iterable: basically anything, _except_ a function
-export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null)
+// Base types that can be made defined as iterable: basically anything
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null | object | Function | symbol)
 // We should exclude AsyncIterable from the types that can be assigned to iterables (and therefore passed to defineIterableProperty)
-export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue }
+export type IterablePropertyValue = IterablePropertyPrimitive // Exclude<IterablePropertyPrimitive, AsyncIterator<any> | AsyncIterable<any>>
 
 export const Iterability = Symbol("Iterability");
 export interface Iterability<Depth extends 'shallow' = 'shallow'> { [Iterability]: Depth }
@@ -329,11 +329,11 @@ export function defineIterableProperty<T extends object, const N extends string 
           if (piped === v)
             return;
 
-          piped = v;
+          piped = v as AsyncIterable<V>;
           let stack = DEBUG ? new Error() : undefined;
           if (DEBUG)
             console.info(new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
-          consume.call(v, y => {
+          consume.call(v as AsyncIterable<V>, y => {
             if (v !== piped) {
               // We're being piped from something else. We want to stop that one and get piped from this one
               throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`, { cause: stack });
@@ -373,6 +373,7 @@ export function defineIterableProperty<T extends object, const N extends string 
         return assignHidden(Object(a), Object.assign(pds, {
           toJSON() { return a.valueOf() }
         }));
+      case 'function':
       case 'object':
         // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
         // The proxies are recursive, so that if an object contains objects, they too are proxied. Objects containing primitives remain proxied to
