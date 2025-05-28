@@ -202,7 +202,7 @@ type CheckIsIterablePropertyValue<T, Prefix extends string = ''> = {
     ? { [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined> } // IterablePropertyPrimitive doesn't allow Functions
     : Exclude<T[K], undefined> extends object // IterablePropertyPrimitive allows objects if they are are maps of IterablePropertyPrimitives
       ? Exclude<T[K], undefined> extends Array<infer Z> // ....or arrays of IterablePropertyPrimitives
-        ? Z extends IterablePropertyPrimitive ? never : { [P in `${Prefix}${K & string}`]: Exclude<Z[], undefined> }// If it's an arraym check the array member union is also assignable to IterablePropertyPrimitive
+        ? Z extends IterablePropertyValue ? never : { [P in `${Prefix}${K & string}`]: Exclude<Z[], undefined> }// If it's an arraym check the array member union is also assignable to IterablePropertyPrimitive
         : CheckIsIterablePropertyValue<Exclude<T[K], undefined>, `${Prefix}${K & string}.`>
       : { [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined> }
 }[keyof T] extends infer O

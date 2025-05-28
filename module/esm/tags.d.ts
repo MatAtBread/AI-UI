@@ -88,7 +88,7 @@ interface ExtendedTag {
 type CheckIsIterablePropertyValue<T, Prefix extends string = ''> = {
     [K in keyof T]: Exclude<T[K], undefined> extends IterablePropertyPrimitive ? never : Exclude<T[K], undefined> extends Function ? {
         [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined>;
-    } : Exclude<T[K], undefined> extends object ? Exclude<T[K], undefined> extends Array<infer Z> ? Z extends IterablePropertyPrimitive ? never : {
+    } : Exclude<T[K], undefined> extends object ? Exclude<T[K], undefined> extends Array<infer Z> ? Z extends IterablePropertyValue ? never : {
         [P in `${Prefix}${K & string}`]: Exclude<Z[], undefined>;
     } : CheckIsIterablePropertyValue<Exclude<T[K], undefined>, `${Prefix}${K & string}.`> : {
         [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined>;
