@@ -2,7 +2,7 @@
   No code/data is declared in this file (except the re-exported symbols from iterators.ts).
 */
 
-import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue } from "./iterators.js";
+import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue, IterableType } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
@@ -90,7 +90,7 @@ type IDS<I extends Overrides['ids']> = I extends NonNullable<Overrides['ids']> ?
 } : { ids: {} }
 
 export type Constructed = {
-  constructed: () => (ChildTags | void | PromiseLike<void | ChildTags>);
+  constructed: () => (ChildTags | void | PromiseLike<void | ChildTags> | IterableType<void | ChildTags>);
 }
 
 // Infer the effective set of attributes from an ExTagCreator
@@ -213,7 +213,7 @@ type CheckConstructedReturn<SuppliedDefinitions, Result> =
   SuppliedDefinitions extends { constructed: any }
   ? SuppliedDefinitions extends Constructed
     ? Result
-    : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
+    : { "`constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
   : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never
     ? Result
     : SuppliedDefinitions extends { iterable: any }

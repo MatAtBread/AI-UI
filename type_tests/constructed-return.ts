@@ -50,5 +50,5 @@ K()
 L();
 
 ({} as AssertEqual<typeof I, {
-    "constructed` does not return ChildTags": () => symbol;
+    "`constructed` does not return ChildTags": () => symbol;
 }>).true;

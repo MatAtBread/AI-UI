@@ -69,7 +69,7 @@ export const tag = function (_1, _2, _3) {
     const commonProperties = options?.commonProperties;
     const thisDoc = options?.document ?? globalThis.document;
     const isTestEnv = thisDoc.documentURI === 'about:testing';
-    const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }) {
+    const DynamicElementError = options?.ErrorTag || function DyamicElementError({ error }) {
         return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
     };
     const removedNodes = mutationTracker(thisDoc);
@@ -321,7 +321,7 @@ export const tag = function (_1, _2, _3) {
                     }).catch((errorValue) => {
                         const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
                         if (n?.length) {
-                            n[0].replaceWith(DyamicElementError({ error: errorValue?.value ?? errorValue }));
+                            n[0].replaceWith(DynamicElementError({ error: errorValue?.value ?? errorValue }));
                             n.slice(1).forEach(e => e?.remove());
                         }
                         else
@@ -560,7 +560,7 @@ export const tag = function (_1, _2, _3) {
                     const error = (errorValue) => {
                         if (errorValue) {
                             console.warn("Dynamic attribute termination", errorValue, k, logNode(d), createdBy, logNode(base));
-                            base.appendChild(DyamicElementError({ error: errorValue }));
+                            base.appendChild(DynamicElementError({ error: errorValue }));
                         }
                     };
                     const unboxed = iter.valueOf();
@@ -755,7 +755,7 @@ export const tag = function (_1, _2, _3) {
         : typeof name === 'string' && name in baseTagCreators ? baseTagCreators[name](attrs, children)
             : name === baseTagCreators.createElement ? [...nodes(...children)]
                 : typeof name === 'function' ? name(attrs, children)
-                    : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) });
+                    : DynamicElementError({ error: new Error("Illegal type in createElement:" + name) });
     // @ts-ignore
     const baseTagCreators = {
         createElement

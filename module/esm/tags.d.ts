@@ -1,4 +1,4 @@
-import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue } from "./iterators.js";
+import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue, IterableType } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
 export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 type DeepPartial<X> = [X] extends [{}] ? {
@@ -52,7 +52,7 @@ type IDS<I extends Overrides['ids']> = I extends NonNullable<Overrides['ids']> ?
     ids: {};
 };
 export type Constructed = {
-    constructed: () => (ChildTags | void | PromiseLike<void | ChildTags>);
+    constructed: () => (ChildTags | void | PromiseLike<void | ChildTags> | IterableType<void | ChildTags>);
 };
 export type TagCreatorAttributes<T extends ExTagCreator<any>> = T extends ExTagCreator<infer BaseAttrs> ? BaseAttrs : never;
 type BaseIterables<Base> = Base extends ExTagCreator<infer _Base, infer Super, infer SuperDefs extends Overrides, infer _Statics> ? BaseIterables<Super> extends never ? SuperDefs['iterable'] extends object ? SuperDefs['iterable'] : {} : BaseIterables<Super> & SuperDefs['iterable'] : never;
@@ -99,7 +99,7 @@ type CheckIsIterablePropertyValue<T, Prefix extends string = ''> = {
 type CheckConstructedReturn<SuppliedDefinitions, Result> = SuppliedDefinitions extends {
     constructed: any;
 } ? SuppliedDefinitions extends Constructed ? Result : {
-    "constructed` does not return ChildTags": SuppliedDefinitions['constructed'];
+    "`constructed` does not return ChildTags": SuppliedDefinitions['constructed'];
 } : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never ? Result : SuppliedDefinitions extends {
     iterable: any;
 } ? {

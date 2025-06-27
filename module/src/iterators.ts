@@ -123,8 +123,8 @@ export const asyncExtras = {
   merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A) {
     return merge(this, ...m);
   },
-  combine<T, S extends CombinedIterable>(this: PartialIterable<T>, others: S) {
-    return combine(Object.assign({ '_this': this }, others));
+  combine<T, S extends CombinedIterable, O extends CombineOptions>(this: PartialIterable<T>, others: S, opts: O = {} as O) {
+    return combine(Object.assign({ '_this': this }, others), opts);
   }
 };
 
@@ -548,15 +548,18 @@ type CombinedIterable = { [k: string | number | symbol]: PartialIterable };
 type CombinedIterableType<S extends CombinedIterable> = {
   [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never
 };
-type CombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+type RequiredCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+  [K in keyof S]: S[K] extends PartialIterable<infer T> ? T : never
+}>;
+type PartialCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
   [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never
 }>;
-
 export interface CombineOptions {
   ignorePartial?: boolean; // Set to avoid yielding if some sources are absent
 }
+type CombinedIterableResult<S extends CombinedIterable, O extends CombineOptions> = true extends O['ignorePartial'] ? RequiredCombinedIterableResult<S> : PartialCombinedIterableResult<S>
 
-export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions = {}): CombinedIterableResult<S> => {
+export const combine = <S extends CombinedIterable, O extends CombineOptions>(src: S, opts = {} as O): CombinedIterableResult<S,O> => {
   const accumulated: CombinedIterableType<S> = {};
   const si = new Map<string | number | symbol, AsyncIterator<any>>();
   let pc: Map<string | number | symbol, Promise<{ k: string, ir: IteratorResult<any> }>>; // Initialized lazily
@@ -699,8 +702,8 @@ export function filterMap<U extends PartialIterable, R>(source: U,
                 : resolve({ done: false, value: prev = f }),
               ex => {
                 prev = Ignore; // Remove reference for GC
-                // The filter function failed...
-                const sourceResponse = ai.throw?.(ex) ?? ai.return?.(ex);
+                // The filter function failed. We check ai here as it might have been terminated already
+                const sourceResponse = ai?.throw?.(ex) ?? ai?.return?.(ex);
                 // Terminate the source (ai) and consumer (reject)
                 if (isPromiseLike(sourceResponse)) sourceResponse.then(reject,reject);
                 else reject({ done: true, value: ex })
@@ -766,26 +769,32 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
 
   // The source has produced a new result
   function step(it?: IteratorResult<T, any>) {
-    if (it) current.resolve(it);
+    if (it) current?.resolve(it);
     if (it?.done) {
       // @ts-ignore: release reference
       current = null;
     } else {
       current = deferred<IteratorResult<T>>();
-      ai!.next()
-        .then(step)
-        .catch(error => {
-          current?.reject({ done: true, value: error });
-          // @ts-ignore: release reference
-          current = null;
-        });
+      if (ai) {
+        ai.next()
+          .then(step)
+          .catch(error => {
+            current?.reject({ done: true, value: error });
+            // @ts-ignore: release reference
+            current = null;
+          });
+        } else {
+          current.resolve({ done: true, value: undefined });
+        }
     }
   }
 
   function done(v: IteratorResult<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator]>, any> | undefined) {
+    const result = { done: true, value: v?.value };
+//    current?.resolve(result);
     // @ts-ignore: remove references for GC
     ai = mai = current = null;
-    return { done: true, value: v?.value }
+    return result;
   }
 
   let mai: AsyncIterableIterator<T> = {
