@@ -529,6 +529,7 @@ export const tag = <TagLoader>function <Tags extends string,
   }
 
   function unbox<T>(a: T): T {
+    if (a === null) return null as T;
     const v = a?.valueOf();
     return (Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v) as T;
   }

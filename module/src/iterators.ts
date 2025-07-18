@@ -568,8 +568,9 @@ export const combine = <S extends CombinedIterable, O extends CombineOptions>(sr
     next(): Promise<IteratorResult<CombinedIterableType<S>>> {
       if (pc === undefined) {
         pc = new Map(Object.entries(src).map(([k, sit]) => {
-          si.set(k, sit[Symbol.asyncIterator]!());
-          return [k, si.get(k)!.next().then(ir => ({ si, k, ir }))];
+          const source = sit[Symbol.asyncIterator]!();
+          si.set(k, source);
+          return [k, source.next().then(ir => ({ si, k, ir }))];
         }));
       }
 
@@ -582,8 +583,7 @@ export const combine = <S extends CombinedIterable, O extends CombineOptions>(sr
               return { done: true, value: undefined };
             return step();
           } else {
-            // @ts-ignore
-            accumulated[k] = ir.value;
+            accumulated[k as keyof typeof accumulated] = ir.value;
             pc.set(k, si.get(k)!.next().then(ir => ({ k, ir })));
           }
           if (opts.ignorePartial) {
@@ -791,7 +791,6 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
 
   function done(v: IteratorResult<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator]>, any> | undefined) {
     const result = { done: true, value: v?.value };
-//    current?.resolve(result);
     // @ts-ignore: remove references for GC
     ai = mai = current = null;
     return result;

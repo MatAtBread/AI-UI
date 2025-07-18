@@ -420,8 +420,9 @@ export const combine = (src, opts = {}) => {
         next() {
             if (pc === undefined) {
                 pc = new Map(Object.entries(src).map(([k, sit]) => {
-                    si.set(k, sit[Symbol.asyncIterator]());
-                    return [k, si.get(k).next().then(ir => ({ si, k, ir }))];
+                    const source = sit[Symbol.asyncIterator]();
+                    si.set(k, source);
+                    return [k, source.next().then(ir => ({ si, k, ir }))];
                 }));
             }
             return (function step() {
@@ -434,7 +435,6 @@ export const combine = (src, opts = {}) => {
                         return step();
                     }
                     else {
-                        // @ts-ignore
                         accumulated[k] = ir.value;
                         pc.set(k, si.get(k).next().then(ir => ({ k, ir })));
                     }
@@ -606,7 +606,6 @@ function multi() {
     }
     function done(v) {
         const result = { done: true, value: v?.value };
-        //    current?.resolve(result);
         // @ts-ignore: remove references for GC
         ai = mai = current = null;
         return result;

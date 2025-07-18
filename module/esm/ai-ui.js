@@ -430,6 +430,8 @@ export const tag = function (_1, _2, _3) {
         }
     }
     function unbox(a) {
+        if (a === null)
+            return null;
         const v = a?.valueOf();
         return (Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v);
     }
