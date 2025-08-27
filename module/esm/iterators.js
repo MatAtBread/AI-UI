@@ -33,7 +33,8 @@ export const asyncExtras = {
         return merge(this, ...m);
     },
     combine(others, opts = {}) {
-        return combine(Object.assign({ '_this': this }, others), opts);
+        const sources = Object.assign({ '_this': this }, others);
+        return combine(sources, opts);
     }
 };
 const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)];
@@ -412,7 +413,7 @@ export const merge = (...ai) => {
     return iterableHelpers(merged);
 };
 export const combine = (src, opts = {}) => {
-    const accumulated = {};
+    const accumulated = opts.initially ? opts.initially : {};
     const si = new Map();
     let pc; // Initialized lazily
     const ci = {
@@ -487,6 +488,9 @@ async function consume(f) {
 }
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
+export async function* once(v) {
+    yield v;
+}
 function resolveSync(v, then, except) {
     if (isPromiseLike(v))
         return v.then(then, except);
@@ -511,9 +515,16 @@ export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
         },
         next(...args) {
             if (initialValue !== Ignore) {
-                const init = Promise.resolve({ done: false, value: initialValue });
-                initialValue = Ignore;
-                return init;
+                if (isPromiseLike(initialValue)) {
+                    const init = initialValue.then(value => ({ done: false, value }));
+                    initialValue = Ignore;
+                    return init;
+                }
+                else {
+                    const init = Promise.resolve({ done: false, value: initialValue });
+                    initialValue = Ignore;
+                    return init;
+                }
             }
             return new Promise(function step(resolve, reject) {
                 if (!ai)

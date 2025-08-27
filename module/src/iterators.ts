@@ -23,7 +23,7 @@ import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferr
   This relies on a hack to `wrapAsyncHelper` in iterators.ts which *accepts* a Partial<AsyncIterator>
   but casts it to a AsyncIterator before use.
 
-  The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
+  The iterability of properties of an object is determined by the presence and value of the `Iterability` symbol.
   By default, the current implementation does a deep mapping, so an iterable property 'obj' is itself
   iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
   iterable, but it's membetrs are just POJS values.
@@ -123,8 +123,9 @@ export const asyncExtras = {
   merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A) {
     return merge(this, ...m);
   },
-  combine<T, S extends CombinedIterable, O extends CombineOptions>(this: PartialIterable<T>, others: S, opts: O = {} as O) {
-    return combine(Object.assign({ '_this': this }, others), opts);
+  combine<T extends Partial<AsyncIterable<T>>, S extends CombinedIterable, O extends CombineOptions<S & { _this: T }>>(this: PartialIterable<T>, others: S, opts: O = {} as O) {
+    const sources = Object.assign({ '_this': this }, others);
+    return combine(sources, opts);
   }
 };
 
@@ -554,13 +555,14 @@ type RequiredCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIter
 type PartialCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
   [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never
 }>;
-export interface CombineOptions {
+export interface CombineOptions<S extends CombinedIterable> {
   ignorePartial?: boolean; // Set to avoid yielding if some sources are absent
+  initially?: CombinedIterableType<S>; // optional initial values for individual fields
 }
-type CombinedIterableResult<S extends CombinedIterable, O extends CombineOptions> = true extends O['ignorePartial'] ? RequiredCombinedIterableResult<S> : PartialCombinedIterableResult<S>
+type CombinedIterableResult<S extends CombinedIterable, O extends CombineOptions<S>> = true extends O['ignorePartial'] ? RequiredCombinedIterableResult<S> : PartialCombinedIterableResult<S>
 
-export const combine = <S extends CombinedIterable, O extends CombineOptions>(src: S, opts = {} as O): CombinedIterableResult<S,O> => {
-  const accumulated: CombinedIterableType<S> = {};
+export const combine = <S extends CombinedIterable, O extends CombineOptions<S>>(src: S, opts = {} as O): CombinedIterableResult<S,O> => {
+  const accumulated: CombinedIterableType<S> = opts.initially ? opts.initially : {};
   const si = new Map<string | number | symbol, AsyncIterator<any>>();
   let pc: Map<string | number | symbol, Promise<{ k: string, ir: IteratorResult<any> }>>; // Initialized lazily
   const ci = {
@@ -654,6 +656,10 @@ type MaybePromised<T> = PromiseLike<T> | T;
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 
+export async function *once<T>(v:T) {
+  yield v;
+}
+
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
 function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: any) => any): MaybePromised<R> {
@@ -668,7 +674,7 @@ function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: a
 
 export function filterMap<U extends PartialIterable, R>(source: U,
   fn: Mapper<HelperAsyncIterable<U>, R>,
-  initialValue: R | typeof Ignore = Ignore,
+  initialValue: R | Promise<R> | typeof Ignore = Ignore,
   prev: R | typeof Ignore = Ignore
 ): AsyncExtraIterable<R> {
   let ai: AsyncIterator<HelperAsyncIterable<U>>;
@@ -685,9 +691,15 @@ export function filterMap<U extends PartialIterable, R>(source: U,
 
     next(...args: [] | [undefined]) {
       if (initialValue !== Ignore) {
-        const init = Promise.resolve({ done: false, value: initialValue });
-        initialValue = Ignore;
-        return init;
+        if (isPromiseLike(initialValue)) {
+          const init = initialValue.then(value => ({done:false, value }));
+          initialValue = Ignore;
+          return init;
+        } else {
+          const init = Promise.resolve({ done: false, value: initialValue });
+          initialValue = Ignore;
+          return init;
+        }
       }
 
       return new Promise<IteratorResult<R>>(function step(resolve, reject) {
