@@ -1,7 +1,5 @@
-export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null);
-export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | {
-    [k: string | symbol | number]: IterablePropertyValue;
-};
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null | object | Function | symbol);
+export type IterablePropertyValue = IterablePropertyPrimitive;
 export declare const Iterability: unique symbol;
 export interface Iterability<Depth extends 'shallow' = 'shallow'> {
     [Iterability]: Depth;
@@ -19,8 +17,8 @@ export type IterableType<T> = [T] extends [infer U] ? U & Partial<AsyncExtraIter
 export type IterableProperties<T> = [T] extends [infer IP] ? [
     IP
 ] extends [Partial<AsyncExtraIterable<unknown>>] | [Iterability<'shallow'>] ? IP : [IP] extends [object] ? IP extends Array<infer E> ? Omit<IterableProperties<E>[], NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>> : {
-    [K in keyof IP]: IterableProperties<IP[K]>;
-} & IterableType<IP> : IterableType<IP> : never;
+    [K in keyof IP]: IterableProperties<IP[K]> & IterableType<IP[K]>;
+} : IterableType<IP> : never;
 export type IsIterableProperty<Q, R = never> = [Q] extends [Partial<AsyncExtraIterable<infer V>>] ? V : R;
 export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, AsyncIterableHelpers {
     push(value: T): boolean;
@@ -44,9 +42,11 @@ export declare const asyncExtras: {
     initially: typeof initially;
     consume: typeof consume;
     merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A): CollapseIterableTypes<[Partial<AsyncIterable<T>>, ...A][number]> & AsyncExtraIterable<CollapseIterableType<[Partial<AsyncIterable<T>>, ...A][number]>>;
-    combine<T, S extends CombinedIterable>(this: PartialIterable<T>, others: S): CombinedIterableResult<{
+    combine<T extends Partial<AsyncIterable<T>>, S extends CombinedIterable, O extends CombineOptions<S & {
+        _this: T;
+    }>>(this: PartialIterable<T>, others: S, opts?: O): CombinedIterableResult<{
         _this: Partial<AsyncIterable<T>>;
-    } & S>;
+    } & S, O>;
 };
 export declare const queueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T>;
 export declare const debounceQueueIteratableIterator: <T>(stop?: () => void) => QueueIteratableIterator<T>;
@@ -68,13 +68,21 @@ export declare const merge: <A extends Partial<AsyncIterable<TYield> | AsyncIter
 type CombinedIterable = {
     [k: string | number | symbol]: PartialIterable;
 };
-type CombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+type CombinedIterableType<S extends CombinedIterable> = {
+    [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never;
+};
+type RequiredCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+    [K in keyof S]: S[K] extends PartialIterable<infer T> ? T : never;
+}>;
+type PartialCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
     [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never;
 }>;
-export interface CombineOptions {
+export interface CombineOptions<S extends CombinedIterable> {
     ignorePartial?: boolean;
+    initially?: CombinedIterableType<S>;
 }
-export declare const combine: <S extends CombinedIterable>(src: S, opts?: CombineOptions) => CombinedIterableResult<S>;
+type CombinedIterableResult<S extends CombinedIterable, O extends CombineOptions<S>> = true extends O['ignorePartial'] ? RequiredCombinedIterableResult<S> : PartialCombinedIterableResult<S>;
+export declare const combine: <S extends CombinedIterable, O extends CombineOptions<S>>(src: S, opts?: O) => CombinedIterableResult<S, O>;
 export declare function iterableHelpers<A extends AsyncIterable<any>>(ai: A): A & AsyncExtraIterable<A extends AsyncIterable<infer T> ? T : unknown>;
 export declare function generatorHelpers<G extends (...args: any[]) => R, R extends AsyncGenerator>(g: G): (...args: Parameters<G>) => ReturnType<G> & AsyncExtraIterable<ReturnType<G> extends AsyncGenerator<infer T> ? T : unknown>;
 type HelperAsyncIterable<Q extends Partial<AsyncIterable<any>>> = HelperAsyncIterator<Required<Q>[typeof Symbol.asyncIterator]>;
@@ -83,8 +91,9 @@ declare function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u:
 type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>);
 type MaybePromised<T> = PromiseLike<T> | T;
 export declare const Ignore: unique symbol;
+export declare function once<T>(v: T): AsyncGenerator<Awaited<T>, void, unknown>;
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
-export declare function filterMap<U extends PartialIterable, R>(source: U, fn: Mapper<HelperAsyncIterable<U>, R>, initialValue?: R | typeof Ignore, prev?: R | typeof Ignore): AsyncExtraIterable<R>;
+export declare function filterMap<U extends PartialIterable, R>(source: U, fn: Mapper<HelperAsyncIterable<U>, R>, initialValue?: R | Promise<R> | typeof Ignore, prev?: R | typeof Ignore): AsyncExtraIterable<R>;
 declare function map<U extends PartialIterable, R>(this: U, mapper: Mapper<HelperAsyncIterable<U>, R>): AsyncExtraIterable<R>;
 declare function filter<U extends PartialIterable>(this: U, fn: (o: HelperAsyncIterable<U>) => boolean | PromiseLike<boolean>): AsyncExtraIterable<HelperAsyncIterable<U>>;
 declare function unique<U extends PartialIterable>(this: U, fn?: (next: HelperAsyncIterable<U>, prev: HelperAsyncIterable<U>) => boolean | PromiseLike<boolean>): AsyncExtraIterable<HelperAsyncIterable<U>>;

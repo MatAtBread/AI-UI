@@ -23,16 +23,16 @@ import { DeferredPromise, deferred, isObjectLike, isPromiseLike } from "./deferr
   This relies on a hack to `wrapAsyncHelper` in iterators.ts which *accepts* a Partial<AsyncIterator>
   but casts it to a AsyncIterator before use.
 
-  The iterability of propertys of an object is determined by the presence and value of the `Iterability` symbol.
+  The iterability of properties of an object is determined by the presence and value of the `Iterability` symbol.
   By default, the current implementation does a deep mapping, so an iterable property 'obj' is itself
   iterable, as are it's members. The only defined value at present is "shallow", in which case 'obj' remains
   iterable, but it's membetrs are just POJS values.
 */
 
-// Base types that can be made defined as iterable: basically anything, _except_ a function
-export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null)
+// Base types that can be made defined as iterable: basically anything
+export type IterablePropertyPrimitive = (string | number | bigint | boolean | undefined | null | object | Function | symbol)
 // We should exclude AsyncIterable from the types that can be assigned to iterables (and therefore passed to defineIterableProperty)
-export type IterablePropertyValue = IterablePropertyPrimitive | IterablePropertyValue[] | { [k: string | symbol | number]: IterablePropertyValue }
+export type IterablePropertyValue = IterablePropertyPrimitive // Exclude<IterablePropertyPrimitive, AsyncIterator<any> | AsyncIterable<any>>
 
 export const Iterability = Symbol("Iterability");
 export interface Iterability<Depth extends 'shallow' = 'shallow'> { [Iterability]: Depth }
@@ -72,7 +72,7 @@ export type IterableProperties<T> = [T] extends [infer IP] ?
   [IP] extends [Partial<AsyncExtraIterable<unknown>>] | [Iterability<'shallow'>] ? IP
   : [IP] extends [object] ?
     IP extends Array<infer E> ? Omit<IterableProperties<E>[], NonAccessibleIterableArrayKeys> & Partial<AsyncExtraIterable<E[]>>
-  : { [K in keyof IP]: IterableProperties<IP[K]> }  & IterableType<IP>
+  : { [K in keyof IP]: IterableProperties<IP[K]> & IterableType<IP[K]> }
   : IterableType<IP>
   : never;
 
@@ -123,8 +123,9 @@ export const asyncExtras = {
   merge<T, A extends Partial<AsyncIterable<any>>[]>(this: PartialIterable<T>, ...m: A) {
     return merge(this, ...m);
   },
-  combine<T, S extends CombinedIterable>(this: PartialIterable<T>, others: S) {
-    return combine(Object.assign({ '_this': this }, others));
+  combine<T extends Partial<AsyncIterable<T>>, S extends CombinedIterable, O extends CombineOptions<S & { _this: T }>>(this: PartialIterable<T>, others: S, opts: O = {} as O) {
+    const sources = Object.assign({ '_this': this }, others);
+    return combine(sources, opts);
   }
 };
 
@@ -329,11 +330,11 @@ export function defineIterableProperty<T extends object, const N extends string 
           if (piped === v)
             return;
 
-          piped = v;
+          piped = v as AsyncIterable<V>;
           let stack = DEBUG ? new Error() : undefined;
           if (DEBUG)
             console.info(new Error(`Iterable "${name.toString()}" has been assigned to consume another iterator. Did you mean to declare it?`));
-          consume.call(v, y => {
+          consume.call(v as AsyncIterable<V>, y => {
             if (v !== piped) {
               // We're being piped from something else. We want to stop that one and get piped from this one
               throw new Error(`Piped iterable "${name.toString()}" has been replaced by another iterator`, { cause: stack });
@@ -373,6 +374,7 @@ export function defineIterableProperty<T extends object, const N extends string 
         return assignHidden(Object(a), Object.assign(pds, {
           toJSON() { return a.valueOf() }
         }));
+      case 'function':
       case 'object':
         // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
         // The proxies are recursive, so that if an object contains objects, they too are proxied. Objects containing primitives remain proxied to
@@ -441,7 +443,8 @@ export function defineIterableProperty<T extends object, const N extends string 
           }
 
           // If the key is a target property, create the proxy to handle it
-          if (key === 'valueOf') return () => destructure(a, path);
+          if (key === 'valueOf' || (key === 'toJSON' && !('toJSON' in target)))
+            return () => destructure(a, path);
           if (key === Symbol.toPrimitive) {
             // Special case, since Symbol.toPrimitive is in ha(), we need to implement it
             return function (hint?: 'string' | 'number' | 'default') {
@@ -546,16 +549,20 @@ type CombinedIterable = { [k: string | number | symbol]: PartialIterable };
 type CombinedIterableType<S extends CombinedIterable> = {
   [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never
 };
-type CombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+type RequiredCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
+  [K in keyof S]: S[K] extends PartialIterable<infer T> ? T : never
+}>;
+type PartialCombinedIterableResult<S extends CombinedIterable> = AsyncExtraIterable<{
   [K in keyof S]?: S[K] extends PartialIterable<infer T> ? T : never
 }>;
-
-export interface CombineOptions {
+export interface CombineOptions<S extends CombinedIterable> {
   ignorePartial?: boolean; // Set to avoid yielding if some sources are absent
+  initially?: CombinedIterableType<S>; // optional initial values for individual fields
 }
+type CombinedIterableResult<S extends CombinedIterable, O extends CombineOptions<S>> = true extends O['ignorePartial'] ? RequiredCombinedIterableResult<S> : PartialCombinedIterableResult<S>
 
-export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions = {}): CombinedIterableResult<S> => {
-  const accumulated: CombinedIterableType<S> = {};
+export const combine = <S extends CombinedIterable, O extends CombineOptions<S>>(src: S, opts = {} as O): CombinedIterableResult<S,O> => {
+  const accumulated: CombinedIterableType<S> = opts.initially ? opts.initially : {};
   const si = new Map<string | number | symbol, AsyncIterator<any>>();
   let pc: Map<string | number | symbol, Promise<{ k: string, ir: IteratorResult<any> }>>; // Initialized lazily
   const ci = {
@@ -563,8 +570,9 @@ export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions
     next(): Promise<IteratorResult<CombinedIterableType<S>>> {
       if (pc === undefined) {
         pc = new Map(Object.entries(src).map(([k, sit]) => {
-          si.set(k, sit[Symbol.asyncIterator]!());
-          return [k, si.get(k)!.next().then(ir => ({ si, k, ir }))];
+          const source = sit[Symbol.asyncIterator]!();
+          si.set(k, source);
+          return [k, source.next().then(ir => ({ si, k, ir }))];
         }));
       }
 
@@ -577,8 +585,7 @@ export const combine = <S extends CombinedIterable>(src: S, opts: CombineOptions
               return { done: true, value: undefined };
             return step();
           } else {
-            // @ts-ignore
-            accumulated[k] = ir.value;
+            accumulated[k as keyof typeof accumulated] = ir.value;
             pc.set(k, si.get(k)!.next().then(ir => ({ k, ir })));
           }
           if (opts.ignorePartial) {
@@ -649,6 +656,10 @@ type MaybePromised<T> = PromiseLike<T> | T;
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
 
+export async function *once<T>(v:T) {
+  yield v;
+}
+
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
 function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: any) => any): MaybePromised<R> {
@@ -663,7 +674,7 @@ function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: a
 
 export function filterMap<U extends PartialIterable, R>(source: U,
   fn: Mapper<HelperAsyncIterable<U>, R>,
-  initialValue: R | typeof Ignore = Ignore,
+  initialValue: R | Promise<R> | typeof Ignore = Ignore,
   prev: R | typeof Ignore = Ignore
 ): AsyncExtraIterable<R> {
   let ai: AsyncIterator<HelperAsyncIterable<U>>;
@@ -680,9 +691,15 @@ export function filterMap<U extends PartialIterable, R>(source: U,
 
     next(...args: [] | [undefined]) {
       if (initialValue !== Ignore) {
-        const init = Promise.resolve({ done: false, value: initialValue });
-        initialValue = Ignore;
-        return init;
+        if (isPromiseLike(initialValue)) {
+          const init = initialValue.then(value => ({done:false, value }));
+          initialValue = Ignore;
+          return init;
+        } else {
+          const init = Promise.resolve({ done: false, value: initialValue });
+          initialValue = Ignore;
+          return init;
+        }
       }
 
       return new Promise<IteratorResult<R>>(function step(resolve, reject) {
@@ -697,8 +714,8 @@ export function filterMap<U extends PartialIterable, R>(source: U,
                 : resolve({ done: false, value: prev = f }),
               ex => {
                 prev = Ignore; // Remove reference for GC
-                // The filter function failed...
-                const sourceResponse = ai.throw?.(ex) ?? ai.return?.(ex);
+                // The filter function failed. We check ai here as it might have been terminated already
+                const sourceResponse = ai?.throw?.(ex) ?? ai?.return?.(ex);
                 // Terminate the source (ai) and consumer (reject)
                 if (isPromiseLike(sourceResponse)) sourceResponse.then(reject,reject);
                 else reject({ done: true, value: ex })
@@ -764,26 +781,31 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
 
   // The source has produced a new result
   function step(it?: IteratorResult<T, any>) {
-    if (it) current.resolve(it);
+    if (it) current?.resolve(it);
     if (it?.done) {
       // @ts-ignore: release reference
       current = null;
     } else {
       current = deferred<IteratorResult<T>>();
-      ai!.next()
-        .then(step)
-        .catch(error => {
-          current?.reject({ done: true, value: error });
-          // @ts-ignore: release reference
-          current = null;
-        });
+      if (ai) {
+        ai.next()
+          .then(step)
+          .catch(error => {
+            current?.reject({ done: true, value: error });
+            // @ts-ignore: release reference
+            current = null;
+          });
+        } else {
+          current.resolve({ done: true, value: undefined });
+        }
     }
   }
 
   function done(v: IteratorResult<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator]>, any> | undefined) {
+    const result = { done: true, value: v?.value };
     // @ts-ignore: remove references for GC
     ai = mai = current = null;
-    return { done: true, value: v?.value }
+    return result;
   }
 
   let mai: AsyncIterableIterator<T> = {

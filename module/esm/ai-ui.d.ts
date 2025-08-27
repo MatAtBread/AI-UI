@@ -1,6 +1,6 @@
 import { WhenParameters, WhenReturn } from './when.js';
 import type { ChildTags, TagCreator, TagCreatorFunction } from './tags.js';
-export { when } from './when.js';
+export { when, Ready } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js';
 export * as Iterators from './iterators.js';
 export declare const UniqueID: unique symbol;

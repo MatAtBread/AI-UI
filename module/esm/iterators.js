@@ -32,8 +32,9 @@ export const asyncExtras = {
     merge(...m) {
         return merge(this, ...m);
     },
-    combine(others) {
-        return combine(Object.assign({ '_this': this }, others));
+    combine(others, opts = {}) {
+        const sources = Object.assign({ '_this': this }, others);
+        return combine(sources, opts);
     }
 };
 const extraKeys = [...Object.getOwnPropertySymbols(asyncExtras), ...Object.keys(asyncExtras)];
@@ -259,6 +260,7 @@ export function defineIterableProperty(obj, name, v) {
                 return assignHidden(Object(a), Object.assign(pds, {
                     toJSON() { return a.valueOf(); }
                 }));
+            case 'function':
             case 'object':
                 // We box objects by creating a Proxy for the object that pushes on get/set/delete, and maps the supplied async iterator to push the specified key
                 // The proxies are recursive, so that if an object contains objects, they too are proxied. Objects containing primitives remain proxied to
@@ -322,7 +324,7 @@ export function defineIterableProperty(obj, name, v) {
                         }
                     }
                     // If the key is a target property, create the proxy to handle it
-                    if (key === 'valueOf')
+                    if (key === 'valueOf' || (key === 'toJSON' && !('toJSON' in target)))
                         return () => destructure(a, path);
                     if (key === Symbol.toPrimitive) {
                         // Special case, since Symbol.toPrimitive is in ha(), we need to implement it
@@ -411,7 +413,7 @@ export const merge = (...ai) => {
     return iterableHelpers(merged);
 };
 export const combine = (src, opts = {}) => {
-    const accumulated = {};
+    const accumulated = opts.initially ? opts.initially : {};
     const si = new Map();
     let pc; // Initialized lazily
     const ci = {
@@ -419,8 +421,9 @@ export const combine = (src, opts = {}) => {
         next() {
             if (pc === undefined) {
                 pc = new Map(Object.entries(src).map(([k, sit]) => {
-                    si.set(k, sit[Symbol.asyncIterator]());
-                    return [k, si.get(k).next().then(ir => ({ si, k, ir }))];
+                    const source = sit[Symbol.asyncIterator]();
+                    si.set(k, source);
+                    return [k, source.next().then(ir => ({ si, k, ir }))];
                 }));
             }
             return (function step() {
@@ -433,7 +436,6 @@ export const combine = (src, opts = {}) => {
                         return step();
                     }
                     else {
-                        // @ts-ignore
                         accumulated[k] = ir.value;
                         pc.set(k, si.get(k).next().then(ir => ({ k, ir })));
                     }
@@ -486,6 +488,9 @@ async function consume(f) {
 }
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
+export async function* once(v) {
+    yield v;
+}
 function resolveSync(v, then, except) {
     if (isPromiseLike(v))
         return v.then(then, except);
@@ -510,9 +515,16 @@ export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
         },
         next(...args) {
             if (initialValue !== Ignore) {
-                const init = Promise.resolve({ done: false, value: initialValue });
-                initialValue = Ignore;
-                return init;
+                if (isPromiseLike(initialValue)) {
+                    const init = initialValue.then(value => ({ done: false, value }));
+                    initialValue = Ignore;
+                    return init;
+                }
+                else {
+                    const init = Promise.resolve({ done: false, value: initialValue });
+                    initialValue = Ignore;
+                    return init;
+                }
             }
             return new Promise(function step(resolve, reject) {
                 if (!ai)
@@ -523,8 +535,8 @@ export function filterMap(source, fn, initialValue = Ignore, prev = Ignore) {
                         ? step(resolve, reject)
                         : resolve({ done: false, value: prev = f }), ex => {
                         prev = Ignore; // Remove reference for GC
-                        // The filter function failed...
-                        const sourceResponse = ai.throw?.(ex) ?? ai.return?.(ex);
+                        // The filter function failed. We check ai here as it might have been terminated already
+                        const sourceResponse = ai?.throw?.(ex) ?? ai?.return?.(ex);
                         // Terminate the source (ai) and consumer (reject)
                         if (isPromiseLike(sourceResponse))
                             sourceResponse.then(reject, reject);
@@ -582,26 +594,32 @@ function multi() {
     // The source has produced a new result
     function step(it) {
         if (it)
-            current.resolve(it);
+            current?.resolve(it);
         if (it?.done) {
             // @ts-ignore: release reference
             current = null;
         }
         else {
             current = deferred();
-            ai.next()
-                .then(step)
-                .catch(error => {
-                current?.reject({ done: true, value: error });
-                // @ts-ignore: release reference
-                current = null;
-            });
+            if (ai) {
+                ai.next()
+                    .then(step)
+                    .catch(error => {
+                    current?.reject({ done: true, value: error });
+                    // @ts-ignore: release reference
+                    current = null;
+                });
+            }
+            else {
+                current.resolve({ done: true, value: undefined });
+            }
         }
     }
     function done(v) {
+        const result = { done: true, value: v?.value };
         // @ts-ignore: remove references for GC
         ai = mai = current = null;
-        return { done: true, value: v?.value };
+        return result;
     }
     let mai = {
         [Symbol.asyncIterator]() {

@@ -2,7 +2,7 @@
   No code/data is declared in this file (except the re-exported symbols from iterators.ts).
 */
 
-import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyValue } from "./iterators.js";
+import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue, IterableType } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
@@ -90,7 +90,7 @@ type IDS<I extends Overrides['ids']> = I extends NonNullable<Overrides['ids']> ?
 } : { ids: {} }
 
 export type Constructed = {
-  constructed: () => (ChildTags | void | PromiseLike<void | ChildTags>);
+  constructed: () => (ChildTags | void | PromiseLike<void | ChildTags> | IterableType<void | ChildTags>);
 }
 
 // Infer the effective set of attributes from an ExTagCreator
@@ -195,14 +195,30 @@ interface ExtendedTag {
   >
 }
 
+type CheckIsIterablePropertyValue<T, Prefix extends string = ''> = {
+  [K in keyof T]: Exclude<T[K], undefined> extends IterablePropertyPrimitive
+  ? never // This isn't a problem as it's an IterablePropertyPrimitive
+  : Exclude<T[K], undefined> extends Function
+    ? { [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined> } // IterablePropertyPrimitive doesn't allow Functions
+    : Exclude<T[K], undefined> extends object // IterablePropertyPrimitive allows objects if they are are maps of IterablePropertyPrimitives
+      ? Exclude<T[K], undefined> extends Array<infer Z> // ....or arrays of IterablePropertyPrimitives
+        ? Z extends IterablePropertyValue ? never : { [P in `${Prefix}${K & string}`]: Exclude<Z[], undefined> }// If it's an arraym check the array member union is also assignable to IterablePropertyPrimitive
+        : CheckIsIterablePropertyValue<Exclude<T[K], undefined>, `${Prefix}${K & string}.`>
+      : { [P in `${Prefix}${K & string}`]: Exclude<T[K], undefined> }
+}[keyof T] extends infer O
+  ? { [K in keyof O]: O[K] }
+  : never;
+
 type CheckConstructedReturn<SuppliedDefinitions, Result> =
   SuppliedDefinitions extends { constructed: any }
   ? SuppliedDefinitions extends Constructed
     ? Result
-    : { "constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
+    : { "`constructed` does not return ChildTags": SuppliedDefinitions['constructed'] }
   : ExcessKeys<SuppliedDefinitions, Overrides & Constructed> extends never
     ? Result
-    : { "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed> }
+    : SuppliedDefinitions extends { iterable: any }
+      ? { "The extended tag defintion contains non-iterable types": Exclude<CheckIsIterablePropertyValue<SuppliedDefinitions['iterable']>, undefined> }
+      : { "The extended tag defintion contains unknown or incorrectly typed keys": keyof ExcessKeys<SuppliedDefinitions, Overrides & Constructed> }
 
 export interface TagCreationOptions {
   debugger?: boolean

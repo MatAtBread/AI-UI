@@ -6,7 +6,7 @@ import type { ChildTags, Constructed, Instance, Overrides, TagCreationOptions, T
 import { callStackSymbol } from './tags.js';
 
 /* Export useful stuff for users of the bundled code */
-export { when } from './when.js';
+export { when, Ready } from './when.js';
 export type { ChildTags, Instance, TagCreator, TagCreatorFunction } from './tags.js'
 export * as Iterators from './iterators.js';
 
@@ -153,7 +153,7 @@ export const tag = <TagLoader>function <Tags extends string,
   const commonProperties = options?.commonProperties;
   const thisDoc = options?.document ?? globalThis.document;
   const isTestEnv = thisDoc.documentURI === 'about:testing';
-  const DyamicElementError = options?.ErrorTag || function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
+  const DynamicElementError = options?.ErrorTag || function DyamicElementError({ error }: { error: Error | IteratorResult<Error> }) {
     return thisDoc.createComment(error instanceof Error ? error.toString() : 'Error:\n' + JSON.stringify(error, null, 2));
   }
 
@@ -425,7 +425,7 @@ export const tag = <TagLoader>function <Tags extends string,
           }).catch((errorValue: any) => {
             const n = replacement.nodes?.filter(n => Boolean(n?.parentNode));
             if (n?.length) {
-              n[0].replaceWith(DyamicElementError({ error: errorValue?.value ?? errorValue }));
+              n[0].replaceWith(DynamicElementError({ error: errorValue?.value ?? errorValue }));
               n.slice(1).forEach(e => e?.remove());
             }
             else console.warn("Can't report error", errorValue, replacement.nodes?.map(logNode));
@@ -529,6 +529,7 @@ export const tag = <TagLoader>function <Tags extends string,
   }
 
   function unbox<T>(a: T): T {
+    if (a === null) return null as T;
     const v = a?.valueOf();
     return (Array.isArray(v) ? Array.prototype.map.call(v, unbox) : v) as T;
   }
@@ -657,7 +658,7 @@ export const tag = <TagLoader>function <Tags extends string,
           const error = (errorValue: any) => {
             if (errorValue) {
               console.warn("Dynamic attribute termination", errorValue, k, logNode(d), createdBy, logNode(base));
-              base.appendChild(DyamicElementError({ error: errorValue }));
+              base.appendChild(DynamicElementError({ error: errorValue }));
             }
           }
 
@@ -860,7 +861,7 @@ export const tag = <TagLoader>function <Tags extends string,
     : typeof name === 'string' && name in baseTagCreators ? baseTagCreators[name](attrs, children)
     : name === baseTagCreators.createElement ? [...nodes(...children)]
     : typeof name === 'function' ? name(attrs, children)
-    : DyamicElementError({ error: new Error("Illegal type in createElement:" + name) })
+    : DynamicElementError({ error: new Error("Illegal type in createElement:" + name) })
 
   // @ts-ignore
   const baseTagCreators: CreateElement & {

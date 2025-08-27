@@ -9,6 +9,7 @@ interface SpecialWhenEvents {
     "@start": EmptyObject;
     "@ready": EmptyObject;
 }
+export declare const Ready: Readonly<{}>;
 interface WhenEvents extends GlobalEventHandlersEventMap, SpecialWhenEvents {
 }
 type EventNameList<T extends string> = T extends keyof WhenEvents ? T : T extends `${infer S extends keyof WhenEvents},${infer R}` ? EventNameList<R> extends never ? never : `${S},${EventNameList<R>}` : never;
