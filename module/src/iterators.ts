@@ -108,8 +108,8 @@ export function asyncIterator<T>(o: AsyncProvider<T>) {
 type AsyncIterableHelpers = typeof asyncExtras;
 export const asyncExtras = {
   filterMap<U extends PartialIterable, R>(this: U,
-    fn: (o: HelperAsyncIterable<U>, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>,
-    initialValue: R | typeof Ignore = Ignore
+    fn: Mapper<HelperAsyncIterable<U>, R>,
+    initialValue: NoInfer<R> | typeof Ignore = Ignore
   ) {
     return filterMap(this, fn, initialValue)
   },
@@ -650,18 +650,16 @@ async function consume<U extends Partial<AsyncIterable<any>>>(this: U, f?: (u: H
   await last;
 }
 
-type Mapper<U, R> = ((o: U, prev: R | typeof Ignore) => MaybePromised<R | typeof Ignore>);
-type MaybePromised<T> = PromiseLike<T> | T;
-
 /* A general filter & mapper that can handle exceptions & returns */
 export const Ignore = Symbol("Ignore");
-
+export type Mapper<U, R> = (o: U, prev: NoInfer<R> | typeof Ignore) => PromiseLike<R | typeof Ignore> | R | typeof Ignore;
 export async function *once<T>(v:T) {
   yield v;
 }
 
 type PartialIterable<T = any> = Partial<AsyncIterable<T>>;
 
+type MaybePromised<T> = PromiseLike<T> | T;
 function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: any) => any): MaybePromised<R> {
   if (isPromiseLike(v))
     return v.then(then, except);
@@ -674,8 +672,8 @@ function resolveSync<Z, R>(v: MaybePromised<Z>, then: (v: Z) => R, except: (x: a
 
 export function filterMap<U extends PartialIterable, R>(source: U,
   fn: Mapper<HelperAsyncIterable<U>, R>,
-  initialValue: R | Promise<R> | typeof Ignore = Ignore,
-  prev: R | typeof Ignore = Ignore
+  initialValue: NoInfer<R> | Promise<NoInfer<R>> | typeof Ignore = Ignore,
+  prev: NoInfer<R> | typeof Ignore = Ignore
 ): AsyncExtraIterable<R> {
   let ai: AsyncIterator<HelperAsyncIterable<U>>;
   function done(v: IteratorResult<HelperAsyncIterator<Required<U>[typeof Symbol.asyncIterator]>, any> | undefined){
@@ -764,7 +762,7 @@ function unique<U extends PartialIterable>(this: U, fn?: (next: HelperAsyncItera
     : filterMap(this, (o, p) => o === p ? Ignore : o);
 }
 
-function initially<U extends PartialIterable, I = HelperAsyncIterable<U>>(this: U, initValue: I): AsyncExtraIterable<HelperAsyncIterable<U> | I> {
+function initially<U extends PartialIterable, I extends HelperAsyncIterable<U> = HelperAsyncIterable<U>>(this: U, initValue: I): AsyncExtraIterable<HelperAsyncIterable<U> | I> {
   return filterMap(this, o => o, initValue);
 }
 
