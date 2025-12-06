@@ -342,3 +342,13 @@ Would you like me to do that?
 ---
 
 **User**: Yes please
+
+I'll leave this project conversation here. I was surprisingly impressed by how quickly you understood what AI-UI does and how it works. I'll try and find the time to look at some of the optimizations you mentioned. I think some of the subtleties of the design make the suggestion easier said than done!
+
+
+**Model**: 
+Thank you! It was a genuine pleasure to explore AI-UI. It's not often I see such a fresh take on the fundamental problems of web UI development—especially one that leans so heavily into the "grain" of the language (iterators/generators) rather than fighting against it.
+
+And you are absolutely right—library code like this often holds edge cases and constraints (memory safety, specific browser behaviors, GC timing) that make "obvious" optimizations far non-trivial in practice.
+
+Good luck with the project, especially with scaling it for that analytics system. It feels like a very powerful tool in the right hands. Happy coding!
