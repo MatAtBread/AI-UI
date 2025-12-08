@@ -8,34 +8,41 @@ function docEventHandler(ev) {
         eventObservations.set(this, new Map());
     const observations = eventObservations.get(this).get(ev.type);
     if (observations) {
-        for (const o of observations) {
-            try {
-                const { push, terminate, containerRef, selector, includeChildren } = o;
-                const container = containerRef.deref();
-                if (!container || !container.isConnected) {
-                    const msg = "Container `#" + container?.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
-                    observations.delete(o);
-                    terminate(new Error(msg));
-                }
-                else {
-                    if (ev.target instanceof Node) {
-                        if (selector) {
-                            const nodes = container.querySelectorAll(selector);
-                            for (const n of nodes) {
-                                if ((includeChildren ? n.contains(ev.target) : ev.target === n) && container.contains(n))
+        let target = ev.target;
+        while (target instanceof Node) {
+            const containerObservations = observations.get(target);
+            if (containerObservations) {
+                for (const o of containerObservations) {
+                    try {
+                        const { push, terminate, containerRef, selector, includeChildren } = o;
+                        const container = containerRef.deref();
+                        if (!container || !container.isConnected) {
+                            const msg = "Container `#" + container?.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
+                            containerObservations.delete(o);
+                            terminate(new Error(msg));
+                        }
+                        else {
+                            if (selector) {
+                                const nodes = container.querySelectorAll(selector);
+                                for (const n of nodes) {
+                                    if ((includeChildren ? n.contains(ev.target) : ev.target === n) && container.contains(n))
+                                        push(ev);
+                                }
+                            }
+                            else {
+                                if (includeChildren ? container.contains(ev.target) : ev.target === container)
                                     push(ev);
                             }
                         }
-                        else {
-                            if (includeChildren ? container.contains(ev.target) : ev.target === container)
-                                push(ev);
-                        }
+                    }
+                    catch (ex) {
+                        console.warn('docEventHandler', ex);
                     }
                 }
             }
-            catch (ex) {
-                console.warn('docEventHandler', ex);
-            }
+            if (target === this)
+                break;
+            target = target.parentNode;
         }
     }
 }
@@ -71,10 +78,13 @@ function whenEvent(container, what) {
             passive: true,
             capture: true
         });
-        eventObservations.get(container.ownerDocument).set(eventName, new Set());
+        eventObservations.get(container.ownerDocument).set(eventName, new Map());
     }
     const observations = eventObservations.get(container.ownerDocument).get(eventName);
-    const queue = queueIteratableIterator(() => observations.delete(details));
+    if (!observations.has(container))
+        observations.set(container, new Set());
+    const containerObservations = observations.get(container);
+    const queue = queueIteratableIterator(() => containerObservations.delete(details));
     const details = {
         push: queue.push,
         terminate(ex) { queue.return?.(ex); },
@@ -83,7 +93,7 @@ function whenEvent(container, what) {
         selector
     };
     containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-        .then(_ => observations.add(details));
+        .then(_ => containerObservations.add(details));
     return queue.multi();
 }
 async function* doneImmediately() {

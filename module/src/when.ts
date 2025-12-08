@@ -25,8 +25,8 @@ type WhenIteratedType<S extends WhenParameters> =
 
 type MappableIterable<A extends AsyncIterable<any>> =
   A extends AsyncIterable<infer T> ?
-    A & AsyncExtraIterable<T> &
-    (<R>(mapper: (value: A extends AsyncIterable<infer T> ? T : never) => R) => (AsyncExtraIterable<Awaited<R>>))
+  A & AsyncExtraIterable<T> &
+  (<R>(mapper: (value: A extends AsyncIterable<infer T> ? T : never) => R) => (AsyncExtraIterable<Awaited<R>>))
   : never
 
 // The extended iterator that supports async iterator mapping, chaining, etc
@@ -44,7 +44,7 @@ interface SpecialWhenEvents {
 
 export const Ready = Object.freeze({});
 
-interface WhenEvents extends GlobalEventHandlersEventMap, SpecialWhenEvents {}
+interface WhenEvents extends GlobalEventHandlersEventMap, SpecialWhenEvents { }
 type EventNameList<T extends string> = T extends keyof WhenEvents
   ? T
   : T extends `${infer S extends keyof WhenEvents},${infer R}`
@@ -88,14 +88,14 @@ type ExtractEvents<S> = WhenEvents[ExtractEventNames<S>]
 
 /** when **/
 interface EventObservation<EventName extends keyof GlobalEventHandlersEventMap> {
-  push: (ev: GlobalEventHandlersEventMap[EventName])=>void;
-  terminate: (ex: Error)=>void;
+  push: (ev: GlobalEventHandlersEventMap[EventName]) => void;
+  terminate: (ex: Error) => void;
   containerRef: WeakRef<Element>
   selector: string | null;
   includeChildren: boolean;
 }
 
-const eventObservations = new WeakMap<DocumentFragment | Document, Map<keyof WhenEvents, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>();
+const eventObservations = new WeakMap<DocumentFragment | Document, Map<keyof WhenEvents, Map<Element | DocumentFragment | Document, Set<EventObservation<keyof GlobalEventHandlersEventMap>>>>>();
 
 function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(this: DocumentFragment | Document, ev: GlobalEventHandlersEventMap[EventName]) {
   if (!eventObservations.has(this))
@@ -103,31 +103,38 @@ function docEventHandler<EventName extends keyof GlobalEventHandlersEventMap>(th
 
   const observations = eventObservations.get(this)!.get(ev.type as keyof GlobalEventHandlersEventMap);
   if (observations) {
-    for (const o of observations) {
-      try {
-        const { push, terminate, containerRef, selector, includeChildren } = o;
-        const container = containerRef.deref();
-        if (!container || !container.isConnected) {
-          const msg = "Container `#" + container?.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
-          observations.delete(o);
-          terminate(new Error(msg));
-        } else {
-          if (ev.target instanceof Node) {
-            if (selector) {
-              const nodes = container.querySelectorAll(selector);
-              for (const n of nodes) {
-                if ((includeChildren ? n.contains(ev.target) : ev.target === n) && container.contains(n))
+    let target = ev.target;
+    while (target instanceof Node) {
+      const containerObservations = observations.get(target as Element);
+      if (containerObservations) {
+        for (const o of containerObservations) {
+          try {
+            const { push, terminate, containerRef, selector, includeChildren } = o;
+            const container = containerRef.deref();
+            if (!container || !container.isConnected) {
+              const msg = "Container `#" + container?.id + ">" + (selector || '') + "` removed from DOM. Removing subscription";
+              containerObservations.delete(o);
+              terminate(new Error(msg));
+            } else {
+              if (selector) {
+                const nodes = container.querySelectorAll(selector);
+                for (const n of nodes) {
+                  if ((includeChildren ? n.contains(ev.target as Node) : ev.target === n) && container.contains(n))
+                    push(ev)
+                }
+              } else {
+                if (includeChildren ? container.contains(ev.target as Node) : ev.target === container)
                   push(ev)
               }
-            } else {
-              if (includeChildren ? container.contains(ev.target) : ev.target === container )
-                push(ev)
             }
+          } catch (ex) {
+            console.warn('docEventHandler', ex);
           }
         }
-      } catch (ex) {
-        console.warn('docEventHandler', ex);
       }
+
+      if (target === this) break;
+      target = target.parentNode;
     }
   }
 }
@@ -138,29 +145,29 @@ function isCSSSelector(s: string): s is CSSIdentifier {
 
 function childless<T extends string | null>(sel: T): T extends null ? { includeChildren: true, selector: null } : { includeChildren: boolean, selector: T } {
   const includeChildren = !sel || !sel.endsWith('>')
-  return { includeChildren, selector: includeChildren ? sel : sel.slice(0,-1) } as any;
+  return { includeChildren, selector: includeChildren ? sel : sel.slice(0, -1) } as any;
 }
 
 function parseWhenSelector<EventName extends string>(what: IsValidWhenSelector<EventName>): undefined | [ReturnType<typeof childless>, keyof GlobalEventHandlersEventMap] {
   const parts = what.split(':');
   if (parts.length === 1) {
     if (isCSSSelector(parts[0]))
-      return [childless(parts[0]),"change"];
+      return [childless(parts[0]), "change"];
     return [{ includeChildren: true, selector: null }, parts[0] as keyof GlobalEventHandlersEventMap];
   }
   if (parts.length === 2) {
     if (isCSSSelector(parts[1]) && !isCSSSelector(parts[0]))
-    return [childless(parts[1]), parts[0] as keyof GlobalEventHandlersEventMap]
+      return [childless(parts[1]), parts[0] as keyof GlobalEventHandlersEventMap]
   }
   return undefined;
 }
 
-function doThrow(message: string):never {
+function doThrow(message: string): never {
   throw new Error(message);
 }
 
 function whenEvent<EventName extends string>(container: Element, what: IsValidWhenSelector<EventName>) {
-  const [{ includeChildren, selector}, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: "+what);
+  const [{ includeChildren, selector }, eventName] = parseWhenSelector(what) ?? doThrow("Invalid WhenSelector: " + what);
 
   if (!eventObservations.has(container.ownerDocument))
     eventObservations.set(container.ownerDocument, new Map());
@@ -170,23 +177,26 @@ function whenEvent<EventName extends string>(container: Element, what: IsValidWh
       passive: true,
       capture: true
     });
-    eventObservations.get(container.ownerDocument)!.set(eventName, new Set());
+    eventObservations.get(container.ownerDocument)!.set(eventName, new Map());
   }
 
-  const observations = eventObservations.get(container.ownerDocument)!.get(eventName);
-  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => observations!.delete(details));
+  const observations = eventObservations.get(container.ownerDocument)!.get(eventName)!;
+  if (!observations.has(container))
+    observations.set(container, new Set());
+  const containerObservations = observations.get(container)!;
+  const queue = queueIteratableIterator<GlobalEventHandlersEventMap[keyof GlobalEventHandlersEventMap]>(() => containerObservations.delete(details));
   const details: EventObservation<keyof GlobalEventHandlersEventMap> = {
     push: queue.push,
-    terminate(ex: Error) { queue.return?.(ex)},
+    terminate(ex: Error) { queue.return?.(ex) },
     containerRef: new WeakRef(container),
     includeChildren,
     selector
   };
 
   containerAndSelectorsMounted(container, selector ? [selector] : undefined)
-    .then(_ => observations!.add(details));
+    .then(_ => containerObservations.add(details));
 
-  return queue.multi() ;
+  return queue.multi();
 }
 
 async function* doneImmediately<Z>(): AsyncIterableIterator<Z> {
@@ -262,10 +272,10 @@ export function when<S extends WhenParameters>(container: Element, ...sources: S
 
         return containerAndSelectorsMounted(container, missing).then(() => {
           const merged = (iterators.length > 1)
-          ? merge(...iterators)
-          : iterators.length === 1
-            ? iterators[0]
-            : doneImmediately();
+            ? merge(...iterators)
+            : iterators.length === 1
+              ? iterators[0]
+              : doneImmediately();
 
           // Now everything is ready, we simply delegate all async ops to the underlying
           // merged asyncIterator "events"
