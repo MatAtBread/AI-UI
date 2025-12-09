@@ -606,7 +606,7 @@ export const tag = <TagLoader>function <Tags extends string,
         }
 
         function assignIterable(iter: AsyncIterable<unknown> | AsyncIterator<unknown, any, undefined>, k: string) {
-          const ap = asyncIterator(iter);
+          let ap = asyncIterator(iter);
           // DEBUG support
           let createdAt = Date.now() + timeOutWarn;
           const createdBy = DEBUG && new Error("Created by").stack;
@@ -617,8 +617,9 @@ export const tag = <TagLoader>function <Tags extends string,
               mounted = mounted || base.isConnected;
               // If we have been mounted before, but aren't now, remove the consumer
               if (removedNodes.has(base)) {
-                error("(node removed)");
-                ap.return?.();
+                /* We don't need to close the iterator here as it must have been done if it's in removedNodes */
+                // error("(node removed)");
+                // ap.return?.();
                 return;
               }
 
@@ -667,7 +668,7 @@ export const tag = <TagLoader>function <Tags extends string,
             update({ done: false, value: unboxed });
           else
             ap.next().then(update).catch(error);
-          removedNodes.onRemoval([base], k, () => ap.return?.());
+          removedNodes.onRemoval([base], k, () =>  { ap.return?.(); (ap as any) = null; });
         }
 
         function assignObject(value: any, k: string) {

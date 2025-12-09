@@ -808,7 +808,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
 
   let mai: AsyncIterable<T> = {
     [Symbol.asyncIterator]() {
-      const iter: AsyncIterator<T> = {
+      return Object.create(mai, Object.getOwnPropertyDescriptors({
         next() {
           if (!ai) {
             ai = source[Symbol.asyncIterator]!();
@@ -837,8 +837,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
             return Promise.resolve({ done: true, value: v });
           return Promise.resolve(ai?.return?.(v)).then(done, done)
         }
-      };
-      return Object.create(mai, Object.getOwnPropertyDescriptors(iter));
+      }));
     }
   };
   return iterableHelpers(mai);
