@@ -513,7 +513,7 @@ export const tag = function (_1, _2, _3) {
                     }
                 }
                 function assignIterable(iter, k) {
-                    const ap = asyncIterator(iter);
+                    let ap = asyncIterator(iter);
                     // DEBUG support
                     let createdAt = Date.now() + timeOutWarn;
                     const createdBy = DEBUG && new Error("Created by").stack;
@@ -523,8 +523,9 @@ export const tag = function (_1, _2, _3) {
                             mounted = mounted || base.isConnected;
                             // If we have been mounted before, but aren't now, remove the consumer
                             if (removedNodes.has(base)) {
-                                error("(node removed)");
-                                ap.return?.();
+                                /* We don't need to close the iterator here as it must have been done if it's in removedNodes */
+                                // error("(node removed)");
+                                // ap.return?.();
                                 return;
                             }
                             const value = unbox(es.value);
@@ -570,7 +571,7 @@ export const tag = function (_1, _2, _3) {
                         update({ done: false, value: unboxed });
                     else
                         ap.next().then(update).catch(error);
-                    removedNodes.onRemoval([base], k, () => ap.return?.());
+                    removedNodes.onRemoval([base], k, () => { ap.return?.(); ap = null; });
                 }
                 function assignObject(value, k) {
                     if (value instanceof Node) {

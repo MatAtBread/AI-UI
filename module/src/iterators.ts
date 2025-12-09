@@ -164,7 +164,7 @@ function internalQueueIteratableIterator<T>(stop = () => { }) {
         return Promise.resolve({ done: true as const, value: undefined });
 
       const value = deferred<IteratorResult<T>>();
-      // We install a catch handler as the promise might be legitimately reject before anything waits for it,
+      // We install a catch handler as the promise might legitimately reject before anything waits for it,
       // and this suppresses the uncaught exception warning.
       value.catch(ex => { });
       q[_pending].unshift(value);
@@ -773,7 +773,7 @@ function waitFor<U extends PartialIterable>(this: U, cb: (done: (value: void | P
 function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsyncIterable<U>> {
   type T = HelperAsyncIterable<U>;
   const source = this;
-  let consumers = 0;
+  const consumers = new Set<AsyncIterator<T>>();
   let current: DeferredPromise<IteratorResult<T, any>>;
   let ai: AsyncIterator<T, any, undefined> | undefined = undefined;
 
@@ -806,38 +806,38 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
     return result;
   }
 
-  let mai: AsyncIterableIterator<T> = {
+  let mai: AsyncIterable<T> = {
     [Symbol.asyncIterator]() {
-      consumers += 1;
-      return mai;
-    },
+      return Object.create(mai, Object.getOwnPropertyDescriptors({
+        next() {
+          if (!ai) {
+            ai = source[Symbol.asyncIterator]!();
+            step();
+          }
+          consumers.add(this);
+          return current;
+        },
 
-    next() {
-      if (!ai) {
-        ai = source[Symbol.asyncIterator]!();
-        step();
-      }
-      return current;
-    },
+        throw(ex: any) {
+          // The consumer wants us to exit with an exception. Tell the source if we're the final one
+          if (!consumers.has(this))
+            throw new Error("AsyncIterator protocol error");
+          consumers.delete(this);
+          if (consumers.size)
+            return Promise.resolve({ done: true, value: ex });
+          return Promise.resolve(ai?.throw?.(ex) ?? ai?.return?.(ex)).then(done, done)
+        },
 
-    throw(ex: any) {
-      // The consumer wants us to exit with an exception. Tell the source if we're the final one
-      if (consumers < 1)
-        throw new Error("AsyncIterator protocol error");
-      consumers -= 1;
-      if (consumers)
-        return Promise.resolve({ done: true, value: ex });
-      return Promise.resolve(ai?.throw?.(ex) ?? ai?.return?.(ex)).then(done, done)
-    },
-
-    return(v?: any) {
-      // The consumer told us to return, so we need to terminate the source if we're the only one
-      if (consumers < 1)
-        throw new Error("AsyncIterator protocol error");
-      consumers -= 1;
-      if (consumers)
-        return Promise.resolve({ done: true, value: v });
-      return Promise.resolve(ai?.return?.(v)).then(done, done)
+        return(v?: any) {
+          // The consumer told us to return, so we need to terminate the source if we're the only one
+          if (!consumers.has(this))
+            throw new Error("AsyncIterator protocol error");
+          consumers.delete(this);
+          if (consumers.size)
+            return Promise.resolve({ done: true, value: v });
+          return Promise.resolve(ai?.return?.(v)).then(done, done)
+        }
+      }));
     }
   };
   return iterableHelpers(mai);

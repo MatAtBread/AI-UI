@@ -31,13 +31,13 @@ declare var y: AsyncExtraIterable<string | null>;
 }
 
 {
-    async function *once(){ yield null };
-    const more = generatorHelpers(once)();
+  async function* once() { yield null };
+  const more = generatorHelpers(once)();
 
 
-  const a1 =  merge(x);
-  const a2 =  merge(x, more);
-  const a3 =  merge(x, once());
+  const a1 = merge(x);
+  const a2 = merge(x, more);
+  const a3 = merge(x, once());
 
   type t1 = AssertExtends<typeof a1, AsyncExtraIterable<string>>['true'];
   type t1x = AssertExtends<typeof a1, AsyncExtraIterable<string | null>>['false'];
@@ -46,16 +46,17 @@ declare var y: AsyncExtraIterable<string | null>;
   type t3 = AssertExtends<typeof a3, AsyncExtraIterable<string | null>>['true'];
   type t3x = AssertExtends<typeof a3, AsyncExtraIterable<string>>['true'];
 
-  const b1 = filterMap(a2,() => { return 12 as const; });
-  const b2 = filterMap(a2,(v) => { return v ? 34 as const : Ignore; });
-  const b3 = filterMap(a2,(v) => { return v ? 56 as const : Ignore; }, Ignore);
-  const b4 = filterMap(a2,(v) => { return v ? 78 as const : Ignore; }, 78);
+  const b1 = filterMap(a2, () => { return 12 as const; });
+  const b2 = filterMap(a2, (v) => { return v ? 34 as const : Ignore; });
+  const b3 = filterMap(a2, (v) => { return v ? 56 as const : Ignore; }, Ignore);
+  const b4 = filterMap(a2, (v) => { return v ? 78 as const : Ignore; }, 78);
   // @ts-expect-error : initialValue does not match return type of the mapper
-  const b5 = filterMap(a2,(v) => { return v ? 90 as const : Ignore; }, 12);
+  const b5 = filterMap(a2, (v) => { return v ? 90 as const : Ignore; }, 12);
 
-  const b6 = filterMap(a2,(v, prev: 'x' | typeof Ignore) => { return 'x' as const });
+  const b6 = filterMap(a2, (v, prev: 'x' | typeof Ignore) => { return 'x' as const });
   type tb6 = AssertEqual<typeof b6, AsyncExtraIterable<'x'>>['true'];
-  const b7 = filterMap(a2,(v, prev) => { return 'x' as const });
+  const b7 = filterMap(a2, (v, prev) => { return 'x' as const });
+  // @ts-expect-error : TS cannot infer the type of prev from the return type of the mapper
   type tb7 = AssertEqual<typeof b7, AsyncExtraIterable<'x'>>['true'];
 
   type tb1 = AssertEqual<typeof b1, AsyncExtraIterable<12>>['true'];
