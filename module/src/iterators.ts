@@ -87,10 +87,10 @@ export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, As
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers { }
 
 // NB: This also (incorrectly) passes sync iterators, as the protocol names are the same
-export function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
+function isAsyncIterator<T = unknown>(o: any | AsyncIterator<T>): o is AsyncIterator<T> {
   return isObjectLike(o) && 'next' in o && typeof o?.next === 'function'
 }
-export function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
+function isAsyncIterable<T = unknown>(o: any | AsyncIterable<T>): o is AsyncIterable<T> {
   return isObjectLike(o) && (Symbol.asyncIterator in o) && typeof o[Symbol.asyncIterator] === 'function'
 }
 export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T> {
@@ -498,48 +498,52 @@ export const merge = <A extends Partial<AsyncIterable<TYield> | AsyncIterator<TY
 
   const results: (TYield | TReturn)[] = new Array(ai.length);
 
-  const merged: AsyncIterableIterator<A[number]> = {
-    [Symbol.asyncIterator]() { return merged },
-    next() {
-      init();
-      return promises.size
-        ? Promise.race(promises.values()).then(({ key, result }) => {
-          if (result.done) {
-            promises.delete(key);
-            it.delete(key);
-            results[key] = result.value;
-            return merged.next();
-          } else {
-            promises.set(key,
-              it.has(key)
-                ? it.get(key)!.next().then(result => ({ key, result })).catch(ex => ({ key, result: { done: true, value: ex } }))
-                : Promise.resolve({ key, result: { done: true, value: undefined } }))
-            return result;
+  const merged: AsyncIterable<A[number]> = {
+    [Symbol.asyncIterator]() {
+      return {
+        __proto__: merged,
+        next() {
+          init();
+          return promises.size
+            ? Promise.race(promises.values()).then(({ key, result }) => {
+              if (result.done) {
+                promises.delete(key);
+                it.delete(key);
+                results[key] = result.value;
+                return this.next();
+              } else {
+                promises.set(key,
+                  it.has(key)
+                    ? it.get(key)!.next().then(result => ({ key, result })).catch(ex => ({ key, result: { done: true, value: ex } }))
+                    : Promise.resolve({ key, result: { done: true, value: undefined } }))
+                return result;
+              }
+            }).catch(ex => {
+              // `ex` is the underlying async iteration exception
+              return this.throw!(ex) // ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
+            })
+            : Promise.resolve({ done: true as const, value: results });
+        },
+        async return(r) {
+          for (const key of it.keys()) {
+            if (promises.has(key)) {
+              promises.delete(key);
+              results[key] = await it.get(key)?.return?.({ done: true, value: r }).then(v => v.value, ex => ex);
+            }
           }
-        }).catch(ex => {
-            // `ex` is the underlying async iteration exception
-            return merged.throw!(ex) // ?? Promise.reject({ done: true as const, value: new Error("Iterator merge exception") });
-        })
-        : Promise.resolve({ done: true as const, value: results });
-    },
-    async return(r) {
-      for (const key of it.keys()) {
-        if (promises.has(key)) {
-          promises.delete(key);
-          results[key] = await it.get(key)?.return?.({ done: true, value: r }).then(v => v.value, ex => ex);
+          return { done: true, value: results };
+        },
+        async throw(ex: any) {
+          for (const key of it.keys()) {
+            if (promises.has(key)) {
+              promises.delete(key);
+              results[key] = await it.get(key)?.throw?.(ex).then(v => v.value, ex => ex);
+            }
+          }
+          // Because we've passed the exception on to all the sources, we're now done
+          return { done: true, value: results };
         }
       }
-      return { done: true, value: results };
-    },
-    async throw(ex: any) {
-      for (const key of it.keys()) {
-        if (promises.has(key)) {
-          promises.delete(key);
-          results[key] = await it.get(key)?.throw?.(ex).then(v => v.value, ex => ex);
-        }
-      }
-      // Because we've passed the exception on to all the sources, we're now done
-      return { done: true, value: results };
     }
   };
   return iterableHelpers(merged as unknown as CollapseIterableTypes<A[number]>);
@@ -566,48 +570,52 @@ export const combine = <S extends CombinedIterable, O extends CombineOptions<S>>
   const si = new Map<string | number | symbol, AsyncIterator<any>>();
   let pc: Map<string | number | symbol, Promise<{ k: string, ir: IteratorResult<any> }>>; // Initialized lazily
   const ci = {
-    [Symbol.asyncIterator]() { return ci },
-    next(): Promise<IteratorResult<CombinedIterableType<S>>> {
-      if (pc === undefined) {
-        pc = new Map(Object.entries(src).map(([k, sit]) => {
-          const source = sit[Symbol.asyncIterator]!();
-          si.set(k, source);
-          return [k, source.next().then(ir => ({ si, k, ir }))];
-        }));
-      }
+    [Symbol.asyncIterator]() {
+      return {
+        __proto__: ci,
+        next(): Promise<IteratorResult<CombinedIterableType<S>>> {
+          if (pc === undefined) {
+            pc = new Map(Object.entries(src).map(([k, sit]) => {
+              const source = sit[Symbol.asyncIterator]!();
+              si.set(k, source);
+              return [k, source.next().then(ir => ({ si, k, ir }))];
+            }));
+          }
 
-      return (function step(): Promise<IteratorResult<CombinedIterableType<S>>> {
-        return Promise.race(pc.values()).then(({ k, ir }) => {
-          if (ir.done) {
-            pc.delete(k);
-            si.delete(k);
-            if (!pc.size)
-              return { done: true, value: undefined };
-            return step();
-          } else {
-            accumulated[k as keyof typeof accumulated] = ir.value;
-            pc.set(k, si.get(k)!.next().then(ir => ({ k, ir })));
-          }
-          if (opts.ignorePartial) {
-            if (Object.keys(accumulated).length < Object.keys(src).length)
-              return step();
-          }
-          return { done: false, value: accumulated };
-        })
-      })();
-    },
-    return(v?: any) {
-      for (const ai of si.values()) {
-          ai.return?.(v)
-      };
-      return Promise.resolve({ done: true, value: v });
-    },
-    throw(ex: any) {
-      for (const ai of si.values())
-        ai.throw?.(ex)
-      return Promise.resolve({ done: true, value: ex });
+          return (function step(): Promise<IteratorResult<CombinedIterableType<S>>> {
+            return Promise.race(pc.values()).then(({ k, ir }) => {
+              if (ir.done) {
+                pc.delete(k);
+                si.delete(k);
+                if (!pc.size)
+                  return { done: true, value: undefined };
+                return step();
+              } else {
+                accumulated[k as keyof typeof accumulated] = ir.value;
+                pc.set(k, si.get(k)!.next().then(ir => ({ k, ir })));
+              }
+              if (opts.ignorePartial) {
+                if (Object.keys(accumulated).length < Object.keys(src).length)
+                  return step();
+              }
+              return { done: false, value: accumulated };
+            })
+          })();
+        },
+        return(v?: any) {
+          for (const ai of si.values()) {
+            ai.return?.(v)
+          };
+          return Promise.resolve({ done: true, value: v });
+        },
+        throw(ex: any) {
+          for (const ai of si.values())
+            ai.throw?.(ex)
+          return Promise.resolve({ done: true, value: ex });
+        }
+      }
     }
-  }
+  };
   return iterableHelpers(ci);
 }
 
@@ -682,67 +690,69 @@ export function filterMap<U extends PartialIterable, R>(source: U,
     prev = Ignore;
     return { done: true, value: v?.value }
   }
-  let fai: AsyncIterableIterator<R> = {
+  let fai: AsyncIterable<R> = {
     [Symbol.asyncIterator]() {
-      return fai;
-    },
+      return {
+        __proto__: fai,
 
-    next(...args: [] | [undefined]) {
-      if (initialValue !== Ignore) {
-        if (isPromiseLike(initialValue)) {
-          const init = initialValue.then(value => ({done:false, value }));
-          initialValue = Ignore;
-          return init;
-        } else {
-          const init = Promise.resolve({ done: false, value: initialValue });
-          initialValue = Ignore;
-          return init;
+        next(...args: [] | [undefined]) {
+          if (initialValue !== Ignore) {
+            if (isPromiseLike(initialValue)) {
+              const init = initialValue.then(value => ({ done: false, value }));
+              initialValue = Ignore;
+              return init;
+            } else {
+              const init = Promise.resolve({ done: false, value: initialValue });
+              initialValue = Ignore;
+              return init;
+            }
+          }
+
+          return new Promise<IteratorResult<R>>(function step(resolve, reject) {
+            if (!ai)
+              ai = source[Symbol.asyncIterator]!();
+            ai.next(...args).then(
+              p => p.done
+                ? (prev = Ignore, resolve(p))
+                : resolveSync(fn(p.value, prev),
+                  f => f === Ignore
+                    ? step(resolve, reject)
+                    : resolve({ done: false, value: prev = f }),
+                  ex => {
+                    prev = Ignore; // Remove reference for GC
+                    // The filter function failed. We check ai here as it might have been terminated already
+                    const sourceResponse = ai?.throw?.(ex) ?? ai?.return?.(ex);
+                    // Terminate the source (ai) and consumer (reject)
+                    if (isPromiseLike(sourceResponse)) sourceResponse.then(reject, reject);
+                    else reject({ done: true, value: ex })
+                  }
+                ),
+              ex => {
+                // The source threw. Tell the consumer
+                prev = Ignore; // Remove reference for GC
+                reject({ done: true, value: ex })
+              }
+            ).catch(ex => {
+              // The callback threw
+              prev = Ignore; // Remove reference for GC
+              const sourceResponse = ai.throw?.(ex) ?? ai.return?.(ex);
+              // Terminate the source (ai) and consumer (reject)
+              if (isPromiseLike(sourceResponse)) sourceResponse.then(reject, reject);
+              else reject({ done: true, value: sourceResponse })
+            })
+          })
+        },
+
+        throw(ex: any) {
+          // The consumer wants us to exit with an exception. Tell the source
+          return Promise.resolve(ai?.throw?.(ex) ?? ai?.return?.(ex)).then(done, done)
+        },
+
+        return(v?: any) {
+          // The consumer told us to return, so we need to terminate the source
+          return Promise.resolve(ai?.return?.(v)).then(done, done)
         }
       }
-
-      return new Promise<IteratorResult<R>>(function step(resolve, reject) {
-        if (!ai)
-          ai = source[Symbol.asyncIterator]!();
-        ai.next(...args).then(
-          p => p.done
-            ? (prev = Ignore, resolve(p))
-            : resolveSync(fn(p.value, prev),
-              f => f === Ignore
-                ? step(resolve, reject)
-                : resolve({ done: false, value: prev = f }),
-              ex => {
-                prev = Ignore; // Remove reference for GC
-                // The filter function failed. We check ai here as it might have been terminated already
-                const sourceResponse = ai?.throw?.(ex) ?? ai?.return?.(ex);
-                // Terminate the source (ai) and consumer (reject)
-                if (isPromiseLike(sourceResponse)) sourceResponse.then(reject,reject);
-                else reject({ done: true, value: ex })
-              }
-            ),
-          ex => {
-            // The source threw. Tell the consumer
-            prev = Ignore; // Remove reference for GC
-            reject({ done: true, value: ex })
-          }
-        ).catch(ex => {
-          // The callback threw
-          prev = Ignore; // Remove reference for GC
-          const sourceResponse = ai.throw?.(ex) ?? ai.return?.(ex);
-          // Terminate the source (ai) and consumer (reject)
-          if (isPromiseLike(sourceResponse)) sourceResponse.then(reject, reject);
-          else reject({ done: true, value: sourceResponse })
-        })
-      })
-    },
-
-    throw(ex: any) {
-      // The consumer wants us to exit with an exception. Tell the source
-      return Promise.resolve(ai?.throw?.(ex) ?? ai?.return?.(ex)).then(done, done)
-    },
-
-    return(v?: any) {
-      // The consumer told us to return, so we need to terminate the source
-      return Promise.resolve(ai?.return?.(v)).then(done, done)
     }
   };
   return iterableHelpers(fai)
@@ -808,7 +818,8 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
 
   let mai: AsyncIterable<T> = {
     [Symbol.asyncIterator]() {
-      return Object.create(mai, Object.getOwnPropertyDescriptors({
+      return {
+        __proto__: mai,
         next() {
           if (!ai) {
             ai = source[Symbol.asyncIterator]!();
@@ -837,7 +848,7 @@ function multi<U extends PartialIterable>(this: U): AsyncExtraIterable<HelperAsy
             return Promise.resolve({ done: true, value: v });
           return Promise.resolve(ai?.return?.(v)).then(done, done)
         }
-      }));
+      };
     }
   };
   return iterableHelpers(mai);

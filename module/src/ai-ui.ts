@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter } from './iterators.js';
 import { WhenParameters, WhenReturn, when } from './when.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import type { ChildTags, Constructed, Instance, Overrides, TagCreationOptions, TagCreator, TagCreatorFunction, ExtendTagFunctionInstance, ExtendTagFunction } from './tags.js';
@@ -186,7 +186,7 @@ export const tag = <TagLoader>function <Tags extends string,
         ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
         set(this: Element, a: object) {
           if (isAsyncIter(a)) {
-            const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
+            const ai = asyncIterator(a);
             const step = () => ai.next().then(
               ({ done, value }) => { assignProps(this, value); done || step() },
               ex => console.warn(ex));
@@ -342,7 +342,7 @@ export const tag = <TagLoader>function <Tags extends string,
 
       if (isAsyncIter<ChildTags>(c)) {
         const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
-        let ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
+        let ap = asyncIterator(c);
         let notYetMounted = true;
 
         const terminateSource = (force: boolean = false) => {
