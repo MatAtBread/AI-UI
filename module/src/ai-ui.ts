@@ -188,8 +188,10 @@ export const tag = <TagLoader>function <Tags extends string,
           if (isAsyncIter(a)) {
             const ai = asyncIterator(a);
             const step = () => ai.next().then(
-              ({ done, value }) => { assignProps(this, value); done || step() },
-              ex => console.warn(ex));
+              ({ done, value }) => { assignProps(this, value); done || step() }
+            ).catch(
+              ex => console.warn(ex)
+            );
             step();
           }
           else assignProps(this, a);

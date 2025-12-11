@@ -97,7 +97,7 @@ export const tag = function (_1, _2, _3) {
             set(a) {
                 if (isAsyncIter(a)) {
                     const ai = asyncIterator(a);
-                    const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn(ex));
+                    const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }).catch(ex => console.warn(ex));
                     step();
                 }
                 else

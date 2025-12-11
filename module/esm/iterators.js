@@ -12,10 +12,10 @@ export function isAsyncIter(o) {
     return isAsyncIterable(o) || isAsyncIterator(o);
 }
 export function asyncIterator(o) {
-    if (isAsyncIterator(o))
-        return o;
     if (isAsyncIterable(o))
         return o[Symbol.asyncIterator]();
+    if (isAsyncIterator(o))
+        return o;
     throw new Error("Not an async provider");
 }
 export const asyncExtras = {

@@ -97,11 +97,11 @@ export function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterat
   return isAsyncIterable(o) || isAsyncIterator(o)
 }
 
-export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>
+export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T> | AsyncIterableIterator<T>
 
 export function asyncIterator<T>(o: AsyncProvider<T>) {
-  if (isAsyncIterator(o)) return o;
   if (isAsyncIterable(o)) return o[Symbol.asyncIterator]();
+  if (isAsyncIterator(o)) return o;
   throw new Error("Not an async provider");
 }
 

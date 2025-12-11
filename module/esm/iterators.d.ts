@@ -27,7 +27,7 @@ export interface QueueIteratableIterator<T> extends AsyncIterableIterator<T>, As
 export interface AsyncExtraIterable<T> extends AsyncIterable<T>, AsyncIterableHelpers {
 }
 export declare function isAsyncIter<T = unknown>(o: any | AsyncIterable<T> | AsyncIterator<T>): o is AsyncIterable<T> | AsyncIterator<T>;
-export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T>;
+export type AsyncProvider<T> = AsyncIterator<T> | AsyncIterable<T> | AsyncIterableIterator<T>;
 export declare function asyncIterator<T>(o: AsyncProvider<T>): AsyncIterator<T, any, any>;
 type AsyncIterableHelpers = typeof asyncExtras;
 export declare const asyncExtras: {
