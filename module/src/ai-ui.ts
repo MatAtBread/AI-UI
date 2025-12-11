@@ -965,7 +965,11 @@ function mutationTracker(root: Node) {
   }).observe(root, { subtree: true, childList: true });
 
   return {
-    has(e:Node) { return tracked.has(e) },
+    has(e:Node) {
+      return !tracked.has(e) ? false
+      : e.isConnected ? (tracked.delete(e), false)
+      : true;
+    },
     add(e:Node) { return tracked.add(e) },
     getRemovalHandler(e: Node, name: Symbol) {
       return removals.get(e)?.get(name);

@@ -839,7 +839,11 @@ function mutationTracker(root) {
         });
     }).observe(root, { subtree: true, childList: true });
     return {
-        has(e) { return tracked.has(e); },
+        has(e) {
+            return !tracked.has(e) ? false
+                : e.isConnected ? (tracked.delete(e), false)
+                    : true;
+        },
         add(e) { return tracked.add(e); },
         getRemovalHandler(e, name) {
             return removals.get(e)?.get(name);
