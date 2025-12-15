@@ -51,7 +51,7 @@
     "bundle-dev-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.cjs --bundle --target=es2020 --sourcemap=inline",
     "bundle-min-cjs": "esbuild src/ai-ui.ts --format=cjs --outfile=dist/ai-ui.min.cjs --bundle --target=es2020 --minify",
     "bundle-jsx": "esbuild src/jsx-runtime.ts --outfile=esm/jsx-runtime --platform=neutral --target=es2020 && cp esm/jsx-runtime dist/jsx-runtime",
-    "prepublishOnly": "npm run build && npm test",
+    "prepublishOnly": "npm run build && npm test && npm login",
     "test": "tsc -p ../type_tests/tsconfig.json && npm run tests --",
     "tests": "ts-node ../testing/index.ts",
     "examples": "npx http-server .. -c0 -e js",
