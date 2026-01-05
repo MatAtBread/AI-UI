@@ -7,7 +7,7 @@ import type { UniqueID } from "./ai-ui.js";
 
 export type ChildTags = Node // Things that are DOM nodes (including elements)
   | number | string | boolean // Things that can be converted to text nodes via toString
-  | undefined // A value that won't generate an element
+  | undefined | void // A value that won't generate an element
   | typeof Ignore // A value that won't generate an element
   // NB: we can't check the contained type at runtime, so we have to be liberal
   // and wait for the de-containment to fail if it turns out to not be a `ChildTags`
