@@ -1,4 +1,4 @@
-import { ChildTags, tag, TagCreatorFunction, CreateElement } from "./ai-ui.js"
+import { ChildTags, tag } from "./ai-ui.js"
 
 /* Support for React.createElement(type, props, ...children) */
 const baseTags = tag();

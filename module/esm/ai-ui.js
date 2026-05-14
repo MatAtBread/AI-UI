@@ -1,5 +1,5 @@
 import { isPromiseLike } from './deferred.js';
-import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter, isAsyncIterator } from './iterators.js';
+import { Ignore, asyncIterator, defineIterableProperty, isAsyncIter } from './iterators.js';
 import { when } from './when.js';
 import { DEBUG, console, timeOutWarn } from './debug.js';
 import { callStackSymbol } from './tags.js';
@@ -96,8 +96,8 @@ export const tag = function (_1, _2, _3) {
             ...Object.getOwnPropertyDescriptor(Element.prototype, 'attributes'),
             set(a) {
                 if (isAsyncIter(a)) {
-                    const ai = isAsyncIterator(a) ? a : a[Symbol.asyncIterator]();
-                    const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }, ex => console.warn(ex));
+                    const ai = asyncIterator(a);
+                    const step = () => ai.next().then(({ done, value }) => { assignProps(this, value); done || step(); }).catch(ex => console.warn(ex));
                     step();
                 }
                 else
@@ -245,7 +245,7 @@ export const tag = function (_1, _2, _3) {
             }
             if (isAsyncIter(c)) {
                 const insertionStack = DEBUG ? ('\n' + new Error().stack?.replace(/^Error: /, "Insertion :")) : '';
-                let ap = isAsyncIterator(c) ? c : c[Symbol.asyncIterator]();
+                let ap = asyncIterator(c);
                 let notYetMounted = true;
                 const terminateSource = (force = false) => {
                     if (!ap || !replacement.nodes)
@@ -839,7 +839,11 @@ function mutationTracker(root) {
         });
     }).observe(root, { subtree: true, childList: true });
     return {
-        has(e) { return tracked.has(e); },
+        has(e) {
+            return !tracked.has(e) ? false
+                : e.isConnected ? (tracked.delete(e), false)
+                    : true;
+        },
         add(e) { return tracked.add(e); },
         getRemovalHandler(e, name) {
             return removals.get(e)?.get(name);

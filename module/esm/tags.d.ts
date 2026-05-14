@@ -1,6 +1,6 @@
 import type { AsyncProvider, Ignore, IterableProperties, IterablePropertyPrimitive, IterablePropertyValue, IterableType } from "./iterators.js";
 import type { UniqueID } from "./ai-ui.js";
-export type ChildTags = Node | number | string | boolean | undefined | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
+export type ChildTags = Node | number | string | boolean | undefined | void | typeof Ignore | AsyncIterable<ChildTags> | AsyncIterator<ChildTags> | PromiseLike<ChildTags> | Array<ChildTags> | Iterable<ChildTags>;
 type DeepPartial<X> = [X] extends [{}] ? {
     [K in keyof X]?: DeepPartial<X[K]>;
 } : X;

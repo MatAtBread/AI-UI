@@ -106,7 +106,7 @@ const AppInstance = div.extended({
       add = AddItem(),
       todo = div(
         add.item.map!(newItem => [
-          todo.children,
+          todo.childNodes,
           ToDoItem(newItem)
         ])
       )
